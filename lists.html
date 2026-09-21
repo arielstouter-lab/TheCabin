@@ -96,6 +96,13 @@
 
         function sortItems(items){
             const cmp = (a,b) => {
+                if(a.sort_order != null && b.sort_order != null){
+                    if(a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+                } else if(a.sort_order != null){
+                    return -1;
+                } else if(b.sort_order != null){
+                    return 1;
+                }
                 if(a.priority !== b.priority) return a.priority ? -1 : 1;
                 if(a.due_date && b.due_date) return a.due_date < b.due_date ? -1 : (a.due_date > b.due_date ? 1 : 0);
                 if(a.due_date && !b.due_date) return -1;
@@ -291,14 +298,15 @@
         function renderStandardPanel(sec){
             const peopleOptions = people.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
             const items = sortItems(itemsBySection[sec.id] || []);
-            const itemsHtml = items.length ? items.map(item => {
+            const itemsHtml = items.length ? items.map((item, index) => {
                 const chips = [];
                 if(item.priority) chips.push(`<span class="lst-chip priority-chip">High priority</span>`);
                 if(item.assigned_to && personName(item.assigned_to)) chips.push(`<span class="lst-chip">${escapeHtml(personName(item.assigned_to))}</span>`);
                 if(item.due_date) chips.push(`<span class="lst-chip ${dueClass(item.due_date)}">${item.due_date}</span>`);
                 return `
-          <div class="lst-item ${item.priority ? 'priority' : ''} ${item.checked ? 'checked' : ''}" data-item-row="${item.id}">
+          <div class="lst-item draggable-item ${item.priority ? 'priority' : ''} ${item.checked ? 'checked' : ''}" ${!item.checked ? 'draggable="true"' : ''} data-index="${index}" data-item-row="${item.id}">
             <div class="lst-item-top">
+              ${!item.checked ? '<span class="drag-handle" title="Drag to reorder">⋮⋮</span>' : ''}
               <label class="lst-check-label">
                 <input type="checkbox" data-toggle-check="${item.id}" ${item.checked ? 'checked' : ''} />
                 <span class="lst-item-text">${escapeHtml(item.text)}</span>
@@ -328,6 +336,42 @@
             <button class="button-inline" data-add-item="${sec.id}">Add</button>
           </div>
         </div>`;
+        }
+
+        async function reorderItems(sectionId, fromIndex, toIndex){
+            if(isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
+
+            const allItems = sortItems(itemsBySection[sectionId] || []);
+            const unchecked = allItems.filter(i => !i.checked);
+            const checked = allItems.filter(i => i.checked);
+
+            if(fromIndex >= unchecked.length) return;
+            const [moved] = unchecked.splice(fromIndex, 1);
+            if(!moved) return;
+
+            const targetIndex = Math.min(toIndex, unchecked.length);
+            unchecked.splice(targetIndex, 0, moved);
+
+            unchecked.forEach((item, idx) => {
+                item.sort_order = idx + 1;
+            });
+            checked.forEach((item, idx) => {
+                item.sort_order = unchecked.length + idx + 1;
+            });
+
+            itemsBySection[sectionId] = [...unchecked, ...checked];
+            render();
+
+            try {
+                const updates = [...unchecked, ...checked].map(item =>
+                    sb.from('household_list_items')
+                        .update({ sort_order: item.sort_order })
+                        .eq('id', item.id)
+                );
+                await Promise.all(updates);
+            } catch (err) {
+                console.error('Failed to save item order:', err);
+            }
         }
 
         function render(){
@@ -434,14 +478,27 @@
                 const due_date = dueInput.value || null;
                 const priority = priorityInput.checked;
 
+                const existing = itemsBySection[sectionId] || [];
+                const maxSort = existing.reduce((max, i) => Math.max(max, i.sort_order || 0), 0);
+
                 try{
                     const {data, error} = await sb.from('household_list_items')
-                        .insert({section_id: sectionId, text, assigned_to, due_date, priority, checked: false})
+                        .insert({section_id: sectionId, text, assigned_to, due_date, priority, checked: false, sort_order: maxSort + 1})
                         .select()
                         .single();
-                    if(error || !data){ setStatus('Could not add item.'); return; }
-                    itemsBySection[sectionId] = itemsBySection[sectionId] || [];
-                    itemsBySection[sectionId].push(data);
+                    if(error || !data){
+                        const {data: fbData, error: fbErr} = await sb.from('household_list_items')
+                            .insert({section_id: sectionId, text, assigned_to, due_date, priority, checked: false})
+                            .select()
+                            .single();
+                        if(fbErr || !fbData){ setStatus('Could not add item.'); return; }
+                        fbData.sort_order = maxSort + 1;
+                        itemsBySection[sectionId] = itemsBySection[sectionId] || [];
+                        itemsBySection[sectionId].push(fbData);
+                    } else {
+                        itemsBySection[sectionId] = itemsBySection[sectionId] || [];
+                        itemsBySection[sectionId].push(data);
+                    }
                     render();
                     const nextInput = document.querySelector(`[data-new-item-text="${sectionId}"]`);
                     if(nextInput) nextInput.focus();
@@ -580,6 +637,18 @@
                 e.preventDefault();
                 const btn = document.querySelector('[data-add-pantry-item]');
                 if(btn) btn.click();
+            }
+        });
+
+        const panelEl = document.getElementById('lst-panel');
+
+        initDragAndDrop(panelEl, {
+            canDrag: (el) => !el.classList.contains('checked'),
+            onReorder: (fromIndex, toIndex) => {
+                const sec = sections.find(s => s.id === activeSectionId);
+                if(sec && !isPantry(sec) && !isRecipes(sec)){
+                    reorderItems(sec.id, fromIndex, toIndex);
+                }
             }
         });
 

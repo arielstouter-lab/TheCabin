@@ -698,6 +698,7 @@ input {
   scrollbar-width: thin; /* Hides bulky scrollbars on Firefox */
   border-bottom: 2px solid var(--line);
   padding-bottom: 4px;
+  margin-bottom: 20px;
 }
 
 .tab {
@@ -917,25 +918,8 @@ input {
   padding: 8px 10px;
   margin-bottom: 6px;
   font-size: 13.5px;
-  touch-action: pan-y;
 }
-.cal-event-handle {
-  cursor: grab;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-  color: var(--ink-soft);
-  font-size: 14px;
-  padding: 2px 4px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-.cal-event-handle:active { cursor: grabbing; }
 .cal-event-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.cal-event.cal-dragging { opacity: 0.4; background: var(--card); }
-.cal-event.cal-drag-over { border-color: var(--primary); background: var(--card); box-shadow: 0 0 0 1px var(--primary); }
 
 /* ==========================================
    Calendar page — seasonal background fade
@@ -1058,8 +1042,44 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .cl-note { font-size: 11.5px; color: var(--ink-soft); margin-top: 16px; line-height: 1.5; }
 
 /* ==========================================
+   Shared Drag & Drop Styles
+   ========================================== */
+.drag-handle {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+  padding: 1px 4px 0 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.draggable-item {
+  touch-action: pan-y;
+}
+
+.draggable-item.is-dragging {
+  opacity: 0.4;
+  background: var(--card);
+}
+
+.draggable-item.is-drag-over {
+  border-color: var(--primary);
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+/* ==========================================
    Lists page
-========================================== */
+   ========================================== */
 .lst-sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
 
 .lst-items { padding: 10px 14px 4px; flex: 1; }
@@ -1067,6 +1087,19 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .lst-item {
   border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
   padding: 9px 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 5px;
+}
+
+.lst-check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.lst-check-label input[type="checkbox"] {
+  margin-top: 2px;
+  cursor: pointer;
 }
 
 /* Align entire pantry item on a single line */

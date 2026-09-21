@@ -225,8 +225,8 @@
             const evs = eventsByDate[selectedDate] || [];
             list.innerHTML = evs.length
                 ? evs.map((ev, index) => `
-          <div class="cal-event" draggable="true" data-index="${index}" data-event-row="${ev.id}">
-            <span class="cal-event-handle" title="Drag to reorder">⋮⋮</span>
+          <div class="cal-event draggable-item" draggable="true" data-index="${index}" data-event-row="${ev.id}">
+            <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
             <span class="cal-event-title">${escapeHtml(ev.title)}</span>
             <button class="icon-delete" data-del-event="${ev.id}" title="Remove">✕</button>
           </div>`).join('')
@@ -296,109 +296,8 @@
             }
         }
 
-        // Desktop HTML5 drag and drop
-        eventsContainer.addEventListener('dragstart', (e) => {
-            const item = e.target.closest('.cal-event');
-            if (!item) return;
-            item.classList.add('cal-dragging');
-            e.dataTransfer.setData('text/plain', item.dataset.index);
-        });
-
-        eventsContainer.addEventListener('dragend', (e) => {
-            const item = e.target.closest('.cal-event');
-            if (item) item.classList.remove('cal-dragging');
-            eventsContainer.querySelectorAll('.cal-event').forEach(el => el.classList.remove('cal-drag-over'));
-        });
-
-        eventsContainer.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const overItem = e.target.closest('.cal-event');
-            eventsContainer.querySelectorAll('.cal-event').forEach(el => {
-                if (el === overItem && !el.classList.contains('cal-dragging')) {
-                    el.classList.add('cal-drag-over');
-                } else {
-                    el.classList.remove('cal-drag-over');
-                }
-            });
-        });
-
-        eventsContainer.addEventListener('dragleave', (e) => {
-            const overItem = e.target.closest('.cal-event');
-            if (overItem) overItem.classList.remove('cal-drag-over');
-        });
-
-        eventsContainer.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            eventsContainer.querySelectorAll('.cal-event').forEach(el => {
-                el.classList.remove('cal-dragging');
-                el.classList.remove('cal-drag-over');
-            });
-            const fromIndex = Number(e.dataTransfer.getData('text/plain'));
-            const targetItem = e.target.closest('.cal-event');
-            if (!targetItem) return;
-            const toIndex = Number(targetItem.dataset.index);
-            reorderEvents(fromIndex, toIndex);
-        });
-
-        // Mobile touch drag and drop
-        let touchDragItem = null;
-        let touchFromIndex = null;
-        let touchCurrentOverItem = null;
-
-        eventsContainer.addEventListener('touchstart', (e) => {
-            if (e.target.closest('.icon-delete')) return;
-            const handle = e.target.closest('.cal-event-handle');
-            if (!handle) return;
-            const item = handle.closest('.cal-event');
-            if (!item) return;
-
-            touchDragItem = item;
-            touchFromIndex = Number(item.dataset.index);
-            touchCurrentOverItem = null;
-            item.classList.add('cal-dragging');
-        }, { passive: true });
-
-        eventsContainer.addEventListener('touchmove', (e) => {
-            if (!touchDragItem) return;
-            const touch = e.touches[0];
-            const target = document.elementFromPoint(touch.clientX, touch.clientY);
-            const overItem = target ? target.closest('.cal-event') : null;
-
-            if (overItem && overItem !== touchDragItem && eventsContainer.contains(overItem)) {
-                if (touchCurrentOverItem && touchCurrentOverItem !== overItem) {
-                    touchCurrentOverItem.classList.remove('cal-drag-over');
-                }
-                touchCurrentOverItem = overItem;
-                overItem.classList.add('cal-drag-over');
-            } else if (!overItem && touchCurrentOverItem) {
-                touchCurrentOverItem.classList.remove('cal-drag-over');
-                touchCurrentOverItem = null;
-            }
-
-            if (e.cancelable) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-
-        eventsContainer.addEventListener('touchend', () => {
-            if (!touchDragItem) return;
-            touchDragItem.classList.remove('cal-dragging');
-            if (touchCurrentOverItem) {
-                touchCurrentOverItem.classList.remove('cal-drag-over');
-                const toIndex = Number(touchCurrentOverItem.dataset.index);
-                reorderEvents(touchFromIndex, toIndex);
-            }
-            touchDragItem = null;
-            touchFromIndex = null;
-            touchCurrentOverItem = null;
-        });
-
-        eventsContainer.addEventListener('touchcancel', () => {
-            if (touchDragItem) touchDragItem.classList.remove('cal-dragging');
-            if (touchCurrentOverItem) touchCurrentOverItem.classList.remove('cal-drag-over');
-            touchDragItem = null;
-            touchFromIndex = null;
-            touchCurrentOverItem = null;
+        initDragAndDrop(eventsContainer, {
+            onReorder: (fromIndex, toIndex) => reorderEvents(fromIndex, toIndex)
         });
 
         document.getElementById('cal-add-event').addEventListener('click', async () => {

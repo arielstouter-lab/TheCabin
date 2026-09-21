@@ -219,3 +219,135 @@ function getFriendlyAuthError(error) {
       return error.message || "Unable to sign in.";
   }
 }
+
+/* -----------------------------
+   Shared Drag & Drop
+----------------------------- */
+
+/**
+ * Generic Drag and Drop Reordering Helper (Desktop + Mobile Touch)
+ * @param {HTMLElement} container - The list/panel container element
+ * @param {Object} options
+ * @param {string} [options.itemSelector='.draggable-item'] - Selector for draggable rows
+ * @param {string} [options.handleSelector='.drag-handle'] - Selector for the drag handle
+ * @param {Function} options.onReorder - Callback (fromIndex, toIndex) => void
+ * @param {Function} [options.canDrag] - Optional validator (itemEl) => boolean
+ */
+function initDragAndDrop(container, {
+  itemSelector = '.draggable-item',
+  handleSelector = '.drag-handle',
+  onReorder,
+  canDrag = () => true
+}) {
+  if (!container) return;
+
+  // --- Desktop HTML5 Drag & Drop ---
+  container.addEventListener('dragstart', (e) => {
+    const item = e.target.closest(itemSelector);
+    if (!item || !canDrag(item)) return;
+    item.classList.add('is-dragging');
+    e.dataTransfer.setData('text/plain', item.dataset.index);
+  });
+
+  container.addEventListener('dragend', (e) => {
+    const item = e.target.closest(itemSelector);
+    if (item) item.classList.remove('is-dragging');
+    container.querySelectorAll(itemSelector).forEach(el => el.classList.remove('is-drag-over'));
+  });
+
+  container.addEventListener('dragover', (e) => {
+    const overItem = e.target.closest(itemSelector);
+    if (!overItem || !canDrag(overItem)) return;
+    e.preventDefault();
+    container.querySelectorAll(itemSelector).forEach(el => {
+      if (el === overItem && !el.classList.contains('is-dragging')) {
+        el.classList.add('is-drag-over');
+      } else {
+        el.classList.remove('is-drag-over');
+      }
+    });
+  });
+
+  container.addEventListener('dragleave', (e) => {
+    const overItem = e.target.closest(itemSelector);
+    if (overItem) overItem.classList.remove('is-drag-over');
+  });
+
+  container.addEventListener('drop', (e) => {
+    e.preventDefault();
+    container.querySelectorAll(itemSelector).forEach(el => {
+      el.classList.remove('is-dragging', 'is-drag-over');
+    });
+    const fromIndexStr = e.dataTransfer.getData('text/plain');
+    if (!fromIndexStr) return;
+    const fromIndex = Number(fromIndexStr);
+    const targetItem = e.target.closest(itemSelector);
+    if (!targetItem || !canDrag(targetItem)) return;
+    const toIndex = Number(targetItem.dataset.index);
+
+    if (!isNaN(fromIndex) && !isNaN(toIndex) && fromIndex !== toIndex) {
+      onReorder(fromIndex, toIndex);
+    }
+  });
+
+  // --- Mobile Touch Drag & Drop ---
+  let touchDragItem = null;
+  let touchFromIndex = null;
+  let touchCurrentOverItem = null;
+
+  container.addEventListener('touchstart', (e) => {
+    if (e.target.closest('button, input, select, textarea, .icon-delete')) return;
+    const handle = e.target.closest(handleSelector);
+    if (!handle) return;
+    const item = handle.closest(itemSelector);
+    if (!item || !canDrag(item)) return;
+
+    touchDragItem = item;
+    touchFromIndex = Number(item.dataset.index);
+    touchCurrentOverItem = null;
+    item.classList.add('is-dragging');
+  }, { passive: true });
+
+  container.addEventListener('touchmove', (e) => {
+    if (!touchDragItem) return;
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const overItem = target ? target.closest(itemSelector) : null;
+
+    if (overItem && overItem !== touchDragItem && container.contains(overItem) && canDrag(overItem)) {
+      if (touchCurrentOverItem && touchCurrentOverItem !== overItem) {
+        touchCurrentOverItem.classList.remove('is-drag-over');
+      }
+      touchCurrentOverItem = overItem;
+      overItem.classList.add('is-drag-over');
+    } else if (!overItem && touchCurrentOverItem) {
+      touchCurrentOverItem.classList.remove('is-drag-over');
+      touchCurrentOverItem = null;
+    }
+
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+
+  container.addEventListener('touchend', () => {
+    if (!touchDragItem) return;
+    touchDragItem.classList.remove('is-dragging');
+    if (touchCurrentOverItem) {
+      touchCurrentOverItem.classList.remove('is-drag-over');
+      const toIndex = Number(touchCurrentOverItem.dataset.index);
+      if (!isNaN(touchFromIndex) && !isNaN(toIndex) && touchFromIndex !== toIndex) {
+        onReorder(touchFromIndex, toIndex);
+      }
+    }
+    touchDragItem = null;
+    touchFromIndex = null;
+    touchCurrentOverItem = null;
+  });
+
+  container.addEventListener('touchcancel', () => {
+    if (touchDragItem) touchDragItem.classList.remove('is-dragging');
+    if (touchCurrentOverItem) touchCurrentOverItem.classList.remove('is-drag-over');
+    touchDragItem = null;
+    touchFromIndex = null;
+    touchCurrentOverItem = null;
+  });
+}
