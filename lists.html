@@ -161,7 +161,7 @@
             tabsEl.innerHTML = orderedSections().map(sec => {
                 const active = sec.id === activeSectionId ? 'active' : '';
                 const closeBtn = isPermanent(sec) ? '' :
-                    `<button class="button-primary" data-del-section="${sec.id}" title="Remove tab">✕</button>`;
+                    `<button class="tab active" type="button" data-del-section="${sec.id}" title="Remove tab">✕</button>`;
                 return `
           <div class="tab ${active}" data-select-tab="${sec.id}">
             <span>${escapeHtml(sec.name)}</span>
