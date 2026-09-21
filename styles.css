@@ -1090,6 +1090,21 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   flex-shrink: 0;
 }
 
+/* Completed item state */
+.lst-item.checked {
+  opacity: 0.6;
+}
+
+.lst-item.checked .lst-item-text {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+/* Dim chip badges on completed items */
+.lst-item.checked .lst-chip {
+  opacity: 0.7;
+}
+
 .lst-item.priority { border-color: var(--danger); background: #fbf1ee; }
 .lst-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .lst-item-text { font-size: 13.5px; color: var(--ink); word-break: break-word; }

@@ -443,6 +443,8 @@
                     itemsBySection[sectionId] = itemsBySection[sectionId] || [];
                     itemsBySection[sectionId].push(data);
                     render();
+                    const nextInput = document.querySelector(`[data-new-item-text="${sectionId}"]`);
+                    if(nextInput) nextInput.focus();
                 } catch(e){
                     setStatus('Could not add item.');
                 }
@@ -466,6 +468,8 @@
                     itemsBySection[sectionId] = itemsBySection[sectionId] || [];
                     itemsBySection[sectionId].push(data);
                     render();
+                    const nextInput = document.getElementById('lst-pantry-new-text');
+                    if(nextInput) nextInput.focus();
                 } catch(e){
                     setStatus('Could not add pantry item.');
                 }
@@ -567,10 +571,13 @@
 
         document.getElementById('lst-panel').addEventListener('keydown', (e) => {
             if(e.key === 'Enter' && e.target.matches('[data-new-item-text]')){
+                e.preventDefault();
                 const sectionId = e.target.getAttribute('data-new-item-text');
-                document.querySelector(`[data-add-item="${sectionId}"]`).click();
+                const btn = document.querySelector(`[data-add-item="${sectionId}"]`);
+                if(btn) btn.click();
             }
             if(e.key === 'Enter' && e.target.id === 'lst-pantry-new-text'){
+                e.preventDefault();
                 const btn = document.querySelector('[data-add-pantry-item]');
                 if(btn) btn.click();
             }
