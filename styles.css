@@ -979,6 +979,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .lst-item-row {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
