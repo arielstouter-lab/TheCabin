@@ -125,7 +125,7 @@
 
         async function loadAll(){
             try{
-                const [{data: peopleData}, {data: sectionData}, {data: itemData}] = await Promise.all([
+                const [{data: peopleData}, {data: sectionData}, {data: itemData}, {data: recipeData}] = await Promise.all([
                     sb.from('household_people').select('*').order('created_at'),
                     sb.from('household_list_sections').select('*').order('created_at'),
                     sb.from('household_list_items').select('*').order('created_at'),
@@ -133,6 +133,7 @@
                 ]);
                 people = peopleData || [];
                 sections = sectionData || [];
+                recipes = recipeData || [];
                 itemsBySection = {};
                 (itemData || []).forEach(item => {
                     itemsBySection[item.section_id] = itemsBySection[item.section_id] || [];
@@ -141,7 +142,7 @@
                 await ensurePermanentSections();
             } catch(e){
                 setStatus('Could not load lists.');
-                sections = []; itemsBySection = {}; people = [];
+                sections = []; itemsBySection = {}; people = []; recipes = [];
             }
 
             if(!activeSectionId || !sections.find(s => s.id === activeSectionId)){
@@ -251,17 +252,17 @@
             const filtered = recipes.filter(r => {
                 if(!q) return true;
                 const nameMatch = (r.name || '').toLowerCase().includes(q);
-                const ings = Array.isArray(r.ingredients) ? r.ingredients : [];
-                const ingMatch = ings.some(ing => ing.toLowerCase().includes(q));
-                return nameMatch || ingMatch;
+                const ingredients = Array.isArray(r.ingredients) ? r.ingredients : [];
+                const ingredientMatch = ingredients.some(ing => ing.toLowerCase().includes(q));
+                return nameMatch || ingredientMatch;
             });
 
             const recipesHtml = filtered.length ? filtered.map(recipe => {
-                const ings = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
-                const ingsHtml = ings.length ? ings.map(ing => `
+                const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+                const ingredientsHtml = ingredients.length ? ingredients.map(ingredients => `
                   <div class="lst-item-row" style="padding: 4px 0; border-top: 1px solid var(--line);">
-                    <span class="lst-item-text">${escapeHtml(ing)}</span>
-                    <button type="button" class="button-inline" data-add-recipe-ingredient="${escapeHtml(ing)}">Add to groceries</button>
+                    <span class="lst-item-text">${escapeHtml(ingredients)}</span>
+                    <button type="button" class="button-inline" data-add-recipe-ingredient="${escapeHtml(ingredients)}">Add to groceries</button>
                   </div>
         `).join('') : '<p class="empty-state" style="padding: 4px 0; font-size: 12px;">No ingredients listed.</p>';
 
@@ -272,7 +273,7 @@
                       <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add all to groceries</button>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 4px;">
-                      ${ingsHtml}
+                      ${ingredientsHtml}
                     </div>
                   </div>`;
             }).join('') : `<p class="empty-state">${recipeSearchQuery ? 'No recipes match your search.' : 'No recipes found.'}</p>`;
