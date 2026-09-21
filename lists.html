@@ -157,7 +157,7 @@
         }
 
         function renderTabs(){
-            const tabsEl = document.getElementById('tab');
+            const tabsEl = document.getElementById('lst-tabs');
             tabsEl.innerHTML = orderedSections().map(sec => {
                 const active = sec.id === activeSectionId ? 'active' : '';
                 const closeBtn = isPermanent(sec) ? '' :
