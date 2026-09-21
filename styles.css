@@ -987,7 +987,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 
 .lst-item-row .lst-item-text {
   flex: 1;
-  min-width: 0;
+  min-width: 20px;
 }
 
 .lst-actions {
