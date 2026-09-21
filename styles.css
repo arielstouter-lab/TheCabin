@@ -700,27 +700,57 @@ input {
 }
 
 .tab {
-  flex: 0 0 auto; /* Prevents tabs from shrinking or stretching awkwardly */
-  padding: 10px 16px;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-family: inherit;
+  font-size: 13.5px;
   font-weight: 500;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -6px; /* Aligns active border with container bottom */
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-bottom: none; /* Flat bottom edge */
+  border-radius: 10px 10px 0 0; /* Rounded top corners: TL TR BR BL */
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  bottom: -1px; /* Sits over the container's bottom border */
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .tab:hover {
-  color: var(--primary-hover);
+  background: var(--card);
+  color: var(--ink);
 }
 
 .tab.active {
+  background: var(--card); /* Matches the list panel background */
   color: var(--primary);
-  border-bottom-color: var(--border);
+  font-weight: 600;
+  border-color: var(--line);
+  border-bottom: 1px solid var(--card); /* Blends into the card below */
+  z-index: 2;
+}
+
+/* Tab delete button */
+.tab-del {
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 4px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-del:hover {
+  color: var(--danger);
+  background: rgba(166, 67, 47, 0.1);
 }
 
 /* =========================
