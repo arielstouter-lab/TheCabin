@@ -754,6 +754,9 @@ input {
   background: rgba(166, 67, 47, 0.1);
 }
 
+.subrow-label { font-size: 10.5px; color: var(--ink-soft); margin: 0 0 2px; text-transform: none; white-space: nowrap; }
+
+
 /* =========================
    Mobile
 ========================= */
@@ -1019,7 +1022,6 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .cl-pts-badge small { display: block; font-weight: 500; color: var(--ink-soft); font-size: 10px; }
 
 .cl-chore-fields { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.cl-subrow-label { font-size: 10.5px; color: var(--ink-soft); margin: 0 0 2px; text-transform: none; white-space: nowrap; }
 
 .cl-split-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .cl-split-total { font-size: 11px; color: var(--ink-soft); margin-left: 2px; }
