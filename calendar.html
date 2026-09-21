@@ -27,12 +27,12 @@
         </header>
 
         <section class="content">
-            <div class="cal-status" id="cal-status"></div>
+            <div class="status-line" id="status-line"></div>
 
             <div class="cal-grid-layout">
-                <div class="cal-panel">
-                    <div class="cal-panel-head">
-                        <h2 class="cal-panel-title">Month</h2>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Month</h2>
                         <div class="cal-nav">
                             <button class="cal-nav-btn" id="cal-prev">&lsaquo;</button>
                             <span class="cal-month-label" id="cal-month-label"></span>
@@ -47,15 +47,16 @@
                     <div class="cal-days" id="cal-days"></div>
                 </div>
 
-                <div class="cal-panel">
-                    <div class="cal-panel-head">
-                        <h2 class="cal-panel-title">Events</h2>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Events</h2>
                         <span class="cal-selected-label" id="cal-selected-label"></span>
                     </div>
                     <div class="cal-events" id="cal-events"></div>
                     <div class="cal-add-row">
+                        <label for="cal-new-event" class="visually-hidden">New event</label>
                         <input type="text" id="cal-new-event" placeholder="Add an event for this day" />
-                        <button class="cal-btn" id="cal-add-event">Add</button>
+                        <button class="button-inline" id="cal-add-event">Add</button>
                     </div>
                 </div>
             </div>
@@ -131,7 +132,7 @@
         }
 
         function setStatus(msg){
-            const el = document.getElementById('cal-status');
+            const el = document.getElementById('status-line');
             el.textContent = msg || '';
             if(msg) setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, 2200);
         }
@@ -156,7 +157,8 @@
                     eventsByDate[ev.event_date] = eventsByDate[ev.event_date] || [];
                     eventsByDate[ev.event_date].push({id: ev.id, title: ev.title, sort_order: ev.sort_order});
                 });
-            } catch(e){
+            } catch(err){
+                console.error('Failed to load events:', err);
                 setStatus('Could not load events.');
                 eventsByDate = {};
             }
@@ -289,6 +291,7 @@
                 const failed = results.find(r => r.error);
                 if (failed && failed.error) throw failed.error;
             } catch (err) {
+                console.error('Failed to save event order:', err);
                 setStatus('Could not save event order.');
             }
         }
@@ -377,7 +380,7 @@
             }
         }, { passive: false });
 
-        eventsContainer.addEventListener('touchend', (e) => {
+        eventsContainer.addEventListener('touchend', () => {
             if (!touchDragItem) return;
             touchDragItem.classList.remove('cal-dragging');
             if (touchCurrentOverItem) {

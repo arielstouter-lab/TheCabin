@@ -28,20 +28,21 @@
     </header>
 
     <section class="content">
-      <div class="cl-status" id="cl-status"></div>
+      <div class="status-line" id="status-line"></div>
 
-      <div class="full-width-box" id="cl-beam">
+      <div class="welcome-card" id="cl-beam">
         <p>Weekly points per person -- gold line markes the even split</p>
       </div>
 
       <div class="cl-grid">
-        <div class="cl-panel">
-          <div class="cl-panel-head">
-            <h2 class="cl-panel-title">Chores</h2>
-            <span class="cl-panel-sub">pts = ×/week &times; minutes &times; their dislike(1&ndash;10) &times; their share %</span>
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Chores</h2>
+            <span class="panel-sub">pts = ×/week &times; minutes &times; their dislike(1&ndash;10) &times; their share %</span>
           </div>
           <div class="cl-chore-list" id="cl-chore-list"></div>
           <div class="cl-add-row">
+            <label for="cl-new-chore-name" class="visually-hidden">New chore</label>
             <input type="text" id="cl-new-chore-name" placeholder="New chore, e.g. Vacuum living room" />
             <button class="button button-primary button-sm" id="cl-add-chore">Add</button>
           </div>
@@ -55,14 +56,15 @@
           </div>
         </div>
 
-        <div class="cl-panel">
-          <div class="cl-panel-head">
-            <h2 class="cl-panel-title">People</h2>
-            <span class="cl-panel-sub" id="cl-target-label"></span>
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">People</h2>
+            <span class="panel-sub" id="cl-target-label"></span>
           </div>
           <div class="cl-people" id="cl-people-list"></div>
           <div class="cl-panel-actions">
             <div class="cl-add-person">
+              <label for="cl-new-person-name" class="visually-hidden">New person</label>
               <input type="text" id="cl-new-person-name" placeholder="Add a person" />
               <button class="button button-primary button-sm" id="cl-add-person">Add</button>
             </div>
@@ -120,7 +122,7 @@
     }
 
     function setStatus(msg){
-      const el = document.getElementById('cl-status');
+      const el = document.getElementById('status-line');
       el.textContent = msg || '';
       if(msg) setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, 2200);
     }
@@ -271,14 +273,14 @@
         const targetPct = max > 0 ? (mean / max) * 100 : 0;
         const over = mean > 0 && t > mean * 1.15;
         html += `
-        <div class="cl-beam-row">
-          <div class="cl-beam-name">${escapeHtml(p.name)}</div>
-          <div class="cl-beam-track">
-            <div class="cl-beam-fill ${over ? 'over' : ''}" style="width:${widthPct}%;"></div>
-            <div class="cl-beam-target" style="left:${targetPct}%;"></div>
-          </div>
-          <div class="cl-beam-pts">${t}</div>
-        </div>`;
+          <div class="cl-beam-row">
+            <div class="cl-beam-name">${escapeHtml(p.name)}</div>
+            <div class="cl-beam-track">
+              <div class="cl-beam-fill ${over ? 'over' : ''}" style="--fill:${widthPct}%;"></div>
+              <div class="cl-beam-target" style="--target:${targetPct}%;"></div>
+            </div>
+            <div class="cl-beam-pts">${t}</div>
+          </div>`;
       });
       beam.innerHTML = html;
     }
@@ -286,7 +288,7 @@
     function renderChores(){
       const list = document.getElementById('cl-chore-list');
       if(state.chores.length === 0){
-        list.innerHTML = '<p class="cl-empty">No chores yet — add one below.</p>';
+        list.innerHTML = '<p class="empty-state">No chores yet — add one below.</p>';
         return;
       }
       list.innerHTML = state.chores.map(c => {
@@ -294,7 +296,7 @@
         const totalClass = total === 100 ? 'good' : (total === 0 ? '' : 'bad');
 
         const dislikeChips = state.people.map(p => `
-        <div class="chip chip-danger cl-dislike-chip" title="${escapeAttr(p.name)}'s dislike of this chore">
+        <div class="chip--w36 chip-danger" title="${escapeAttr(p.name)}'s dislike of this chore">
           <span>${escapeHtml(p.name)}</span>
           <input type="number" min="1" max="10" value="${dislikeOf(c, p.id)}" data-dislike-chore="${c.id}" data-dislike-person="${p.id}" />
         </div>`).join('');
@@ -302,7 +304,7 @@
         const splitChips = state.people.map(p => {
           const pct = (state.assignments[c.id] && state.assignments[c.id][p.id]) || 0;
           return `
-          <div class="chip cl-split-chip">
+          <div class="chip--w40">
             <span>${escapeHtml(p.name)}</span>
             <input type="number" min="0" max="100" value="${pct}" data-split-chore="${c.id}" data-split-person="${p.id}" />
             <span>%</span>
@@ -314,14 +316,14 @@
           <div class="cl-chore-top">
             <input type="text" value="${escapeAttr(c.name)}" data-field="name" data-chore="${c.id}" />
             <span class="cl-pts-badge" data-pts-badge="${c.id}">${choreTotalAtCurrentSplit(c)} pts/wk</span>
-            <button class="cl-del" data-del-chore="${c.id}" title="Remove chore">✕</button>
+            <button class="icon-delete" data-del-chore="${c.id}" title="Remove chore">✕</button>
           </div>
           <div class="cl-chip-groups">
             <div class="cl-chip-group">
               <div class="cl-subrow-label">frequency &amp; time</div>
               <div class="cl-chore-fields">
-                <label class="chip cl-field">×/week <input type="number" min="0" step="1" value="${c.timesPerWeek}" data-field="timesPerWeek" data-chore="${c.id}" /></label>
-                <label class="chip cl-field">min <input type="number" min="0" step="1" value="${c.minutes}" data-field="minutes" data-chore="${c.id}" /></label>
+                <label class="chip--w52">×/week <input type="number" min="0" step="1" value="${c.timesPerWeek}" data-field="timesPerWeek" data-chore="${c.id}" /></label>
+                <label class="chip--w52">min <input type="number" min="0" step="1" value="${c.minutes}" data-field="minutes" data-chore="${c.id}" /></label>
               </div>
             </div>
             <div class="cl-chip-group">
@@ -344,7 +346,7 @@
       const wrap = document.getElementById('cl-people-list');
       const totals = totalsByPerson();
       if(state.people.length === 0){
-        wrap.innerHTML = '<p class="cl-empty">No one on the ledger yet — add someone below.</p>';
+        wrap.innerHTML = '<p class="empty-state">No one on the ledger yet — add someone below.</p>';
         return;
       }
       wrap.innerHTML = state.people.map(p => {
@@ -359,7 +361,7 @@
                 <span class="cl-ticket-pts">${shareOf(c, p.id)}</span>
               </div>`;
                 }).join('')
-                : '<p class="cl-empty">No chores assigned yet.</p>';
+                : '<p class="empty-state">No chores assigned yet.</p>';
 
         return `
         <div class="cl-person">
