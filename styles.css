@@ -687,6 +687,43 @@ input {
 }
 
 /* =========================
+   Shared tabs system
+========================= */
+.tabs-container {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin; /* Hides bulky scrollbars on Firefox */
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 4px;
+}
+
+.tab {
+  flex: 0 0 auto; /* Prevents tabs from shrinking or stretching awkwardly */
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -6px; /* Aligns active border with container bottom */
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.tab:hover {
+  color: var(--primary-hover);
+}
+
+.tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--border);
+}
+
+/* =========================
    Mobile
 ========================= */
 
@@ -895,9 +932,9 @@ body.cal-page::before {
 body.cal-page.img-loaded::before { opacity: 1; }
 
 body.cal-page[data-season="spring"] { background-color: var(--primary-hover); }
-body.cal-page[data-season="summer"] { background-color: var(--ochre); }
-body.cal-page[data-season="fall"]   { background-color: var(--danger); }
-body.cal-page[data-season="winter"] { background-color: var(--ink); }
+body.cal-page[data-season="summer"] { background-color: var(--primary); }
+body.cal-page[data-season="fall"]   { background-color: var(--ink); }
+body.cal-page[data-season="winter"] { background-color: var(--card); }
 
 /* ==========================================
    Chores List page
