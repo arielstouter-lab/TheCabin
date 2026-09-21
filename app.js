@@ -221,6 +221,42 @@ function getFriendlyAuthError(error) {
 }
 
 /* -----------------------------
+   Shared UI Helpers
+----------------------------- */
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, m => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[m]));
+}
+
+function escapeAttr(str) {
+  return escapeHtml(str);
+}
+
+function setStatus(msg, targetId) {
+  const el = (targetId && document.getElementById(targetId)) ||
+             document.querySelector('.status-line') ||
+             document.getElementById('status-line') ||
+             document.getElementById('lst-status');
+  if (!el) return;
+  el.textContent = msg || '';
+  if (msg) {
+    setTimeout(() => {
+      if (el.textContent === msg) el.textContent = '';
+    }, 2200);
+  }
+}
+
+window.escapeHtml = escapeHtml;
+window.escapeAttr = escapeAttr;
+window.setStatus = setStatus;
+
+/* -----------------------------
    Shared Drag & Drop
 ----------------------------- */
 

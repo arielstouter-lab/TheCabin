@@ -16,7 +16,7 @@
 <div class="app-shell">
 
   <main class="main-content">
-    <a href="app.html" class="nav-item active">
+    <a href="app.html" class="brand-link">
       <div class="brand-mark"></div>
     </a>
 
@@ -43,8 +43,8 @@
           <div class="cl-chore-list" id="cl-chore-list"></div>
           <div class="add-row">
             <label for="cl-new-chore-name" class="visually-hidden">New chore</label>
-            <input type="text" id="cl-new-chore-name" placeholder="New chore, e.g. Vacuum living room" />
-            <button class="button button-primary button-sm" id="cl-add-chore">Add</button>
+            <input type="text" id="cl-new-chore-name" class="text-input" placeholder="New chore, e.g. Vacuum living room" />
+            <button class="button-inline" id="cl-add-chore">Add</button>
           </div>
           <div class="cl-panel-actions">
             <button type="button" id="cl-auto-balance" class="button button-primary">
@@ -63,10 +63,10 @@
           </div>
           <div class="cl-people" id="cl-people-list"></div>
           <div class="cl-panel-actions">
-            <div class="cl-add-person">
+            <div class="add-row" style="margin-bottom: 0; flex: 1;">
               <label for="cl-new-person-name" class="visually-hidden">New person</label>
-              <input type="text" id="cl-new-person-name" placeholder="Add a person" />
-              <button class="button button-primary button-sm" id="cl-add-person">Add</button>
+              <input type="text" id="cl-new-person-name" class="text-input" placeholder="Add a person" />
+              <button class="button-inline" id="cl-add-person">Add</button>
             </div>
           </div>
         </div>
@@ -119,12 +119,6 @@
     function splitTotal(choreId){
       const a = state.assignments[choreId] || {};
       return Object.values(a).reduce((s,v)=>s+(v||0),0);
-    }
-
-    function setStatus(msg){
-      const el = document.getElementById('status-line');
-      el.textContent = msg || '';
-      if(msg) setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, 2200);
     }
 
     async function load(){
@@ -298,7 +292,7 @@
         const totalClass = total === 100 ? 'good' : (total === 0 ? '' : 'bad');
 
         const dislikeChips = state.people.map(p => `
-        <div class="chip--w36 chip-danger" title="${escapeAttr(p.name)}'s dislike of this chore">
+        <div class="chip chip--w36 chip-danger" title="${escapeAttr(p.name)}'s dislike of this chore">
           <span>${escapeHtml(p.name)}</span>
           <input type="number" min="1" max="10" value="${dislikeOf(c, p.id)}" data-dislike-chore="${c.id}" data-dislike-person="${p.id}" />
         </div>`).join('');
@@ -306,7 +300,7 @@
         const splitChips = state.people.map(p => {
           const pct = (state.assignments[c.id] && state.assignments[c.id][p.id]) || 0;
           return `
-          <div class="chip--w40">
+          <div class="chip chip--w40">
             <span>${escapeHtml(p.name)}</span>
             <input type="number" min="0" max="100" value="${pct}" data-split-chore="${c.id}" data-split-person="${p.id}" />
             <span>%</span>
@@ -324,8 +318,8 @@
             <div class="cl-chip-group">
               <div class="subrow-label">frequency &amp; time</div>
               <div class="cl-chore-fields">
-                <label class="chip--w52">×/week <input type="number" min="0" step="1" value="${c.timesPerWeek}" data-field="timesPerWeek" data-chore="${c.id}" /></label>
-                <label class="chip--w52">min <input type="number" min="0" step="1" value="${c.minutes}" data-field="minutes" data-chore="${c.id}" /></label>
+                <label class="chip chip--w52">×/week <input type="number" min="0" step="1" value="${c.timesPerWeek}" data-field="timesPerWeek" data-chore="${c.id}" /></label>
+                <label class="chip chip--w52">min <input type="number" min="0" step="1" value="${c.minutes}" data-field="minutes" data-chore="${c.id}" /></label>
               </div>
             </div>
             <div class="cl-chip-group">
@@ -378,11 +372,6 @@
         </div>`;
       }).join('');
     }
-
-    function escapeHtml(s){
-      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    }
-    function escapeAttr(s){ return escapeHtml(s); }
 
     function refreshChoreBadge(choreId){
       const chore = state.chores.find(c => c.id === choreId);

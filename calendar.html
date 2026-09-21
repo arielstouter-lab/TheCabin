@@ -15,7 +15,7 @@
 <body class="app-page cal-page">
 <div class="app-shell">
     <main class="main-content">
-        <a href="app.html" class="nav-item active">
+        <a href="app.html" class="brand-link">
             <div class="brand-mark"></div>
         </a>
 
@@ -55,7 +55,7 @@
                     <div class="cal-events" id="cal-events"></div>
                     <div class="add-row">
                         <label for="cal-new-event" class="visually-hidden">New event</label>
-                        <input type="text" id="cal-new-event" placeholder="Add an event for this day" />
+                        <input type="text" id="cal-new-event" class="text-input" placeholder="Add an event for this day" />
                         <button class="button-inline" id="cal-add-event">Add</button>
                     </div>
                 </div>
@@ -129,16 +129,6 @@
         function todayStr(){
             const t = new Date();
             return toDateStr(t.getFullYear(), t.getMonth(), t.getDate());
-        }
-
-        function setStatus(msg){
-            const el = document.getElementById('status-line');
-            el.textContent = msg || '';
-            if(msg) setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, 2200);
-        }
-
-        function escapeHtml(s){
-            return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
         }
 
         async function loadMonth(){

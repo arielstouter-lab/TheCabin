@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
 </head>
@@ -15,7 +15,7 @@
 <body class="app-page">
 <div class="app-shell">
     <main class="main-content">
-        <a href="app.html" class="nav-item active">
+        <a href="app.html" class="brand-link">
             <div class="brand-mark"></div>
         </a>
 
@@ -55,16 +55,6 @@
         let activeSectionId = null;
         let recipes = [];
         let recipeSearchQuery = '';
-
-        function setStatus(msg){
-            const el = document.getElementById('lst-status');
-            el.textContent = msg || '';
-            if(msg) setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, 2200);
-        }
-
-        function escapeHtml(s){
-            return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-        }
 
         function todayStr(){
             const t = new Date();
