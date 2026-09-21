@@ -535,6 +535,8 @@ input {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .chip {
@@ -603,6 +605,8 @@ input {
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .panel-head {
@@ -859,7 +863,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   font-variant-numeric: tabular-nums; font-weight: 600; color: var(--primary); font-size: 14px;
 }
 
-.cl-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 22px; }
+.cl-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 22px; min-width: 0; }
 
 .cl-chore-list { padding: 10px 16px 6px; }
 .cl-chore-card { border-bottom: 1px solid var(--line); padding: 12px 0; }
@@ -891,23 +895,24 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .cl-people { padding: 6px 16px 16px; }
 .cl-person { margin-bottom: 18px; }
 .cl-person:last-child { margin-bottom: 0; }
-.cl-person-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cl-person-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+.cl-person-head > div:first-child { display: flex; align-items: center; flex: 1; min-width: 0; }
 .cl-person-name {
   font-weight: 700; font-size: 15px; border: none; background: transparent;
-  font-family: 'Fraunces', serif; color: var(--primary); width: 60%;
+  font-family: 'Fraunces', serif; color: var(--primary); flex: 1; min-width: 0; max-width: 180px;
   border-bottom: 1px dashed transparent; padding: 2px 0;
 }
 .cl-person-name:focus { outline: none; border-bottom: 1px dashed var(--primary); }
-.cl-person-total { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ochre); font-size: 14px; }
-.cl-person-remove { background: none; border: none; color: var(--ink-soft); cursor: pointer; font-size: 12px; margin-left: 6px; text-decoration: underline; padding: 0; }
+.cl-person-total { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ochre); font-size: 14px; flex-shrink: 0; white-space: nowrap; }
+.cl-person-remove { background: none; border: none; color: var(--ink-soft); cursor: pointer; font-size: 12px; margin-left: 6px; text-decoration: underline; padding: 0; flex-shrink: 0; }
 .cl-ticket {
   background: var(--paper); border: 1px solid var(--line);
   padding: 7px 10px; margin-bottom: 6px;
   display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px;
 }
-.cl-ticket-name { flex: 1; }
-.cl-ticket-share { color: var(--ink-soft); font-size: 11.5px; font-variant-numeric: tabular-nums; }
-.cl-ticket-pts { font-variant-numeric: tabular-nums; color: var(--ochre); font-weight: 600; font-size: 12.5px; }
+.cl-ticket-name { flex: 1; min-width: 0; overflow-wrap: break-word; word-break: break-word; }
+.cl-ticket-share { color: var(--ink-soft); font-size: 11.5px; font-variant-numeric: tabular-nums; flex-shrink: 0; white-space: nowrap; }
+.cl-ticket-pts { font-variant-numeric: tabular-nums; color: var(--ochre); font-weight: 600; font-size: 12.5px; flex-shrink: 0; }
 
 .cl-note { font-size: 11.5px; color: var(--ink-soft); margin-top: 16px; line-height: 1.5; }
 
@@ -1265,11 +1270,15 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   }
 
   .topbar {
-    padding: 20px;
+    padding: 16px;
   }
 
   .content {
-    padding: 20px;
+    padding: 16px 12px;
+  }
+
+  .welcome-card {
+    padding: 18px 14px;
   }
 
   .dashboard-grid {
@@ -1282,6 +1291,22 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 
   .cal-grid-layout,
   .cl-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .panel-head {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .panel-sub {
+    text-align: left;
+  }
+
+  .cl-panel-actions .button {
+    flex: 1 1 auto;
+    font-size: 13px;
+    padding: 0 12px;
   }
 }
