@@ -684,6 +684,7 @@ input {
 .add-row {
   display: flex;
   gap: 8px;
+  margin-bottom: 20px;
 }
 
 /* =========================
