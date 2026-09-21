@@ -22,7 +22,7 @@
         <header class="topbar">
             <div class="text-center">
                 <h1>Lists</h1>
-                <p>Groceries, pantry, errands, anything else — grouped into tabs.</p>
+                <p>Groceries, pantry, errands, etc.</p>
             </div>
         </header>
 
@@ -47,7 +47,7 @@
 <script>
     (function(){
         const sb = window.supabaseClient;
-        const PERMANENT_TABS = ['Groceries', 'Pantry'];
+        const PERMANENT_TABS = ['Groceries', 'Pantry', 'Recipes'];
 
         let sections = [];
         let itemsBySection = {};
@@ -77,13 +77,19 @@
             return sec && sec.name === 'Pantry';
         }
 
-        // Groceries + Pantry always come first, in that order; user tabs follow
+        function isRecipes(sec){
+            return sec && sec.name === 'Recipes';
+        }
+
+
+        // Groceries + Pantry + Recipes always come first, in that order; user tabs follow
         // in the order they were created.
         function orderedSections(){
             const groceries = sections.find(s => s.name === 'Groceries');
             const pantry = sections.find(s => s.name === 'Pantry');
-            const rest = sections.filter(s => s !== groceries && s !== pantry);
-            return [groceries, pantry, ...rest].filter(Boolean);
+            const recipes = sections.find(s => s.name === 'Recipes');
+            const rest = sections.filter(s => s !== groceries && s !== pantry && s !== recipes);
+            return [groceries, pantry, recipes, ...rest].filter(Boolean);
         }
 
         function sortItems(items){
@@ -200,6 +206,9 @@
             </div>`;
         }
 
+        function renderRecipesPanel(sec){
+        }
+
         function renderStandardPanel(sec){
             const peopleOptions = people.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
             const items = sortItems(itemsBySection[sec.id] || []);
@@ -250,7 +259,11 @@
                 panelEl.innerHTML = '<p class="empty-state">No tabs yet — add one above.</p>';
                 return;
             }
-            panelEl.innerHTML = isPantry(sec) ? renderPantryPanel(sec) : renderStandardPanel(sec);
+            panelEl.innerHTML = isPantry(sec)
+                ? renderPantryPanel(sec)
+                : isRecipes(sec)
+                    ? renderRecipesPanel(sec)
+                    : renderStandardPanel(sec);
         }
 
         document.getElementById('lst-add-section').addEventListener('click', async () => {
