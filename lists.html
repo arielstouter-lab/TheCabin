@@ -200,8 +200,11 @@
             <div class="lst-add-item">
               <input type="text" class="text-input" placeholder="Add a pantry item" id="lst-pantry-new-text" />
               <div class="lst-add-row2">
-                <label class="subrow-label" for="lst-pantry-new-qty">Qty</label>
-                <input type="number" min="1" step="1" value="1" id="lst-pantry-new-qty" style="width:56px;" />
+                <div class="stepper">
+                  <button type="button" class="stepper-btn" data-qty-down="new" title="Decrease quantity">−</button>
+                  <span class="stepper-val" id="lst-pantry-new-qty">1</span>
+                  <button type="button" class="stepper-btn" data-qty-up="new" title="Increase quantity">+</button>
+                </div>
                 <button class="button-inline" data-add-pantry-item="${sec.id}">Add</button>
               </div>
             </div>`;
@@ -267,7 +270,7 @@
                   <div class="lst-item" style="padding: 12px; margin-bottom: 12px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
                       <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--primary); font-family: 'Fraunces', serif;">${escapeHtml(recipe.name)}</h3>
-                      <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add all to groceries</button>
+                      <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 4px;">
                       ${ingredientsHtml}
@@ -319,7 +322,7 @@
               <option value="">Unassigned</option>
               ${peopleOptions}
             </select>
-            <input type="date" data-new-item-due="${sec.id}" />
+            <input type="date" placeholder="Date" data-new-item-due="${sec.id}" />
             <label class="lst-priority-toggle">
               <input type="checkbox" data-new-item-priority="${sec.id}" /> High priority
             </label>
@@ -504,7 +507,7 @@
                 const qtyInput = document.getElementById('lst-pantry-new-qty');
                 const text = textInput.value.trim();
                 if(!text) return;
-                const quantity = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+                const quantity = Math.max(1, parseInt(qtyInput ? (qtyInput.textContent || qtyInput.value) : 1, 10) || 1);
 
                 try{
                     const {data, error} = await sb.from('household_list_items')
@@ -526,6 +529,14 @@
             if(t.matches('[data-qty-up]') || t.matches('[data-qty-down]')){
                 const id = t.getAttribute('data-qty-up') || t.getAttribute('data-qty-down');
                 const delta = t.matches('[data-qty-up]') ? 1 : -1;
+                if(id === 'new'){
+                    const qtyEl = document.getElementById('lst-pantry-new-qty');
+                    if(qtyEl){
+                        const current = parseInt(qtyEl.textContent, 10) || 1;
+                        qtyEl.textContent = String(Math.max(1, current + delta));
+                    }
+                    return;
+                }
                 let updated = null;
                 Object.keys(itemsBySection).forEach(secId => {
                     itemsBySection[secId] = itemsBySection[secId].map(item => {

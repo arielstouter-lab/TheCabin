@@ -80,7 +80,6 @@ input {
 
 .brand {
   display: flex;
-  align-items: center;
   gap: 10px;
   margin-bottom: 36px;
 }
@@ -92,14 +91,21 @@ input {
 }
 
 .brand-mark {
-  width: 34px;
-  height: 34px;
+  width: 100%;
+  height: 100%;
   border-radius: 9px;
-  display: block;
   background-image: url('pinecone.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+/* Brand link for sub-page top brand navigation */
+.brand-link {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto;
 }
 
 .auth-header {
@@ -234,13 +240,6 @@ input {
 .button-inline:hover {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
-}
-
-/* Brand link for sub-page top brand navigation */
-.brand-link {
-  display: inline-block;
-  text-decoration: none;
-  line-height: 1;
 }
 
 /* Canonical small icon-only delete/remove button */
@@ -682,7 +681,7 @@ input {
   scrollbar-width: thin; /* Hides bulky scrollbars on Firefox */
   border-bottom: 2px solid var(--line);
   padding-bottom: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .tab {
