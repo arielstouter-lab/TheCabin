@@ -173,34 +173,31 @@
         function renderPantryPanel(sec){
             const items = [...(itemsBySection[sec.id] || [])].sort((a,b) => a.created_at < b.created_at ? -1 : 1);
             const itemsHtml = items.length ? items.map(item => `
-          <div class="lst-item lst-pantry-item" data-item-row="${item.id}">
-            <div class="lst-item-top">
-              <span class="lst-item-text">${escapeHtml(item.text)}</span>
-              <button class="icon-delete" data-del-item="${item.id}" title="Remove">✕</button>
-            </div>
-            <div class="lst-pantry-controls">
-              <div class="lst-qty-stepper">
-                <button class="lst-qty-btn" data-qty-down="${item.id}" title="Decrease quantity">−</button>
-                <span class="lst-qty-value">${item.quantity ?? 1}</span>
-                <button class="lst-qty-btn" data-qty-up="${item.id}" title="Increase quantity">+</button>
-              </div>
-              <button class="button-inline lst-add-to-groceries" data-add-to-groceries="${item.id}">Add to groceries</button>
-            </div>
-          </div>`).join('') : '<p class="empty-state">Nothing in the pantry yet.</p>';
-
+              <div class="lst-item lst-item-row" data-item-row="${item.id}">
+                <span class="lst-item-text">${escapeHtml(item.text)}</span>
+                <div class="lst-actions">
+                  <div class="stepper">
+                    <button type="button" class="stepper-btn" data-qty-down="${item.id}" title="Decrease quantity">−</button>
+                    <span class="stepper-val">${item.quantity ?? 1}</span>
+                    <button type="button" class="stepper-btn" data-qty-up="${item.id}" title="Increase quantity">+</button>
+                  </div>
+                  <button type="button" class="button-inline" data-add-to-groceries="${item.id}">Add to groceries</button>
+                  <button type="button" class="icon-delete" data-del-item="${item.id}" title="Remove">✕</button>
+                </div>
+              </div>`).join('') : '<p class="empty-state">Nothing in the pantry yet.</p>';
             return `
-        <div class="panel-head">
-          <h2 class="panel-title">${escapeHtml(sec.name)}</h2>
-        </div>
-        <div class="lst-items">${itemsHtml}</div>
-        <div class="lst-add-item">
-          <input type="text" class="text-input" placeholder="Add a pantry item" id="lst-pantry-new-text" />
-          <div class="lst-add-row2">
-            <label class="lst-subrow-label" for="lst-pantry-new-qty">Qty</label>
-            <input type="number" min="1" step="1" value="1" id="lst-pantry-new-qty" style="width:56px;" />
-            <button class="button-inline" data-add-pantry-item="${sec.id}">Add</button>
-          </div>
-        </div>`;
+            <div class="panel-head">
+              <h2 class="panel-title">${escapeHtml(sec.name)}</h2>
+            </div>
+            <div class="lst-items">${itemsHtml}</div>
+            <div class="lst-add-item">
+              <input type="text" class="text-input" placeholder="Add a pantry item" id="lst-pantry-new-text" />
+              <div class="lst-add-row2">
+                <label class="lst-subrow-label" for="lst-pantry-new-qty">Qty</label>
+                <input type="number" min="1" step="1" value="1" id="lst-pantry-new-qty" style="width:56px;" />
+                <button class="button-inline" data-add-pantry-item="${sec.id}">Add</button>
+              </div>
+            </div>`;
         }
 
         function renderStandardPanel(sec){

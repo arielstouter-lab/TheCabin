@@ -1065,6 +1065,28 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
   padding: 9px 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 5px;
 }
+
+/* Align entire pantry item on a single line */
+.lst-item-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lst-item-row .lst-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.lst-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .lst-item.priority { border-color: var(--danger); background: #fbf1ee; }
 .lst-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .lst-item-text { font-size: 13.5px; color: var(--ink); word-break: break-word; }
@@ -1087,6 +1109,41 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; cursor: pointer; user-select: none;
 }
 .lst-priority-toggle input { margin: 0; }
+
+/* Minimal inline stepper */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.stepper-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 8px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.stepper-btn:hover {
+  background: var(--paper);
+}
+
+.stepper-val {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 4px;
+  min-width: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 
 /* ==========================================
    Weather Card and page
