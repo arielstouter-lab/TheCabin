@@ -317,18 +317,18 @@
           <div class="cl-chip-groups">
             <div class="cl-chip-group">
               <div class="subrow-label">frequency &amp; time</div>
-              <div class="cl-chore-fields">
+              <div class="cl-chip-row">
                 <label class="chip chip--w52">×/week <input type="number" min="0" step="1" value="${c.timesPerWeek}" data-field="timesPerWeek" data-chore="${c.id}" /></label>
                 <label class="chip chip--w52">min <input type="number" min="0" step="1" value="${c.minutes}" data-field="minutes" data-chore="${c.id}" /></label>
               </div>
             </div>
             <div class="cl-chip-group">
               <div class="subrow-label">dislike (1&ndash;10), per person</div>
-              <div class="cl-dislike-row">${dislikeChips}</div>
+              <div class="cl-chip-row">${dislikeChips}</div>
             </div>
             <div class="cl-chip-group">
               <div class="subrow-label">share of the chore</div>
-              <div class="cl-split-row">
+              <div class="cl-chip-row">
                 ${splitChips}
                 <span class="cl-split-total ${totalClass}" data-split-total="${c.id}">${total}%</span>
               </div>

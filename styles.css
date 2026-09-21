@@ -11,6 +11,8 @@
   --ochre:#B8862E;
   --line:#C9C2A8;
   --accent:#37533F; /* dynamically overridden elsewhere (e.g. weather) — do not merge with --primary */
+  --weather-bg: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0d1420));
+  --font-serif: 'Fraunces', Georgia, serif;
   --radius: 12px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
 }
@@ -211,16 +213,12 @@ input {
   color: var(--paper);
 }
 
-.button-primary:hover:not(:disabled) {
-  background: var(--primary-hover);
-}
-
 .button-ghost {
   background: var(--paper);
   color: var(--primary);
 }
 
-.button-ghost:hover:not(:disabled) {
+.button:hover:not(:disabled) {
   background: var(--primary-hover);
 }
 
@@ -437,7 +435,7 @@ input {
 .topbar h1 {
   margin: 0 0 3px;
   font-size: 34px;
-  font-family: 'Fraunces', serif;
+  font-family: var(--font-serif), serif;
   letter-spacing: -0.3px;
 }
 
@@ -564,7 +562,8 @@ input {
   text-align: right;
 }
 
-.chip input[type=number]:focus {
+.chip input[type=number]:focus,
+.text-input:focus {
   outline: none;
   border-color: var(--primary);
 }
@@ -618,7 +617,7 @@ input {
 }
 
 .panel-title {
-  font-family: 'Fraunces', serif;
+  font-family: var(--font-serif), serif;
   font-weight: 600;
   font-size: 18px;
   margin: 0;
@@ -657,11 +656,6 @@ input {
   font-family: 'Inter', sans-serif;
   font-size: 13.5px;
   color: var(--ink);
-}
-
-.text-input:focus {
-  outline: none;
-  border-color: var(--primary);
 }
 
 .add-row {
@@ -838,7 +832,10 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 ========================================== */
 .cl-beam-label { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 12px; }
 .cl-beam-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.cl-beam-row:last-child { margin-bottom: 0; }
+.cl-beam-row:last-child,
+.cl-person:last-child {
+  margin-bottom: 0;
+}
 .cl-beam-name {
   width: 110px; flex: 0 0 auto; font-size: 14px; font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -872,7 +869,11 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   flex: 1; border: none; background: transparent; font-size: 14.5px; font-weight: 600; color: var(--ink);
   padding: 3px 2px; border-bottom: 1px dashed transparent; min-width: 0;
 }
-.cl-chore-top input[type=text]:focus { outline: none; border-bottom: 1px dashed var(--primary); }
+.cl-chore-top input[type=text]:focus,
+.cl-person-name:focus {
+  outline: none;
+  border-bottom: 1px dashed var(--primary);
+}
 
 .cl-pts-badge {
   margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ochre); font-size: 13.5px;
@@ -880,28 +881,22 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 }
 .cl-pts-badge small { display: block; font-weight: 500; color: var(--ink-soft); font-size: 10px; }
 
-.cl-chore-fields { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-
-.cl-split-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cl-chip-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .cl-split-total { font-size: 11px; color: var(--ink-soft); margin-left: 2px; }
 .cl-split-total.bad { color: var(--danger); font-weight: 600; }
 .cl-split-total.good { color: var(--primary); font-weight: 600; }
-
-.cl-dislike-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
 .cl-panel-actions { display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--line); flex-wrap: wrap; }
 
 .cl-people { padding: 6px 16px 16px; }
 .cl-person { margin-bottom: 18px; }
-.cl-person:last-child { margin-bottom: 0; }
 .cl-person-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
 .cl-person-head > div:first-child { display: flex; align-items: center; flex: 1; min-width: 0; }
 .cl-person-name {
   font-weight: 700; font-size: 15px; border: none; background: transparent;
-  font-family: 'Fraunces', serif; color: var(--primary); flex: 1; min-width: 0; max-width: 180px;
+  font-family: var(--font-serif), serif; color: var(--primary); flex: 1; min-width: 0; max-width: 180px;
   border-bottom: 1px dashed transparent; padding: 2px 0;
 }
-.cl-person-name:focus { outline: none; border-bottom: 1px dashed var(--primary); }
 .cl-person-total { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ochre); font-size: 14px; flex-shrink: 0; white-space: nowrap; }
 .cl-person-remove { background: none; border: none; color: var(--ink-soft); cursor: pointer; font-size: 12px; margin-left: 6px; text-decoration: underline; padding: 0; flex-shrink: 0; }
 .cl-ticket {
@@ -1080,7 +1075,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border-radius: 18px;
   padding: 28px 26px 22px;
   color: var(--paper);
-  background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0d1420));
+  background: var(--weather-bg);
   box-shadow: 0 18px 40px -18px rgba(20,25,35,0.45);
   overflow: hidden;
   transition: background 0.6s ease;
@@ -1110,7 +1105,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .wc-temp-row { position: relative; display: flex; align-items: baseline; gap: 6px; margin-top: 18px; }
 
 .wc-temp {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-family: var(--font-serif), serif;
   font-size: 64px;
   line-height: 1;
   font-weight: 500;
@@ -1168,7 +1163,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border-radius: 14px;
   overflow: hidden;
   color: rgba(246,245,241,0.85);
-  background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0d1420));
+  background: var(--weather-bg);
   border: 1px solid var(--line, rgba(28,37,49,0.12));
 }
 
@@ -1199,13 +1194,12 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   .sidebar {
     width: 64px;
     padding: 18px 8px;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
     overflow: hidden;
   }
 
-  .sidebar-brand span {
+  .sidebar-brand span,
+  .nav-label,
+  .user-info {
     display: none;
   }
 
@@ -1216,21 +1210,12 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   .sidebar-nav {
     flex: 1 1 auto;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 4px;
   }
 
   .nav-item {
-    display: flex;
     justify-content: center;
-    align-items: center;
     width: 100%;
-  }
-
-  .nav-label {
-    display: none;
   }
 
   .nav-icon {
@@ -1244,25 +1229,9 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   }
 
   .user-card {
-    display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 8px;
     padding: 8px 0;
-  }
-
-  .user-info {
-    display: none;
-  }
-
-  .logout-button {
-    flex-shrink: 0;
-  }
-
-  .main-content {
-    width: 100%;
-    min-width: 0;
-    flex: 1 1 auto;
   }
 
   .menu-item {
