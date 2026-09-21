@@ -265,15 +265,15 @@
         const t = totals[p.id] || 0;
         const widthPct = max > 0 ? (t / max) * 100 : 0;
         const targetPct = max > 0 ? (mean / max) * 100 : 0;
-        const fillStyle = `--fill:${widthPct}%`;
-        const targetStyle = `--target:${targetPct}%`;
+        const fillStyle = `width: ${widthPct}%;`;
+        const targetStyle = `left: ${targetPct}%;`;
         const over = mean > 0 && t > mean * 1.15;
         html += `
           <div class="cl-beam-row">
             <div class="cl-beam-name">${escapeHtml(p.name)}</div>
             <div class="cl-beam-track">
-              <div class="cl-beam-fill ${over ? 'over' : ''}" style="${fillStyle}%;"></div>
-              <div class="cl-beam-target" style="${targetStyle}%;"></div>
+              <div class="cl-beam-fill ${over ? 'over' : ''}" style="${fillStyle}"></div>
+              <div class="cl-beam-target" style="${targetStyle}"></div>
             </div>
             <div class="cl-beam-pts">${t}</div>
           </div>`;

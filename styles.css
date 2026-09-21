@@ -737,110 +737,6 @@ input {
 
 .subrow-label { font-size: 10.5px; color: var(--ink-soft); margin: 0 0 2px; text-transform: none; white-space: nowrap; }
 
-
-/* =========================
-   Mobile
-========================= */
-
-@media (max-width: 760px) {
-
-  .wc-temp { font-size: 52px; }
-
-  .sidebar {
-    width: 64px;
-    padding: 18px 8px;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  .sidebar-brand span {
-    display: none;
-  }
-
-  .sidebar-brand {
-    justify-content: center;
-  }
-
-  .sidebar-nav {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .nav-item {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-  }
-
-  .nav-label {
-    display: none;
-  }
-
-  .nav-icon {
-    font-size: 18px;
-  }
-
-  .sidebar-bottom {
-    flex-shrink: 0;
-    margin-top: auto;
-    width: 100%;
-  }
-
-  .user-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 0;
-  }
-
-  .user-info {
-    display: none;
-  }
-
-  .logout-button {
-    flex-shrink: 0;
-  }
-
-  .main-content {
-    width: 100%;
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-
-  .menu-item {
-    justify-content: center;
-  }
-
-  .topbar {
-    padding: 20px;
-  }
-
-  .content {
-    padding: 20px;
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .auth-card {
-    padding: 28px 22px;
-  }
-
-  .cal-grid-layout,
-  .cl-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* ==========================================
    Calendar page
 ========================================== */
@@ -950,17 +846,13 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border-bottom: 1px solid var(--line);
 }
 .cl-beam-fill {
-  --fill: 0%;
   position: absolute; left: 0; top: 2px; bottom: 2px;
   background: var(--primary-hover);
   transition: width .35s ease, background .35s ease;
-  width: var(--fill);
 }
 .cl-beam-fill.over { background: var(--danger); }
 .cl-beam-target {
-  --target: 0%;
   position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ochre);
-  left: var(--target);
 }
 .cl-beam-pts {
   width: 64px; flex: 0 0 auto; text-align: right;
@@ -1290,3 +1182,106 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .wf-condition { color: var(--card, #5b6472); }
 .wf-temps { text-align: right; white-space: nowrap; }
 .wf-lo { margin-left: 6px; }
+
+/* ==========================================
+   Mobile / Responsive Overrides
+========================================== */
+
+@media (max-width: 780px) {
+
+  .wc-temp { font-size: 52px; }
+
+  .sidebar {
+    width: 64px;
+    padding: 18px 8px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .sidebar-brand span {
+    display: none;
+  }
+
+  .sidebar-brand {
+    justify-content: center;
+  }
+
+  .sidebar-nav {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .nav-item {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+  }
+
+  .nav-label {
+    display: none;
+  }
+
+  .nav-icon {
+    font-size: 18px;
+  }
+
+  .sidebar-bottom {
+    flex-shrink: 0;
+    margin-top: auto;
+    width: 100%;
+  }
+
+  .user-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .user-info {
+    display: none;
+  }
+
+  .logout-button {
+    flex-shrink: 0;
+  }
+
+  .main-content {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .menu-item {
+    justify-content: center;
+  }
+
+  .topbar {
+    padding: 20px;
+  }
+
+  .content {
+    padding: 20px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card {
+    padding: 28px 22px;
+  }
+
+  .cal-grid-layout,
+  .cl-grid {
+    grid-template-columns: 1fr;
+  }
+}
