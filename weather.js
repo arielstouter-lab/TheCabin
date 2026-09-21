@@ -192,6 +192,8 @@ function renderWeatherCard(raw, place){
 function showWeatherCardState(msg, isError, showRetry){
     const root = document.getElementById("weatherCard");
     root.style.removeProperty("--accent");
+    const container = document.getElementById("weekForecast");
+    if (container) container.style.removeProperty("--accent");
     root.innerHTML = `<div class="wc-state${isError ? ' error':''}">${msg}${
         showRetry ? '<div><button class="wc-retry" id="wcRetry">Try again</button></div>' : ''
     }</div>`;
@@ -203,6 +205,9 @@ function showWeatherCardState(msg, isError, showRetry){
 function renderWeekForecast(raw){
     const container = document.getElementById("weekForecast");
     if (!container) return; // e.g. app.html has no week list — nothing to do
+
+    const currentInfo = codeInfo(raw.current.weather_code, raw.current.is_day);
+    container.style.setProperty("--accent", currentInfo.accent);
 
     container.innerHTML = raw.daily.time.map((t, i) => {
         const date = new Date(t);
