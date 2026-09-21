@@ -35,7 +35,7 @@
                 <button class="button-inline" id="lst-add-section">Add tab</button>
             </div>
 
-            <div class="tab" id="lst-tabs">
+            <div class="tabs-container" id="lst-tabs">
 
             </div>
             <div class="panel" id="lst-panel"></div>
@@ -157,13 +157,13 @@
         }
 
         function renderTabs(){
-            const tabsEl = document.getElementById('lst-tabs');
+            const tabsEl = document.getElementById('tab');
             tabsEl.innerHTML = orderedSections().map(sec => {
                 const active = sec.id === activeSectionId ? 'active' : '';
                 const closeBtn = isPermanent(sec) ? '' :
-                    `<button class="lst-tab-del" data-del-section="${sec.id}" title="Remove tab">✕</button>`;
+                    `<button class="button-primary" data-del-section="${sec.id}" title="Remove tab">✕</button>`;
                 return `
-          <div class="lst-tab ${active}" data-select-tab="${sec.id}">
+          <div class="tab ${active}" data-select-tab="${sec.id}">
             <span>${escapeHtml(sec.name)}</span>
             ${closeBtn}
           </div>`;
