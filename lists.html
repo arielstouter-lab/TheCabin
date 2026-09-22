@@ -49,6 +49,7 @@
     (function(){
         const sb = window.supabaseClient;
         const PERMANENT_TABS = ['Groceries', 'Pantry', 'Recipes'];
+        const INSERT_RETRY_DELAY_MS = 800;
 
         let sections = [];
         let itemsBySection = {};
@@ -100,6 +101,63 @@
             return remembered ? remembered.aisle_id : null;
         }
 
+        // ---- Shared local-state helpers -----------------------------------
+        // These replace the three copy-pasted "walk every section looking
+        // for an item by id" blocks that used to live inline in the event
+        // handlers (delete, quantity +/-, checkbox toggle, add-to-groceries).
+
+        function findItemById(id){
+            for(const secId of Object.keys(itemsBySection)){
+                const item = (itemsBySection[secId] || []).find(i => i.id === id);
+                if(item) return item;
+            }
+            return null;
+        }
+
+        function updateItemLocally(id, patch){
+            let updated = null;
+            Object.keys(itemsBySection).forEach(secId => {
+                itemsBySection[secId] = itemsBySection[secId].map(item => {
+                    if(item.id !== id) return item;
+                    updated = { ...item, ...patch };
+                    return updated;
+                });
+            });
+            return updated;
+        }
+
+        function removeItemLocally(id){
+            Object.keys(itemsBySection).forEach(secId => {
+                itemsBySection[secId] = itemsBySection[secId].filter(i => i.id !== id);
+            });
+        }
+
+        function sleep(ms){
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Inserts a single list item, retrying once after a short delay if
+        // the first attempt fails (e.g. a transient network blip). If the
+        // retry also fails, logs a meaningful error to the console and
+        // rethrows so the caller can show a status message.
+        async function insertListItemWithRetry(payload){
+            try{
+                const {data, error} = await sb.from('household_list_items').insert(payload).select().single();
+                if(error) throw error;
+                return data;
+            } catch(firstErr){
+                console.warn('Insert failed, retrying in', INSERT_RETRY_DELAY_MS, 'ms:', firstErr, payload);
+                await sleep(INSERT_RETRY_DELAY_MS);
+                try{
+                    const {data, error} = await sb.from('household_list_items').insert(payload).select().single();
+                    if(error) throw error;
+                    return data;
+                } catch(secondErr){
+                    console.error('Insert failed after retry. Payload:', payload, 'Error:', secondErr);
+                    throw secondErr;
+                }
+            }
+        }
 
         // Groceries + Pantry + Recipes always come first, in that order; user tabs follow
         // in the order they were created.
@@ -171,12 +229,12 @@
         async function loadAll(){
             try{
                 const [
-                    {data: peopleData},
-                    {data: sectionData},
-                    {data: itemData},
-                    {data: recipeData},
-                    {data: aisleData},
-                    {data: memoryData}
+                    peopleResult,
+                    sectionResult,
+                    itemResult,
+                    recipeResult,
+                    aisleResult,
+                    memoryResult
                 ] = await Promise.all([
                     sb.from('household_people').select('*').order('created_at'),
                     sb.from('household_list_sections').select('*').order('created_at'),
@@ -185,18 +243,35 @@
                     sb.from('household_grocery_aisles').select('*').order('sort_order'),
                     sb.from('household_grocery_item_memory').select('*')
                 ]);
-                people = peopleData || [];
-                sections = sectionData || [];
-                recipes = recipeData || [];
-                groceryAisles = aisleData || [];
-                groceryItemMemory = memoryData || [];
+
+                const loadErrors = [
+                    peopleResult.error,
+                    sectionResult.error,
+                    itemResult.error,
+                    recipeResult.error,
+                    aisleResult.error,
+                    memoryResult.error
+                ].filter(Boolean);
+
+                if(loadErrors.length){
+                    console.error('List load errors:', loadErrors);
+                    throw loadErrors[0];
+                }
+
+                people = peopleResult.data || [];
+                sections = sectionResult.data || [];
+                recipes = recipeResult.data || [];
+                groceryAisles = aisleResult.data || [];
+                groceryItemMemory = memoryResult.data || [];
+
                 itemsBySection = {};
-                (itemData || []).forEach(item => {
+                (itemResult.data || []).forEach(item => {
                     itemsBySection[item.section_id] = itemsBySection[item.section_id] || [];
                     itemsBySection[item.section_id].push(item);
                 });
                 await ensurePermanentSections();
             } catch(e){
+                console.error('Could not load lists:', e);
                 setStatus('Could not load lists.');
                 sections = [];
                 itemsBySection = {};
@@ -542,9 +617,7 @@
 
             if(t.matches('[data-del-item]')){
                 const id = t.getAttribute('data-del-item');
-                Object.keys(itemsBySection).forEach(secId => {
-                    itemsBySection[secId] = itemsBySection[secId].filter(i => i.id !== id);
-                });
+                removeItemLocally(id);
                 render();
                 try{
                     await sb.from('household_list_items').delete().eq('id', id);
@@ -572,52 +645,21 @@
                 const aisle_id = isGroceryItem ? aisleIdForItemText(text) : null;
                 const sort_order = isGroceryItem ? null : maxSort + 1;
 
-                console.log('grocery add debug', {
+                const payload = {
+                    section_id: sectionId,
                     text,
-                    key: groceryKey(text),
-                    section,
-                    isGroceryItem,
-                    groceryItemMemory,
+                    assigned_to,
+                    due_date,
+                    priority,
+                    checked: false,
+                    sort_order,
                     aisle_id
-                });
+                };
 
                 try{
-                    const {data, error} = await sb.from('household_list_items')
-                        .insert({
-                            section_id: sectionId,
-                            text,
-                            assigned_to,
-                            due_date,
-                            priority,
-                            checked: false,
-                            sort_order,
-                            aisle_id
-                        })
-                        .select()
-                        .single();
-                    if(error || !data){
-                        const {data: fbData, error: fbErr} = await sb.from('household_list_items')
-                            .insert({
-                                section_id: sectionId,
-                                text,
-                                assigned_to,
-                                due_date,
-                                priority,
-                                checked: false,
-                                sort_order,
-                                aisle_id
-                            })
-                            .select()
-                            .single();
-                        if(fbErr || !fbData){ setStatus('Could not add item.'); return; }
-                        fbData.sort_order = sort_order;
-                        fbData.aisle_id = aisle_id;
-                        itemsBySection[sectionId] = itemsBySection[sectionId] || [];
-                        itemsBySection[sectionId].push(fbData);
-                    } else {
-                        itemsBySection[sectionId] = itemsBySection[sectionId] || [];
-                        itemsBySection[sectionId].push(data);
-                    }
+                    const data = await insertListItemWithRetry(payload);
+                    itemsBySection[sectionId] = itemsBySection[sectionId] || [];
+                    itemsBySection[sectionId].push(data);
                     render();
                     const nextInput = document.querySelector(`[data-new-item-text="${sectionId}"]`);
                     if(nextInput) nextInput.focus();
@@ -635,17 +677,15 @@
                 if(!text) return;
                 const quantity = Math.max(1, parseInt(qtyInput ? (qtyInput.textContent || qtyInput.value) : 1, 10) || 1);
 
+                const payload = {
+                    section_id: sectionId,
+                    text,
+                    quantity,
+                    checked: false
+                };
+
                 try{
-                    const {data, error} = await sb.from('household_list_items')
-                        .insert({
-                            section_id: sectionId,
-                            text,
-                            quantity,
-                            checked: false
-                        })
-                        .select()
-                        .single();
-                    if(error || !data){ setStatus('Could not add pantry item.'); return; }
+                    const data = await insertListItemWithRetry(payload);
                     itemsBySection[sectionId] = itemsBySection[sectionId] || [];
                     itemsBySection[sectionId].push(data);
                     render();
@@ -668,15 +708,10 @@
                     }
                     return;
                 }
-                let updated = null;
-                Object.keys(itemsBySection).forEach(secId => {
-                    itemsBySection[secId] = itemsBySection[secId].map(item => {
-                        if(item.id !== id) return item;
-                        const next = Math.max(1, (item.quantity ?? 1) + delta);
-                        updated = { ...item, quantity: next };
-                        return updated;
-                    });
-                });
+                const existingItem = findItemById(id);
+                if(!existingItem) return;
+                const nextQty = Math.max(1, (existingItem.quantity ?? 1) + delta);
+                const updated = updateItemLocally(id, { quantity: nextQty });
                 render();
                 if(updated){
                     try{
@@ -688,44 +723,9 @@
 
             if(t.matches('[data-add-to-groceries]')){
                 const id = t.getAttribute('data-add-to-groceries');
-                let sourceItem = null;
-                Object.values(itemsBySection).forEach(list => {
-                    const found = list.find(i => i.id === id);
-                    if(found) sourceItem = found;
-                });
+                const sourceItem = findItemById(id);
                 if(!sourceItem) return;
-
-                const groceries = sections.find(s => s.name === 'Groceries');
-                if(!groceries){ setStatus('Groceries tab not found.'); return; }
-
-                const already = (itemsBySection[groceries.id] || []).some(
-                    i => !i.checked && i.text.trim().toLowerCase() === sourceItem.text.trim().toLowerCase()
-                );
-                if(already){
-                    setStatus('Already on the grocery list.');
-                    return;
-                }
-
-
-                try{
-                    const {data, error} = await sb.from('household_list_items')
-                        .insert({
-                            section_id: groceries.id,
-                            text: sourceItem.text,
-                            checked: false,
-                            aisle_id: aisleIdForItemText(sourceItem.text),
-                            sort_order: null
-                        })
-                        .select()
-                        .single();
-                    if(error || !data){ setStatus('Could not add to groceries.'); return; }
-                    itemsBySection[groceries.id] = itemsBySection[groceries.id] || [];
-                    itemsBySection[groceries.id].push(data);
-                    setStatus('Added to groceries.');
-                    render();
-                } catch(e){
-                    setStatus('Could not add to groceries.');
-                }
+                await addIngredientsToGroceries([sourceItem.text]);
                 return;
             }
         });
@@ -747,14 +747,7 @@
             if(e.target.matches('[data-toggle-check]')){
                 const id = e.target.getAttribute('data-toggle-check');
                 const checked = e.target.checked;
-                let updated = null;
-                Object.keys(itemsBySection).forEach(secId => {
-                    itemsBySection[secId] = itemsBySection[secId].map(item => {
-                        if(item.id !== id) return item;
-                        updated = { ...item, checked };
-                        return updated;
-                    });
-                });
+                const updated = updateItemLocally(id, { checked });
                 render();
                 if(updated){
                     try{
