@@ -192,6 +192,44 @@ function setupApp(session) {
 /* -----------------------------
    Helpers
 ----------------------------- */
+function groceryKey(text) {
+  return String(text || '')
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\b(the|a|an|of|for|with|and)\b/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(word => {
+        if (word.endsWith('ies') && word.length > 4) return word.slice(0, -3) + 'y';
+        if (word.endsWith('es') && word.length > 3) return word.slice(0, -2);
+        if (word.endsWith('s') && word.length > 3) return word.slice(0, -1);
+        return word;
+      })
+      .join(' ');
+}
+
+function groceryWords(text) {
+  return groceryKey(text).split(' ').filter(Boolean);
+}
+
+function groceryKeysMatch(itemText, memoryKey) {
+  const itemKey = groceryKey(itemText);
+  const normalizedMemoryKey = groceryKey(memoryKey);
+
+  if (!itemKey || !normalizedMemoryKey) return false;
+  if (itemKey === normalizedMemoryKey) return true;
+
+  const itemWords = groceryWords(itemKey);
+  const memoryWords = groceryWords(normalizedMemoryKey);
+
+  return memoryWords.some(memoryWord => itemWords.includes(memoryWord));
+}
+
+window.groceryKey = groceryKey;
+window.groceryKeysMatch = groceryKeysMatch;
+
 
 function getInitial(email) {
   if (!email) return "U";

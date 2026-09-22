@@ -82,24 +82,25 @@
             return sec && sec.name === 'Groceries';
         }
 
-        function groceryKey(text) {
-            return String(text || '')
-                .trim()
-                .toLowerCase()
-                .replace(/[^a-z0-9\s]/g, '')
-                .replace(/\s+/g, ' ');
-        }
-
         function aisleSortValue(aisleId){
             const aisle = groceryAisles.find(a => a.id === aisleId);
             return aisle ? aisle.sort_order : 9999;
         }
 
         function aisleIdForItemText(text){
-            const key = groceryKey(text);
-            const remembered = groceryItemMemory.find(m => m.item_key === key);
-            return remembered ? remembered.aisle_id : null;
+            const key = window.groceryKey(text);
+            if(!key) return null;
+
+            const exactMatch = groceryItemMemory.find(m => window.groceryKey(m.item_key) === key);
+            if(exactMatch) return exactMatch.aisle_id;
+
+            const partialMatch = groceryItemMemory
+                .filter(m => window.groceryKeysMatch(text, m.item_key))
+                .sort((a, b) => window.groceryKey(b.item_key).length - window.groceryKey(a.item_key).length)[0];
+
+            return partialMatch ? partialMatch.aisle_id : null;
         }
+
 
         // ---- Shared local-state helpers -----------------------------------
         // These replace the three copy-pasted "walk every section looking
