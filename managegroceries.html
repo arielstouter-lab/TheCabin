@@ -345,9 +345,9 @@
 
         function renderMappings(){
             const listEl = document.getElementById('mg-mapping-list');
-            const q = mappingSearchQuery.trim().toLowerCase();
+            const q = window.groceryKey(mappingSearchQuery);
             const filtered = itemMemory
-                .filter(m => !q || m.item_key.includes(q))
+                .filter(m => !q || window.groceryKey(m.item_key).includes(q))
                 .sort((a, b) => a.item_key.localeCompare(b.item_key));
 
             listEl.innerHTML = filtered.length ? filtered.map(m => `
