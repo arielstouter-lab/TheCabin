@@ -572,6 +572,15 @@
                 const aisle_id = isGroceryItem ? aisleIdForItemText(text) : null;
                 const sort_order = isGroceryItem ? null : maxSort + 1;
 
+                console.log('grocery add debug', {
+                    text,
+                    key: groceryKey(text),
+                    section,
+                    isGroceryItem,
+                    groceryItemMemory,
+                    aisle_id
+                });
+
                 try{
                     const {data, error} = await sb.from('household_list_items')
                         .insert({
