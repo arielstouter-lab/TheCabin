@@ -1025,7 +1025,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .lst-chip.aisle-chip {
   margin-left: auto;
   background: var(--card);
-  color: white;
+  color: var(--ink-soft);
   border-color: var(--line);
   white-space: nowrap;
 }
