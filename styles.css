@@ -232,6 +232,7 @@ input {
   color: var(--paper);
   cursor: pointer;
   border-radius: 9px;
+  text-decoration: none;
 }
 
 .button-inline:hover {
