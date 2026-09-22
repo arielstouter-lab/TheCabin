@@ -1,10 +1,3 @@
-//   <script src="weather.js" defer></script>
-//
-// Renders the card into #weatherCard (both pages).
-// Renders a 7-day list into #weekForecast, but only if that element
-// exists on the page — so app.html just won't have one, no separate
-// file or flag needed.
-
 const WC_STORAGE_KEY = "wc-unit"; // "c" or "f"
 
 // ---- WMO weather code -> { label, icon, accent } -----------------
