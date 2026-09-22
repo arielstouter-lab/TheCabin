@@ -6,9 +6,9 @@
     const CARDS_TABLE = 'credit_cards';
     const REWARDS_TABLE = 'card_rewards';
 
-    let spendRows = [];       // {id, category, monthly_spend} (Credit card spending)
-    let bankSpendRows = [];   // {id, category, monthly_spend} (Bank account spending)
-    let incomeRows = [];      // {id, source, monthly_amount} (Income)
+    let spendRows = [];       // {id, category, frequency, amount, monthly_spend} (Credit card spending)
+    let bankSpendRows = [];   // {id, category, frequency, amount, monthly_spend} (Bank account spending)
+    let incomeRows = [];      // {id, source, frequency, amount, monthly_amount} (Income)
     let cardsRows = [];       // {id, name, annual_fee, base_rate}
     let rewardRows = [];      // {id, card_id, category, rate, special_refund}
 
@@ -29,6 +29,35 @@
         const sign = val < 0 ? '-' : '';
         const absVal = Math.abs(val);
         return sign + '$' + (Math.round(absVal * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function calcMonthlyAmount(amount, frequency) {
+        const val = parseFloat(amount) || 0;
+        const freq = String(frequency || 'monthly').toLowerCase();
+        switch (freq) {
+            case 'semimonthly':
+                return val * 2;
+            case 'biweekly':
+                return (val * 26) / 12;
+            case 'annual':
+                return val / 12;
+            case 'monthly':
+            default:
+                return val;
+        }
+    }
+
+    function frequencyOptionsHtml(selectedFreq) {
+        const freq = String(selectedFreq || 'monthly').toLowerCase();
+        const options = [
+            { value: 'monthly', label: 'Monthly' },
+            { value: 'semimonthly', label: 'Semimonthly (twice a month)' },
+            { value: 'biweekly', label: 'Biweekly (every other week)' },
+            { value: 'annual', label: 'Annual' }
+        ];
+        return options.map(opt =>
+            `<option value="${opt.value}"${opt.value === freq ? ' selected' : ''}>${opt.label}</option>`
+        ).join('');
     }
 
     function render() {
@@ -56,16 +85,21 @@
 
         spendRows.forEach(row => {
             const tr = document.createElement('tr');
+            const freq = row.frequency || 'monthly';
+            const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
+            const monthly = calcMonthlyAmount(amt, freq);
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 140px;"></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.monthly_spend ?? row.amount ?? 0}" data-field="monthly_spend" style="width: 100%; min-width: 90px;"></div></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 130px;"></td>
+              <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
+              <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
               <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete category">✕</button></td>
             `;
-            tr.querySelectorAll('input').forEach(input => {
+            tr.querySelectorAll('input, select').forEach(input => {
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
-                    if (field === 'monthly_spend') val = parseFloat(val) || 0;
+                    if (field === 'amount') val = parseFloat(val) || 0;
                     updateCategoryRow(row.id, { [field]: val });
                 });
             });
@@ -88,16 +122,21 @@
 
         bankSpendRows.forEach(row => {
             const tr = document.createElement('tr');
+            const freq = row.frequency || 'monthly';
+            const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
+            const monthly = calcMonthlyAmount(amt, freq);
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 140px;"></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.monthly_spend ?? row.amount ?? 0}" data-field="monthly_spend" style="width: 100%; min-width: 90px;"></div></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 130px;"></td>
+              <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
+              <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
               <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
             `;
-            tr.querySelectorAll('input').forEach(input => {
+            tr.querySelectorAll('input, select').forEach(input => {
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
-                    if (field === 'monthly_spend') val = parseFloat(val) || 0;
+                    if (field === 'amount') val = parseFloat(val) || 0;
                     updateBankSpendRow(row.id, { [field]: val });
                 });
             });
@@ -120,16 +159,21 @@
 
         incomeRows.forEach(row => {
             const tr = document.createElement('tr');
+            const freq = row.frequency || 'monthly';
+            const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_amount ?? 0);
+            const monthly = calcMonthlyAmount(amt, freq);
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.source || row.name || row.category || '')}" data-field="source" style="width: 100%; min-width: 140px;"></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.monthly_amount ?? row.amount ?? 0}" data-field="monthly_amount" style="width: 100%; min-width: 90px;"></div></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.source || row.name || row.category || '')}" data-field="source" style="width: 100%; min-width: 130px;"></td>
+              <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
+              <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
               <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete income source">✕</button></td>
             `;
-            tr.querySelectorAll('input').forEach(input => {
+            tr.querySelectorAll('input, select').forEach(input => {
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
-                    if (field === 'monthly_amount') val = parseFloat(val) || 0;
+                    if (field === 'amount') val = parseFloat(val) || 0;
                     updateIncomeRow(row.id, { [field]: val });
                 });
             });
@@ -146,10 +190,19 @@
         const container = document.getElementById('balanceSummaryGrid');
         if (!container) return;
 
-        const totalCcSpend = spendRows.reduce((sum, r) => sum + (parseFloat(r.monthly_spend ?? r.amount) || 0), 0);
-        const totalBankSpend = bankSpendRows.reduce((sum, r) => sum + (parseFloat(r.monthly_spend ?? r.amount) || 0), 0);
+        const totalCcSpend = spendRows.reduce((sum, r) => {
+            const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
+            return sum + calcMonthlyAmount(amt, r.frequency);
+        }, 0);
+        const totalBankSpend = bankSpendRows.reduce((sum, r) => {
+            const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
+            return sum + calcMonthlyAmount(amt, r.frequency);
+        }, 0);
         const totalSpending = totalCcSpend + totalBankSpend;
-        const totalIncome = incomeRows.reduce((sum, r) => sum + (parseFloat(r.monthly_amount ?? r.amount) || 0), 0);
+        const totalIncome = incomeRows.reduce((sum, r) => {
+            const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_amount || 0);
+            return sum + calcMonthlyAmount(amt, r.frequency);
+        }, 0);
         const netBalance = totalIncome - totalSpending;
 
         const annualIncome = totalIncome * 12;
@@ -310,7 +363,8 @@
                 let grossTotal = 0;
                 spendRows.forEach(catRow => {
                     const cat = catRow.category;
-                    const spend = catRow.monthly_spend || 0;
+                    const amt = catRow.amount !== undefined && catRow.amount !== null ? catRow.amount : (catRow.monthly_spend || 0);
+                    const spend = calcMonthlyAmount(amt, catRow.frequency);
                     const a = getEffectiveRate(cardA.id, cat);
                     const b = getEffectiveRate(cardB.id, cat);
                     const aReward = (spend * a.rate / 100) + a.refund;
@@ -442,7 +496,8 @@
 
         const categoryResults = spendRows.map(catRow => {
             const cat = catRow.category;
-            const spend = catRow.monthly_spend || 0;
+            const amt = catRow.amount !== undefined && catRow.amount !== null ? catRow.amount : (catRow.monthly_spend || 0);
+            const spend = calcMonthlyAmount(amt, catRow.frequency);
             const a = getEffectiveRate(aId, cat);
             const b = getEffectiveRate(bId, cat);
             const aReward = (spend * a.rate / 100) + a.refund;
@@ -509,7 +564,16 @@
         try {
             const { data, error } = await sb.from(CATEGORIES_TABLE).select('*').order('created_at', { ascending: true });
             if (error) throw error;
-            spendRows = data || [];
+            spendRows = (data || []).map(r => {
+                const freq = r.frequency || 'monthly';
+                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
+                return {
+                    ...r,
+                    frequency: freq,
+                    amount: amt,
+                    monthly_spend: calcMonthlyAmount(amt, freq)
+                };
+            });
         } catch (err) {
             console.error('Error loading categories:', err);
             if (window.setStatus) window.setStatus('Could not load credit card spending categories.');
@@ -522,7 +586,17 @@
         try {
             const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([data]).select().single();
             if (error) throw error;
-            if (inserted) { spendRows.push(inserted); render(); }
+            if (inserted) {
+                const freq = inserted.frequency || data.frequency || 'monthly';
+                const amt = inserted.amount !== undefined && inserted.amount !== null ? inserted.amount : (data.amount || 0);
+                spendRows.push({
+                    ...inserted,
+                    frequency: freq,
+                    amount: amt,
+                    monthly_spend: calcMonthlyAmount(amt, freq)
+                });
+                render();
+            }
             if (window.setStatus) window.setStatus('Added credit card category.');
         } catch (err) {
             console.error('Could not add category:', err);
@@ -534,9 +608,18 @@
         if (!sb) return;
         try {
             const row = spendRows.find(r => r.id === id);
-            if (row) Object.assign(row, patch);
+            if (row) {
+                Object.assign(row, patch);
+                row.monthly_spend = calcMonthlyAmount(row.amount, row.frequency);
+            }
             render();
-            const { error } = await sb.from(CATEGORIES_TABLE).update(patch).eq('id', id);
+            const payload = { ...patch };
+            if (row) {
+                payload.frequency = row.frequency;
+                payload.amount = row.amount;
+                payload.monthly_spend = row.monthly_spend;
+            }
+            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq('id', id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update category:', err);
@@ -566,7 +649,16 @@
         try {
             const { data, error } = await sb.from(BANK_SPENDING_TABLE).select('*').order('created_at', { ascending: true });
             if (error) throw error;
-            bankSpendRows = data || [];
+            bankSpendRows = (data || []).map(r => {
+                const freq = r.frequency || 'monthly';
+                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
+                return {
+                    ...r,
+                    frequency: freq,
+                    amount: amt,
+                    monthly_spend: calcMonthlyAmount(amt, freq)
+                };
+            });
         } catch (err) {
             console.error('Error loading bank spending:', err);
             bankSpendRows = [];
@@ -578,7 +670,17 @@
         try {
             const { data: inserted, error } = await sb.from(BANK_SPENDING_TABLE).insert([data]).select().single();
             if (error) throw error;
-            if (inserted) { bankSpendRows.push(inserted); render(); }
+            if (inserted) {
+                const freq = inserted.frequency || data.frequency || 'monthly';
+                const amt = inserted.amount !== undefined && inserted.amount !== null ? inserted.amount : (data.amount || 0);
+                bankSpendRows.push({
+                    ...inserted,
+                    frequency: freq,
+                    amount: amt,
+                    monthly_spend: calcMonthlyAmount(amt, freq)
+                });
+                render();
+            }
             if (window.setStatus) window.setStatus('Added bank expense.');
         } catch (err) {
             console.error('Could not add bank expense:', err);
@@ -590,9 +692,18 @@
         if (!sb) return;
         try {
             const row = bankSpendRows.find(r => r.id === id);
-            if (row) Object.assign(row, patch);
+            if (row) {
+                Object.assign(row, patch);
+                row.monthly_spend = calcMonthlyAmount(row.amount, row.frequency);
+            }
             render();
-            const { error } = await sb.from(BANK_SPENDING_TABLE).update(patch).eq('id', id);
+            const payload = { ...patch };
+            if (row) {
+                payload.frequency = row.frequency;
+                payload.amount = row.amount;
+                payload.monthly_spend = row.monthly_spend;
+            }
+            const { error } = await sb.from(BANK_SPENDING_TABLE).update(payload).eq('id', id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update bank expense:', err);
@@ -622,7 +733,16 @@
         try {
             const { data, error } = await sb.from(INCOME_TABLE).select('*').order('created_at', { ascending: true });
             if (error) throw error;
-            incomeRows = data || [];
+            incomeRows = (data || []).map(r => {
+                const freq = r.frequency || 'monthly';
+                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_amount || 0);
+                return {
+                    ...r,
+                    frequency: freq,
+                    amount: amt,
+                    monthly_amount: calcMonthlyAmount(amt, freq)
+                };
+            });
         } catch (err) {
             console.error('Error loading income:', err);
             incomeRows = [];
@@ -634,7 +754,17 @@
         try {
             const { data: inserted, error } = await sb.from(INCOME_TABLE).insert([data]).select().single();
             if (error) throw error;
-            if (inserted) { incomeRows.push(inserted); render(); }
+            if (inserted) {
+                const freq = inserted.frequency || data.frequency || 'monthly';
+                const amt = inserted.amount !== undefined && inserted.amount !== null ? inserted.amount : (data.amount || 0);
+                incomeRows.push({
+                    ...inserted,
+                    frequency: freq,
+                    amount: amt,
+                    monthly_amount: calcMonthlyAmount(amt, freq)
+                });
+                render();
+            }
             if (window.setStatus) window.setStatus('Added income source.');
         } catch (err) {
             console.error('Could not add income source:', err);
@@ -646,9 +776,18 @@
         if (!sb) return;
         try {
             const row = incomeRows.find(r => r.id === id);
-            if (row) Object.assign(row, patch);
+            if (row) {
+                Object.assign(row, patch);
+                row.monthly_amount = calcMonthlyAmount(row.amount, row.frequency);
+            }
             render();
-            const { error } = await sb.from(INCOME_TABLE).update(patch).eq('id', id);
+            const payload = { ...patch };
+            if (row) {
+                payload.frequency = row.frequency;
+                payload.amount = row.amount;
+                payload.monthly_amount = row.monthly_amount;
+            }
+            const { error } = await sb.from(INCOME_TABLE).update(payload).eq('id', id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update income source:', err);
@@ -830,16 +969,20 @@
     if (addCategoryBtn) {
         addCategoryBtn.addEventListener('click', () => {
             const catInput = document.getElementById('newCategory');
-            const spendInput = document.getElementById('newCategorySpend');
+            const freqSelect = document.getElementById('newCategoryFrequency');
+            const amountInput = document.getElementById('newCategoryAmount');
             const category = catInput.value.trim();
-            const monthly_spend = parseFloat(spendInput.value) || 0;
+            const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
+            const amount = parseFloat(amountInput.value) || 0;
+            const monthly_spend = calcMonthlyAmount(amount, frequency);
             if (!category) {
                 if (window.setStatus) window.setStatus('Category name is required.');
                 return;
             }
-            addCategoryRow({ category, monthly_spend });
+            addCategoryRow({ category, frequency, amount, monthly_spend });
             catInput.value = '';
-            spendInput.value = '';
+            amountInput.value = '';
+            if (freqSelect) freqSelect.value = 'monthly';
             catInput.focus();
         });
     }
@@ -848,16 +991,20 @@
     if (addBankCategoryBtn) {
         addBankCategoryBtn.addEventListener('click', () => {
             const catInput = document.getElementById('newBankCategory');
-            const spendInput = document.getElementById('newBankCategorySpend');
+            const freqSelect = document.getElementById('newBankCategoryFrequency');
+            const amountInput = document.getElementById('newBankCategoryAmount');
             const category = catInput.value.trim();
-            const monthly_spend = parseFloat(spendInput.value) || 0;
+            const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
+            const amount = parseFloat(amountInput.value) || 0;
+            const monthly_spend = calcMonthlyAmount(amount, frequency);
             if (!category) {
                 if (window.setStatus) window.setStatus('Expense name is required.');
                 return;
             }
-            addBankSpendRow({ category, monthly_spend });
+            addBankSpendRow({ category, frequency, amount, monthly_spend });
             catInput.value = '';
-            spendInput.value = '';
+            amountInput.value = '';
+            if (freqSelect) freqSelect.value = 'monthly';
             catInput.focus();
         });
     }
@@ -866,16 +1013,20 @@
     if (addIncomeBtn) {
         addIncomeBtn.addEventListener('click', () => {
             const sourceInput = document.getElementById('newIncomeSource');
+            const freqSelect = document.getElementById('newIncomeFrequency');
             const amountInput = document.getElementById('newIncomeAmount');
             const source = sourceInput.value.trim();
-            const monthly_amount = parseFloat(amountInput.value) || 0;
+            const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
+            const amount = parseFloat(amountInput.value) || 0;
+            const monthly_amount = calcMonthlyAmount(amount, frequency);
             if (!source) {
                 if (window.setStatus) window.setStatus('Income source is required.');
                 return;
             }
-            addIncomeRow({ source, monthly_amount });
+            addIncomeRow({ source, frequency, amount, monthly_amount });
             sourceInput.value = '';
             amountInput.value = '';
+            if (freqSelect) freqSelect.value = 'monthly';
             sourceInput.focus();
         });
     }
@@ -978,9 +1129,9 @@
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const targetId = e.target.id;
-            if (['newCategory', 'newCategorySpend'].includes(targetId)) {
+            if (['newCategory', 'newCategoryAmount', 'newCategorySpend'].includes(targetId)) {
                 if (addCategoryBtn) addCategoryBtn.click();
-            } else if (['newBankCategory', 'newBankCategorySpend'].includes(targetId)) {
+            } else if (['newBankCategory', 'newBankCategoryAmount', 'newBankCategorySpend'].includes(targetId)) {
                 if (addBankCategoryBtn) addBankCategoryBtn.click();
             } else if (['newIncomeSource', 'newIncomeAmount'].includes(targetId)) {
                 if (addIncomeBtn) addIncomeBtn.click();

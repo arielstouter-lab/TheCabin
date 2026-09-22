@@ -18,7 +18,7 @@
 
         <header class="topbar">
             <div class="text-center">
-                <h1>Credit Card Rewards</h1>
+                <h1>Financial Tools</h1>
                 <p>Log your household spending by category, set up each card's reward rates, then compare any two head-to-head.</p>
             </div>
         </header>
@@ -38,7 +38,7 @@
                 <div class="panel">
                     <div class="panel-head">
                         <h2 class="panel-title">Credit Card Spending</h2>
-                        <span class="panel-sub">Monthly credit card spend per category &mdash; shared across every card</span>
+                        <span class="panel-sub">Monthly credit card spend per category, used by credit card comparison</span>
                     </div>
                     <div class="panel-body">
                         <div class="table-wrap">
@@ -46,6 +46,8 @@
                                 <thead>
                                 <tr>
                                     <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
                                     <th class="col-num">Monthly Spend</th>
                                     <th class="col-action"></th>
                                 </tr>
@@ -58,8 +60,14 @@
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
                                 <input type="text" class="text-input" id="newCategory" placeholder="Category (e.g. Dining, Gas)" />
+                                <select class="text-input" id="newCategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
                                 <div class="num-wrap money">
-                                    <input type="number" class="text-input" id="newCategorySpend" placeholder="Spend / mo" min="0" step="1" />
+                                    <input type="number" class="text-input" id="newCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
                             </div>
                             <button class="button-inline" id="addCategoryBtn">Add category</button>
@@ -70,7 +78,7 @@
                 <div class="panel">
                     <div class="panel-head">
                         <h2 class="panel-title">Bank Account Spending</h2>
-                        <span class="panel-sub">Non-card monthly expenses (e.g. mortgage, rent, utilities, loans)</span>
+                        <span class="panel-sub">Non-card monthly expenses</span>
                     </div>
                     <div class="panel-body">
                         <div class="table-wrap">
@@ -78,6 +86,8 @@
                                 <thead>
                                 <tr>
                                     <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
                                     <th class="col-num">Monthly Spend</th>
                                     <th class="col-action"></th>
                                 </tr>
@@ -90,8 +100,14 @@
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
                                 <input type="text" class="text-input" id="newBankCategory" placeholder="Expense (e.g. Rent, Utilities)" />
+                                <select class="text-input" id="newBankCategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
                                 <div class="num-wrap money">
-                                    <input type="number" class="text-input" id="newBankCategorySpend" placeholder="Spend / mo" min="0" step="1" />
+                                    <input type="number" class="text-input" id="newBankCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
                             </div>
                             <button class="button-inline" id="addBankCategoryBtn">Add expense</button>
@@ -110,6 +126,8 @@
                                 <thead>
                                 <tr>
                                     <th>Income Source</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
                                     <th class="col-num">Monthly Amount</th>
                                     <th class="col-action"></th>
                                 </tr>
@@ -122,8 +140,14 @@
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
                                 <input type="text" class="text-input" id="newIncomeSource" placeholder="Income source (e.g. Salary, Consulting)" />
+                                <select class="text-input" id="newIncomeFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
                                 <div class="num-wrap money">
-                                    <input type="number" class="text-input" id="newIncomeAmount" placeholder="Amount / mo" min="0" step="1" />
+                                    <input type="number" class="text-input" id="newIncomeAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
                             </div>
                             <button class="button-inline" id="addIncomeBtn">Add income</button>
