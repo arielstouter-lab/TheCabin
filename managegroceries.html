@@ -346,20 +346,21 @@
         function renderMappings(){
             const listEl = document.getElementById('mg-mapping-list');
             const q = window.groceryKey(mappingSearchQuery);
-            const filtered = itemMemory
-                .filter(m => !q || window.groceryKey(m.item_key).includes(q))
-                .sort((a, b) => a.item_key.localeCompare(b.item_key));
 
-            listEl.innerHTML = filtered.length ? filtered.map(m => `
-              <div class="lst-item lst-item-row" data-item-row="${escapeHtml(m.item_key)}">
-                <span class="lst-item-text">${escapeHtml(m.item_key)}</span>
+            const currentItems = groceryItems
+                .filter(item => !item.checked)
+                .filter(item => !q || window.groceryKey(item.text).includes(q) || window.groceryKeysMatch(item.text, q))
+                .sort((a, b) => window.groceryKey(a.text).localeCompare(window.groceryKey(b.text)));
+
+            listEl.innerHTML = currentItems.length ? currentItems.map(item => `
+              <div class="lst-item lst-item-row" data-item-row="${item.id}">
+                <span class="lst-item-text">${escapeHtml(item.text)}</span>
                 <div class="lst-actions">
-                  <select data-assign-mapping-key="${escapeHtml(m.item_key)}">
-                    ${aisleOptionsHtml(m.aisle_id)}
+                  <select data-assign-item-text="${escapeHtml(item.text)}">
+                    ${aisleOptionsHtml(item.aisle_id)}
                   </select>
-                  <button type="button" class="icon-delete" data-del-mapping="${escapeHtml(m.item_key)}" title="Remove mapping">✕</button>
                 </div>
-              </div>`).join('') : `<p class="empty-state">${mappingSearchQuery ? 'No items match your search.' : 'No item assignments yet.'}</p>`;
+              </div>`).join('') : `<p class="empty-state">${mappingSearchQuery ? 'No current grocery items match your search.' : 'No current grocery items.'}</p>`;
         }
 
         function renderMappingAisleSelect(){
@@ -418,6 +419,12 @@
         });
 
         document.getElementById('mg-mapping-list').addEventListener('change', async (e) => {
+            if(e.target.matches('[data-assign-item-text]')){
+                const text = e.target.getAttribute('data-assign-item-text');
+                await setItemAisle(text, e.target.value || null);
+                return;
+            }
+
             if(e.target.matches('[data-assign-mapping-key]')){
                 const key = e.target.getAttribute('data-assign-mapping-key');
                 await setItemAisle(key, e.target.value || null);
