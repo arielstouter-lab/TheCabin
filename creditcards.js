@@ -1,7 +1,7 @@
 (function () {
     const sb = window.supabaseClient;
     const CATEGORIES_TABLE = 'household_spending_categories';
-    const CARDS_TABLE = 'cards';
+    const CARDS_TABLE = 'credit_cards';
     const REWARDS_TABLE = 'card_rewards';
 
     let spendRows = [];    // {id, category, monthly_spend}
