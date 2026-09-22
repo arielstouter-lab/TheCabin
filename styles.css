@@ -37,7 +37,10 @@ body {
 }
 
 button,
-input {
+input,
+optgroup,
+select,
+textarea {
   font: inherit;
 }
 
@@ -562,8 +565,7 @@ input {
   text-align: right;
 }
 
-.chip input[type=number]:focus,
-.text-input:focus {
+.chip input[type=number]:focus {
   outline: none;
   border-color: var(--primary);
 }
@@ -650,6 +652,7 @@ input {
 /* Canonical text input used in "add new ..." rows */
 .text-input {
   flex: 1;
+  min-width: 0;
   padding: 7px 9px;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -657,6 +660,31 @@ input {
   font-family: 'Inter', sans-serif;
   font-size: 13.5px;
   color: var(--ink);
+}
+
+/* Base select and date input styling consistent with cabin theme */
+select,
+input[type=date] {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background-color: var(--paper);
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  color: var(--ink);
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+select {
+  cursor: pointer;
+}
+
+.text-input:focus,
+select:focus,
+input[type=date]:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
 .add-row {
@@ -1035,8 +1063,8 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .lst-add-item { padding: 10px 14px 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 7px; }
 .lst-add-row2 { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .lst-add-row2 select, .lst-add-row2 input[type=date] {
-  padding: 6px 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
-  font-family: 'Inter', sans-serif; font-size: 12px; color: var(--ink); flex: 1; min-width: 110px;
+  flex: 1;
+  min-width: 110px;
 }
 .lst-priority-toggle {
   display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-soft);
