@@ -441,7 +441,7 @@
                 const chips = [];
                 if(isGroceries(sec) && item.aisle_id){
                     const aisle = groceryAisles.find(a => a.id === item.aisle_id);
-                    if(aisle) chips.push(`<span class="lst-chip">${escapeHtml(aisle.name)}</span>`);
+                    if(aisle) chips.push(`<span class="lst-chip aisle-chip">${escapeHtml(aisle.name)}</span>`);
                 }
                 if(item.priority) chips.push(`<span class="lst-chip priority-chip">High priority</span>`);
                 if(item.assigned_to && personName(item.assigned_to)) chips.push(`<span class="lst-chip">${escapeHtml(personName(item.assigned_to))}</span>`);

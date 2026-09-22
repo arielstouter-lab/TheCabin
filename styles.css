@@ -1010,11 +1010,25 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .lst-item-text { font-size: 13.5px; color: var(--ink); word-break: break-word; }
 .lst-item.priority .lst-item-text { font-weight: 600; color: var(--danger); }
 
-.lst-item-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--ink-soft); }
+.lst-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
 .lst-chip { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
 .lst-chip.due-soon { border-color: var(--ochre); color: var(--ochre); }
 .lst-chip.overdue { border-color: var(--danger); color: var(--danger); }
 .lst-chip.priority-chip { background: var(--danger); color: white; border-color: var(--danger); font-weight: 600; }
+.lst-chip.aisle-chip {
+  margin-left: auto;
+  background: var(--card);
+  color: white;
+  border-color: var(--line);
+  white-space: nowrap;
+}
 
 .lst-add-item { padding: 10px 14px 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 7px; }
 .lst-add-row2 { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
