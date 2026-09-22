@@ -279,8 +279,61 @@ function getSeason(date) {
   return 'winter';
 }
 
+const SEASON_IMAGES = {
+  spring: 'spring.jpg',
+  summer: 'summer.jpg',
+  fall: 'fall.jpg',
+  winter: 'winter.jpg'
+};
+
+let currentSeason = null;
+let seasonLoadToken = 0;
+
+function updateSeason(date) {
+  if (!document.body || !document.body.classList.contains('cal-page')) return;
+
+  const season = getSeason(date);
+  if (season === currentSeason && document.body.classList.contains('img-loaded')) return;
+  currentSeason = season;
+
+  const myToken = ++seasonLoadToken;
+  const el = document.body;
+
+  const swapImage = () => {
+    const img = new Image();
+    img.onload = () => {
+      if (myToken !== seasonLoadToken) return;
+      el.style.setProperty('--season-img', `url(${SEASON_IMAGES[season]})`);
+      void el.offsetHeight;
+      el.classList.add('img-loaded');
+    };
+    img.src = SEASON_IMAGES[season];
+  };
+
+  if (el.classList.contains('img-loaded')) {
+    el.addEventListener('transitionend', swapImage, { once: true });
+    el.classList.remove('img-loaded');
+  } else {
+    el.dataset.season = season;
+    swapImage();
+  }
+}
+
+function initSeasonalBackground() {
+  if (!document.body || !document.body.classList.contains('cal-page')) return;
+  updateSeason(new Date());
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSeasonalBackground);
+} else {
+  initSeasonalBackground();
+}
+
 window.todayStr = todayStr;
 window.getSeason = getSeason;
+window.updateSeason = updateSeason;
+window.initSeasonalBackground = initSeasonalBackground;
 
 /* -----------------------------
    Shared UI Helpers

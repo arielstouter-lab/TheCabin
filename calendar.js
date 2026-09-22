@@ -2,51 +2,10 @@
     const sb = window.supabaseClient;
     const getSeason = window.getSeason;
     const todayStr = window.todayStr;
+    const updateSeason = window.updateSeason || function(){};
     let viewYear, viewMonth; // 0-indexed month
     let selectedDate; // 'YYYY-MM-DD'
     let eventsByDate = {}; // {'YYYY-MM-DD': [{id, title}]}
-
-    const seasonImages = {
-        spring: 'spring.jpg',
-        summer: 'summer.jpg',
-        fall: 'fall.jpg',
-        winter: 'winter.jpg'
-    };
-
-    let currentSeason = null;
-    let loadToken = 0;
-
-    function updateSeason(date){
-        const season = getSeason(date);
-        if (season === currentSeason) return;
-        currentSeason = season;
-
-        const myToken = ++loadToken;
-        const el = document.body;
-
-        const swapImage = () => {
-            const img = new Image();
-            img.onload = () => {
-                if (myToken !== loadToken) return;
-                el.style.setProperty('--season-img', `url(${seasonImages[season]})`)
-                void el.offsetHeight;
-                el.classList.add('img-loaded');
-            };
-            img.src = seasonImages[season];
-        }
-
-        if (el.classList.contains('img-loaded')) {
-            el.addEventListener('transitionend', swapImage, { once: true });
-            el.classList.remove('img-loaded');
-        } else {
-            el.dataset.season = season;
-            swapImage();
-        }
-    }
-
-    // Today's actual season, day-accurate
-    updateSeason(new Date());
-
 
     function pad(n){ return String(n).padStart(2,'0'); }
     function toDateStr(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
