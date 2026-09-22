@@ -101,6 +101,10 @@
             return partialMatch ? partialMatch.aisle_id : null;
         }
 
+        function panelDeleteSectionButton(sec){
+            if(isPermanent(sec)) return '';
+            return `<button type="button" class="icon-delete" data-del-section="${sec.id}" title="Remove tab">✕</button>`;
+        }
 
         // ---- Shared local-state helpers -----------------------------------
         // These replace the three copy-pasted "walk every section looking
@@ -307,12 +311,9 @@
             const tabsEl = document.getElementById('lst-tabs');
             tabsEl.innerHTML = orderedSections().map(sec => {
                 const active = sec.id === activeSectionId ? 'active' : '';
-                const closeBtn = isPermanent(sec) ? '' :
-                    `<span class="tab-del" data-del-section="${sec.id}" role="button" title="Remove tab">✕</span>`;
                 return `
   <button type="button" class="tab ${active}" data-select-tab="${sec.id}">
     <span>${escapeHtml(sec.name)}</span>
-    ${closeBtn}
   </button>`;
             }).join('');
         }
@@ -511,6 +512,7 @@
             return `
         <div class="panel-head">
           <h2 class="panel-title">${escapeHtml(sec.name)}</h2>
+          ${panelDeleteSectionButton(sec)}
         </div>
         <div class="lst-items">${itemsHtml}</div>
         <div class="lst-add-item">
@@ -596,8 +598,8 @@
                 : isRecipes(sec)
                     ? renderRecipesPanel(sec)
                     :isGroceries(sec)
-                    ? renderGroceriesPanel(sec)
-                    : renderStandardPanel(sec);
+                        ? renderGroceriesPanel(sec)
+                        : renderStandardPanel(sec);
         }
 
         document.getElementById('lst-add-section').addEventListener('click', async () => {
@@ -622,22 +624,6 @@
         });
 
         document.getElementById('lst-tabs').addEventListener('click', async (e) => {
-            const delBtn = e.target.closest('[data-del-section]');
-            if(delBtn){
-                const id = delBtn.getAttribute('data-del-section');
-                sections = sections.filter(s => s.id !== id);
-                delete itemsBySection[id];
-                if(activeSectionId === id){
-                    const groceries = sections.find(s => s.name === 'Groceries');
-                    activeSectionId = groceries ? groceries.id : (sections[0] && sections[0].id) || null;
-                }
-                render();
-                try{
-                    await sb.from('household_list_sections').delete().eq('id', id);
-                } catch(err){ setStatus('Could not delete tab.'); }
-                return;
-            }
-
             const tabBtn = e.target.closest('[data-select-tab]');
             if(tabBtn){
                 activeSectionId = tabBtn.getAttribute('data-select-tab');
@@ -661,6 +647,25 @@
                     const list = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
                     await addIngredientsToGroceries(list);
                 }
+                return;
+            }
+
+            if(t.closest('[data-del-section]')){
+                const delBtn = t.closest('[data-del-section]');
+                const id = delBtn.getAttribute('data-del-section');
+
+                if(!confirm('Remove this tab and its items?')) return;
+
+                sections = sections.filter(s => s.id !== id);
+                delete itemsBySection[id];
+                if(activeSectionId === id){
+                    const groceries = sections.find(s => s.name === 'Groceries');
+                    activeSectionId = groceries ? groceries.id : (sections[0] && sections[0].id) || null;
+                }
+                render();
+                try{
+                    await sb.from('household_list_sections').delete().eq('id', id);
+                } catch(err){ setStatus('Could not delete tab.'); }
                 return;
             }
 
