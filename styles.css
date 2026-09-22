@@ -1393,6 +1393,24 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border-color: var(--primary);
 }
 
+.summary-card.surplus {
+  background: #f0f4f0;
+  border-color: var(--primary);
+}
+
+.summary-card.surplus .value {
+  color: var(--primary);
+}
+
+.summary-card.deficit {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+
+.summary-card.deficit .value {
+  color: var(--danger);
+}
+
 #bestComboContainer {
   margin-bottom: 16px;
 }

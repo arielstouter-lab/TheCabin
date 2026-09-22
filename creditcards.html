@@ -37,8 +37,8 @@
             <div id="tab-budget" class="tab-pane">
                 <div class="panel">
                     <div class="panel-head">
-                        <h2 class="panel-title">Household Spending</h2>
-                        <span class="panel-sub">Monthly spend per category &mdash; shared across every card</span>
+                        <h2 class="panel-title">Credit Card Spending</h2>
+                        <span class="panel-sub">Monthly credit card spend per category &mdash; shared across every card</span>
                     </div>
                     <div class="panel-body">
                         <div class="table-wrap">
@@ -53,7 +53,7 @@
                                 <tbody id="spendGridBody"></tbody>
                             </table>
                         </div>
-                        <p id="spendGridEmpty" class="empty-state" style="display:none;">No categories yet &mdash; add your first one below.</p>
+                        <p id="spendGridEmpty" class="empty-state" style="display:none;">No credit card categories yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -64,6 +64,80 @@
                             </div>
                             <button class="button-inline" id="addCategoryBtn">Add category</button>
                         </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Bank Account Spending</h2>
+                        <span class="panel-sub">Non-card monthly expenses (e.g. mortgage, rent, utilities, loans)</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="bankSpendGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="bankSpendGridEmpty" class="empty-state" style="display:none;">No bank account expenses yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newBankCategory" placeholder="Expense (e.g. Rent, Utilities)" />
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newBankCategorySpend" placeholder="Spend / mo" min="0" step="1" />
+                                </div>
+                            </div>
+                            <button class="button-inline" id="addBankCategoryBtn">Add expense</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Income</h2>
+                        <span class="panel-sub">Monthly income sources (e.g. primary salary, side income)</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Income Source</th>
+                                    <th class="col-num">Monthly Amount</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="incomeGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="incomeGridEmpty" class="empty-state" style="display:none;">No income sources yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newIncomeSource" placeholder="Income source (e.g. Salary, Consulting)" />
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newIncomeAmount" placeholder="Amount / mo" min="0" step="1" />
+                                </div>
+                            </div>
+                            <button class="button-inline" id="addIncomeBtn">Add income</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Monthly Budget Balance</h2>
+                        <span class="panel-sub">Total Income &minus; Total Spending = Net Balance</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="balanceSummaryGrid" class="summary-grid"></div>
                     </div>
                 </div>
             </div>

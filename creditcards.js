@@ -1,12 +1,16 @@
 (function () {
     const sb = window.supabaseClient;
     const CATEGORIES_TABLE = 'household_spending_categories';
+    const BANK_SPENDING_TABLE = 'household_bank_spending';
+    const INCOME_TABLE = 'household_income';
     const CARDS_TABLE = 'credit_cards';
     const REWARDS_TABLE = 'card_rewards';
 
-    let spendRows = [];    // {id, category, monthly_spend}
-    let cardsRows = [];    // {id, name, annual_fee, base_rate}
-    let rewardRows = [];   // {id, card_id, category, rate, special_refund}
+    let spendRows = [];       // {id, category, monthly_spend} (Credit card spending)
+    let bankSpendRows = [];   // {id, category, monthly_spend} (Bank account spending)
+    let incomeRows = [];      // {id, source, monthly_amount} (Income)
+    let cardsRows = [];       // {id, name, annual_fee, base_rate}
+    let rewardRows = [];      // {id, card_id, category, rate, special_refund}
 
     let realtimeChannel = null;
     let realtimeDebounceTimer = null;
@@ -29,6 +33,9 @@
 
     function render() {
         renderSpendGrid();
+        renderBankSpendGrid();
+        renderIncomeGrid();
+        renderBalanceSummary();
         renderCardsGrid();
         renderRewardsGrid();
         renderCardOptions();
@@ -37,7 +44,7 @@
     }
 
     // -------------------------------------------------------------------
-    // Grid 1: Household Spending
+    // Grid 1: Credit Card Spending
     // -------------------------------------------------------------------
     function renderSpendGrid() {
         const body = document.getElementById('spendGridBody');
@@ -50,8 +57,8 @@
         spendRows.forEach(row => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category)}" data-field="category" style="width: 100%; min-width: 140px;"></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.monthly_spend ?? 0}" data-field="monthly_spend" style="width: 100%; min-width: 90px;"></div></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 140px;"></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.monthly_spend ?? row.amount ?? 0}" data-field="monthly_spend" style="width: 100%; min-width: 90px;"></div></td>
               <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete category">✕</button></td>
             `;
             tr.querySelectorAll('input').forEach(input => {
@@ -66,6 +73,110 @@
             if (delBtn) delBtn.addEventListener('click', () => deleteCategoryRow(row.id));
             body.appendChild(tr);
         });
+    }
+
+    // -------------------------------------------------------------------
+    // Grid 1b: Bank Account Spending
+    // -------------------------------------------------------------------
+    function renderBankSpendGrid() {
+        const body = document.getElementById('bankSpendGridBody');
+        const empty = document.getElementById('bankSpendGridEmpty');
+        if (!body) return;
+
+        body.innerHTML = '';
+        if (empty) empty.style.display = bankSpendRows.length ? 'none' : 'block';
+
+        bankSpendRows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 140px;"></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.monthly_spend ?? row.amount ?? 0}" data-field="monthly_spend" style="width: 100%; min-width: 90px;"></div></td>
+              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
+            `;
+            tr.querySelectorAll('input').forEach(input => {
+                input.addEventListener('change', () => {
+                    const field = input.dataset.field;
+                    let val = input.value;
+                    if (field === 'monthly_spend') val = parseFloat(val) || 0;
+                    updateBankSpendRow(row.id, { [field]: val });
+                });
+            });
+            const delBtn = tr.querySelector('.icon-delete');
+            if (delBtn) delBtn.addEventListener('click', () => deleteBankSpendRow(row.id));
+            body.appendChild(tr);
+        });
+    }
+
+    // -------------------------------------------------------------------
+    // Grid 1c: Income
+    // -------------------------------------------------------------------
+    function renderIncomeGrid() {
+        const body = document.getElementById('incomeGridBody');
+        const empty = document.getElementById('incomeGridEmpty');
+        if (!body) return;
+
+        body.innerHTML = '';
+        if (empty) empty.style.display = incomeRows.length ? 'none' : 'block';
+
+        incomeRows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td><input type="text" class="text-input" value="${escapeHtml(row.source || row.name || row.category || '')}" data-field="source" style="width: 100%; min-width: 140px;"></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.monthly_amount ?? row.amount ?? 0}" data-field="monthly_amount" style="width: 100%; min-width: 90px;"></div></td>
+              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete income source">✕</button></td>
+            `;
+            tr.querySelectorAll('input').forEach(input => {
+                input.addEventListener('change', () => {
+                    const field = input.dataset.field;
+                    let val = input.value;
+                    if (field === 'monthly_amount') val = parseFloat(val) || 0;
+                    updateIncomeRow(row.id, { [field]: val });
+                });
+            });
+            const delBtn = tr.querySelector('.icon-delete');
+            if (delBtn) delBtn.addEventListener('click', () => deleteIncomeRow(row.id));
+            body.appendChild(tr);
+        });
+    }
+
+    // -------------------------------------------------------------------
+    // Grid 1d: Budget Balance (Total Income - Total Spending = Balance)
+    // -------------------------------------------------------------------
+    function renderBalanceSummary() {
+        const container = document.getElementById('balanceSummaryGrid');
+        if (!container) return;
+
+        const totalCcSpend = spendRows.reduce((sum, r) => sum + (parseFloat(r.monthly_spend ?? r.amount) || 0), 0);
+        const totalBankSpend = bankSpendRows.reduce((sum, r) => sum + (parseFloat(r.monthly_spend ?? r.amount) || 0), 0);
+        const totalSpending = totalCcSpend + totalBankSpend;
+        const totalIncome = incomeRows.reduce((sum, r) => sum + (parseFloat(r.monthly_amount ?? r.amount) || 0), 0);
+        const netBalance = totalIncome - totalSpending;
+
+        const annualIncome = totalIncome * 12;
+        const annualSpending = totalSpending * 12;
+        const annualBalance = netBalance * 12;
+
+        const isSurplus = netBalance >= 0;
+        const statusClass = isSurplus ? 'surplus' : 'deficit';
+        const statusText = isSurplus ? 'Surplus' : 'Deficit';
+
+        container.innerHTML = `
+          <div class="summary-card">
+            <div class="label">Total Income</div>
+            <div class="value">${fmt$(totalIncome)}<span class="combo-unit">/mo</span></div>
+            <div class="foot">${fmt$(annualIncome)}/yr &middot; across ${incomeRows.length} source${incomeRows.length === 1 ? '' : 's'}</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Total Spending</div>
+            <div class="value">${fmt$(totalSpending)}<span class="combo-unit">/mo</span></div>
+            <div class="foot">CC: ${fmt$(totalCcSpend)}/mo &middot; Bank: ${fmt$(totalBankSpend)}/mo &middot; ${fmt$(annualSpending)}/yr</div>
+          </div>
+          <div class="summary-card ${statusClass}">
+            <div class="label">Net Balance (${statusText})</div>
+            <div class="value">${fmt$(netBalance)}<span class="combo-unit">/mo</span></div>
+            <div class="foot">Income (${fmt$(totalIncome)}) &minus; Spending (${fmt$(totalSpending)}) = ${fmt$(netBalance)}/mo (${fmt$(annualBalance)}/yr)</div>
+          </div>
+        `;
     }
 
     // -------------------------------------------------------------------
@@ -391,7 +502,7 @@
     }
 
     // -------------------------------------------------------------------
-    // Supabase CRUD — categories
+    // Supabase CRUD — categories (credit card spending)
     // -------------------------------------------------------------------
     async function loadCategories() {
         if (!sb) return;
@@ -401,7 +512,7 @@
             spendRows = data || [];
         } catch (err) {
             console.error('Error loading categories:', err);
-            if (window.setStatus) window.setStatus('Could not load spending categories.');
+            if (window.setStatus) window.setStatus('Could not load credit card spending categories.');
             spendRows = [];
         }
     }
@@ -412,7 +523,7 @@
             const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([data]).select().single();
             if (error) throw error;
             if (inserted) { spendRows.push(inserted); render(); }
-            if (window.setStatus) window.setStatus('Added category.');
+            if (window.setStatus) window.setStatus('Added credit card category.');
         } catch (err) {
             console.error('Could not add category:', err);
             if (window.setStatus) window.setStatus('Could not add category: ' + (err.message || err));
@@ -444,6 +555,118 @@
         } catch (err) {
             console.error('Could not delete category:', err);
             if (window.setStatus) window.setStatus('Could not delete category.');
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Supabase CRUD — bank spending
+    // -------------------------------------------------------------------
+    async function loadBankSpending() {
+        if (!sb) return;
+        try {
+            const { data, error } = await sb.from(BANK_SPENDING_TABLE).select('*').order('created_at', { ascending: true });
+            if (error) throw error;
+            bankSpendRows = data || [];
+        } catch (err) {
+            console.error('Error loading bank spending:', err);
+            bankSpendRows = [];
+        }
+    }
+
+    async function addBankSpendRow(data) {
+        if (!sb) return;
+        try {
+            const { data: inserted, error } = await sb.from(BANK_SPENDING_TABLE).insert([data]).select().single();
+            if (error) throw error;
+            if (inserted) { bankSpendRows.push(inserted); render(); }
+            if (window.setStatus) window.setStatus('Added bank expense.');
+        } catch (err) {
+            console.error('Could not add bank expense:', err);
+            if (window.setStatus) window.setStatus('Could not add bank expense: ' + (err.message || err));
+        }
+    }
+
+    async function updateBankSpendRow(id, patch) {
+        if (!sb) return;
+        try {
+            const row = bankSpendRows.find(r => r.id === id);
+            if (row) Object.assign(row, patch);
+            render();
+            const { error } = await sb.from(BANK_SPENDING_TABLE).update(patch).eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Could not update bank expense:', err);
+            if (window.setStatus) window.setStatus('Could not update bank expense.');
+        }
+    }
+
+    async function deleteBankSpendRow(id) {
+        if (!sb) return;
+        try {
+            const { error } = await sb.from(BANK_SPENDING_TABLE).delete().eq('id', id);
+            if (error) throw error;
+            bankSpendRows = bankSpendRows.filter(r => r.id !== id);
+            render();
+            if (window.setStatus) window.setStatus('Deleted bank expense.');
+        } catch (err) {
+            console.error('Could not delete bank expense:', err);
+            if (window.setStatus) window.setStatus('Could not delete bank expense.');
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Supabase CRUD — income
+    // -------------------------------------------------------------------
+    async function loadIncome() {
+        if (!sb) return;
+        try {
+            const { data, error } = await sb.from(INCOME_TABLE).select('*').order('created_at', { ascending: true });
+            if (error) throw error;
+            incomeRows = data || [];
+        } catch (err) {
+            console.error('Error loading income:', err);
+            incomeRows = [];
+        }
+    }
+
+    async function addIncomeRow(data) {
+        if (!sb) return;
+        try {
+            const { data: inserted, error } = await sb.from(INCOME_TABLE).insert([data]).select().single();
+            if (error) throw error;
+            if (inserted) { incomeRows.push(inserted); render(); }
+            if (window.setStatus) window.setStatus('Added income source.');
+        } catch (err) {
+            console.error('Could not add income source:', err);
+            if (window.setStatus) window.setStatus('Could not add income source: ' + (err.message || err));
+        }
+    }
+
+    async function updateIncomeRow(id, patch) {
+        if (!sb) return;
+        try {
+            const row = incomeRows.find(r => r.id === id);
+            if (row) Object.assign(row, patch);
+            render();
+            const { error } = await sb.from(INCOME_TABLE).update(patch).eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Could not update income source:', err);
+            if (window.setStatus) window.setStatus('Could not update income source.');
+        }
+    }
+
+    async function deleteIncomeRow(id) {
+        if (!sb) return;
+        try {
+            const { error } = await sb.from(INCOME_TABLE).delete().eq('id', id);
+            if (error) throw error;
+            incomeRows = incomeRows.filter(r => r.id !== id);
+            render();
+            if (window.setStatus) window.setStatus('Deleted income source.');
+        } catch (err) {
+            console.error('Could not delete income source:', err);
+            if (window.setStatus) window.setStatus('Could not delete income source.');
         }
     }
 
@@ -565,12 +788,14 @@
     }
 
     // -------------------------------------------------------------------
-    // Realtime sync (all three tables)
+    // Realtime sync (all tables)
     // -------------------------------------------------------------------
     function setupRealtime() {
         if (realtimeChannel || !sb) return;
         realtimeChannel = sb.channel('credit_cards_changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: CATEGORIES_TABLE }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: BANK_SPENDING_TABLE }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: INCOME_TABLE }, () => debounceReload())
             .on('postgres_changes', { event: '*', schema: 'public', table: CARDS_TABLE }, () => debounceReload())
             .on('postgres_changes', { event: '*', schema: 'public', table: REWARDS_TABLE }, () => debounceReload())
             .subscribe();
@@ -583,7 +808,7 @@
             if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
                 return;
             }
-            await Promise.all([loadCategories(), loadCards(), loadRewards()]);
+            await Promise.all([loadCategories(), loadBankSpending(), loadIncome(), loadCards(), loadRewards()]);
             render();
         }, 400);
     }
@@ -593,7 +818,7 @@
     });
 
     async function loadAll() {
-        await Promise.all([loadCategories(), loadCards(), loadRewards()]);
+        await Promise.all([loadCategories(), loadBankSpending(), loadIncome(), loadCards(), loadRewards()]);
         render();
         setupRealtime();
     }
@@ -616,6 +841,42 @@
             catInput.value = '';
             spendInput.value = '';
             catInput.focus();
+        });
+    }
+
+    const addBankCategoryBtn = document.getElementById('addBankCategoryBtn');
+    if (addBankCategoryBtn) {
+        addBankCategoryBtn.addEventListener('click', () => {
+            const catInput = document.getElementById('newBankCategory');
+            const spendInput = document.getElementById('newBankCategorySpend');
+            const category = catInput.value.trim();
+            const monthly_spend = parseFloat(spendInput.value) || 0;
+            if (!category) {
+                if (window.setStatus) window.setStatus('Expense name is required.');
+                return;
+            }
+            addBankSpendRow({ category, monthly_spend });
+            catInput.value = '';
+            spendInput.value = '';
+            catInput.focus();
+        });
+    }
+
+    const addIncomeBtn = document.getElementById('addIncomeBtn');
+    if (addIncomeBtn) {
+        addIncomeBtn.addEventListener('click', () => {
+            const sourceInput = document.getElementById('newIncomeSource');
+            const amountInput = document.getElementById('newIncomeAmount');
+            const source = sourceInput.value.trim();
+            const monthly_amount = parseFloat(amountInput.value) || 0;
+            if (!source) {
+                if (window.setStatus) window.setStatus('Income source is required.');
+                return;
+            }
+            addIncomeRow({ source, monthly_amount });
+            sourceInput.value = '';
+            amountInput.value = '';
+            sourceInput.focus();
         });
     }
 
@@ -719,6 +980,10 @@
             const targetId = e.target.id;
             if (['newCategory', 'newCategorySpend'].includes(targetId)) {
                 if (addCategoryBtn) addCategoryBtn.click();
+            } else if (['newBankCategory', 'newBankCategorySpend'].includes(targetId)) {
+                if (addBankCategoryBtn) addBankCategoryBtn.click();
+            } else if (['newIncomeSource', 'newIncomeAmount'].includes(targetId)) {
+                if (addIncomeBtn) addIncomeBtn.click();
             } else if (['newCardName', 'newCardFee', 'newCardBaseRate'].includes(targetId)) {
                 if (addCardBtn) addCardBtn.click();
             } else if (['newRewardCategory', 'newRate', 'newSpecialRefund'].includes(targetId)) {
