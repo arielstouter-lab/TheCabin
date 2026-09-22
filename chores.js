@@ -1,0 +1,499 @@
+(function(){
+  const DEFAULT_DISLIKE = 5;
+  const sb = window.supabaseClient;
+
+  let state = null;
+  const pendingSaves = {};
+
+  function debounceSave(key, fn, delay = 400){
+    clearTimeout(pendingSaves[key]);
+    pendingSaves[key] = setTimeout(async () => {
+      try{
+        await fn();
+      } catch(e){
+        setStatus('Could not save — try again.');
+      }
+    }, delay);
+  }
+
+  function dislikeOf(chore, personId){
+    const d = chore.dislike && chore.dislike[personId];
+    return typeof d === 'number' ? d : DEFAULT_DISLIKE;
+  }
+
+  function costFor(chore, personId){
+    return chore.timesPerWeek * chore.minutes * dislikeOf(chore, personId);
+  }
+
+  function shareOf(chore, personId){
+    const pct = (state.assignments[chore.id] && state.assignments[chore.id][personId]) || 0;
+    return Math.round(costFor(chore, personId) * pct / 100);
+  }
+
+  function choreTotalAtCurrentSplit(chore){
+    return state.people.reduce((sum,p) => sum + shareOf(chore, p.id), 0);
+  }
+
+  function splitTotal(choreId){
+    const a = state.assignments[choreId] || {};
+    return Object.values(a).reduce((s,v)=>s+(v||0),0);
+  }
+
+  async function load(){
+    try{
+      const [{data: people}, {data: chores}, {data: dislikes}, {data: assignments}] = await Promise.all([
+        sb.from('household_people').select('*').order('created_at'),
+        sb.from('household_chores').select('*').order('created_at'),
+        sb.from('chore_dislikes').select('*'),
+        sb.from('chore_assignments').select('*')
+      ]);
+
+      const chorelist = (chores || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        timesPerWeek: c.times_per_week,
+        minutes: c.minutes,
+        dislike: {}
+      }));
+      (dislikes || []).forEach(d => {
+        const c = chorelist.find(c => c.id === d.chore_id);
+        if(c) c.dislike[d.person_id] = d.dislike;
+      });
+
+      const assignMap = {};
+      (assignments || []).forEach(a => {
+        assignMap[a.chore_id] = assignMap[a.chore_id] || {};
+        assignMap[a.chore_id][a.person_id] = a.pct;
+      });
+
+      state = {
+        people: (people || []).map(p => ({id: p.id, name: p.name})),
+        chores: chorelist,
+        assignments: assignMap
+      };
+    } catch(e){
+      setStatus('Could not load data.');
+      state = {people: [], chores: [], assignments: {}};
+    }
+    render();
+  }
+
+  function totalsByPerson(){
+    const totals = {};
+    state.people.forEach(p => totals[p.id] = 0);
+    state.chores.forEach(c => {
+      state.people.forEach(p => { totals[p.id] += shareOf(c, p.id); });
+    });
+    return totals;
+  }
+
+  async function autoBalance(){
+    if(state.people.length === 0) return;
+    const totals = {};
+    state.people.forEach(p => totals[p.id] = 0);
+    const newAssign = {};
+
+    const sorted = [...state.chores].sort((a,b) => {
+      const worstA = Math.max(...state.people.map(p => costFor(a, p.id)), 0);
+      const worstB = Math.max(...state.people.map(p => costFor(b, p.id)), 0);
+      return worstB - worstA;
+    });
+    sorted.forEach(chore => {
+      let best = state.people[0].id;
+      state.people.forEach(p => {
+        if(totals[p.id] + costFor(chore, p.id) < totals[best] + costFor(chore, best)) best = p.id;
+      });
+      newAssign[chore.id] = {[best]: 100};
+      totals[best] += costFor(chore, best);
+    });
+
+    let guard = 0;
+    while(guard++ < 200){
+      let maxP = state.people[0].id, minP = state.people[0].id;
+      state.people.forEach(p => {
+        if(totals[p.id] > totals[maxP]) maxP = p.id;
+        if(totals[p.id] < totals[minP]) minP = p.id;
+      });
+      const diff = totals[maxP] - totals[minP];
+      if(diff <= 1 || maxP === minP) break;
+
+      const candidates = state.chores
+              .filter(c => newAssign[c.id] && newAssign[c.id][maxP] === 100)
+              .sort((a,b) => costFor(a, maxP) - costFor(b, maxP));
+      if(candidates.length === 0) break;
+      const chore = candidates[0];
+      const unitMax = costFor(chore, maxP) / 100;
+      const unitMin = costFor(chore, minP) / 100;
+      if(unitMax + unitMin <= 0) break;
+
+      const y = diff / (unitMax + unitMin);
+      if(y >= 100){
+        newAssign[chore.id] = {[minP]: 100};
+        totals[maxP] -= costFor(chore, maxP);
+        totals[minP] += costFor(chore, minP);
+      } else {
+        const pctToMin = Math.max(0, Math.min(100, Math.round(y)));
+        const pctToMax = 100 - pctToMin;
+        newAssign[chore.id] = {[minP]: pctToMin, [maxP]: pctToMax};
+        totals[maxP] -= Math.round(costFor(chore, maxP) * pctToMin / 100);
+        totals[minP] -= Math.round(costFor(chore, minP) * pctToMin / 100);
+        break;
+      }
+    }
+
+    state.assignments = newAssign;
+    render();
+
+    try{
+      const choreIds = Object.keys(newAssign);
+      if(choreIds.length){
+        await sb.from('chore_assignments').delete().in('chore_id', choreIds);
+        const rows = choreIds.flatMap(choreId =>
+                Object.entries(newAssign[choreId]).map(([personId, pct]) => ({chore_id: choreId, person_id: personId, pct}))
+        );
+        await sb.from('chore_assignments').insert(rows);
+      }
+    } catch(e){
+      setStatus('Balanced locally, but could not save.');
+    }
+  }
+
+  function render(){
+    renderBeam();
+    renderChores();
+    renderPeople();
+  }
+
+  function renderBeam(){
+    const beam = document.getElementById('cl-beam');
+    const totals = totalsByPerson();
+    const values = Object.values(totals);
+    const max = Math.max(1, ...values);
+    const mean = values.length ? values.reduce((a,b)=>a+b,0) / values.length : 0;
+
+    if(state.people.length === 0){
+      beam.innerHTML = '<p class="cl-beam-label">Add people to see the balance.</p>';
+      document.getElementById('cl-target-label').textContent = '';
+      return;
+    }
+    document.getElementById('cl-target-label').textContent = 'target ≈ ' + Math.round(mean) + ' pts/wk each';
+
+    let html = '<p class="cl-beam-label">Weekly points per person — gold line marks the even split.</p>';
+    state.people.forEach(p => {
+      const t = totals[p.id] || 0;
+      const widthPct = max > 0 ? (t / max) * 100 : 0;
+      const targetPct = max > 0 ? (mean / max) * 100 : 0;
+      const fillStyle = `width: ${widthPct}%;`;
+      const targetStyle = `left: ${targetPct}%;`;
+      const over = mean > 0 && t > mean * 1.15;
+      html += `
+        <div class="cl-beam-row">
+          <div class="cl-beam-name">${escapeHtml(p.name)}</div>
+          <div class="cl-beam-track">
+            <div class="cl-beam-fill ${over ? 'over' : ''}" style="${fillStyle}"></div>
+            <div class="cl-beam-target" style="${targetStyle}"></div>
+          </div>
+          <div class="cl-beam-pts">${t}</div>
+        </div>`;
+    });
+    beam.innerHTML = html;
+  }
+
+  function renderChores(){
+    const list = document.getElementById('cl-chore-list');
+    if(state.chores.length === 0){
+      list.innerHTML = '<p class="empty-state">No chores yet — add one below.</p>';
+      return;
+    }
+    list.innerHTML = state.chores.map(c => {
+      const total = splitTotal(c.id);
+      const totalClass = total === 100 ? 'good' : (total === 0 ? '' : 'bad');
+
+      const dislikeChips = state.people.map(p => `
+      <div class="chip chip--w36 chip-danger" title="${escapeAttr(p.name)}'s dislike of this chore">
+        <span>${escapeHtml(p.name)}</span>
+        <input type="number" min="1" max="10" value="${dislikeOf(c, p.id)}" data-dislike-chore="${c.id}" data-dislike-person="${p.id}" />
+      </div>`).join('');
+
+      const splitChips = state.people.map(p => {
+        const pct = (state.assignments[c.id] && state.assignments[c.id][p.id]) || 0;
+        return `
+        <div class="chip chip--w40">
+          <span>${escapeHtml(p.name)}</span>
+          <input type="number" min="0" max="100" value="${pct}" data-split-chore="${c.id}" data-split-person="${p.id}" />
+          <span>%</span>
+        </div>`;
+      }).join('');
+
+      return `
+      <div class="cl-chore-card" data-row="${c.id}">
+        <div class="cl-chore-top">
+          <input type="text" value="${escapeAttr(c.name)}" data-field="name" data-chore="${c.id}" />
+          <span class="cl-pts-badge" data-pts-badge="${c.id}">${choreTotalAtCurrentSplit(c)} pts/wk</span>
+          <button class="icon-delete" data-del-chore="${c.id}" title="Remove chore">✕</button>
+        </div>
+        <div class="cl-chip-groups">
+          <div class="cl-chip-group">
+            <div class="subrow-label">frequency &amp; time</div>
+            <div class="cl-chip-row">
+              <label class="chip chip--w52">×/week <input type="number" min="0" step="1" value="${c.timesPerWeek}" data-field="timesPerWeek" data-chore="${c.id}" /></label>
+              <label class="chip chip--w52">min <input type="number" min="0" step="1" value="${c.minutes}" data-field="minutes" data-chore="${c.id}" /></label>
+            </div>
+          </div>
+          <div class="cl-chip-group">
+            <div class="subrow-label">dislike (1&ndash;10), per person</div>
+            <div class="cl-chip-row">${dislikeChips}</div>
+          </div>
+          <div class="cl-chip-group">
+            <div class="subrow-label">share of the chore</div>
+            <div class="cl-chip-row">
+              ${splitChips}
+              <span class="cl-split-total ${totalClass}" data-split-total="${c.id}">${total}%</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderPeople(){
+    const wrap = document.getElementById('cl-people-list');
+    const totals = totalsByPerson();
+    if(state.people.length === 0){
+      wrap.innerHTML = '<p class="empty-state">No one on the ledger yet — add someone below.</p>';
+      return;
+    }
+    wrap.innerHTML = state.people.map(p => {
+      const mine = state.chores.filter(c => ((state.assignments[c.id]||{})[p.id]||0) > 0);
+      const ticketsHtml = mine.length
+              ? mine.map(c => {
+                const pct = (state.assignments[c.id]||{})[p.id] || 0;
+                return `
+            <div class="cl-ticket">
+              <span class="cl-ticket-name">${escapeHtml(c.name)}</span>
+              <span class="cl-ticket-share">${pct}% · dislike ${dislikeOf(c,p.id)}</span>
+              <span class="cl-ticket-pts">${shareOf(c, p.id)}</span>
+            </div>`;
+              }).join('')
+              : '<p class="empty-state">No chores assigned yet.</p>';
+
+      return `
+      <div class="cl-person">
+        <div class="cl-person-head">
+          <div>
+            <input class="cl-person-name" data-person-name="${p.id}" value="${escapeAttr(p.name)}" />
+            <button class="cl-person-remove" data-del-person="${p.id}">remove</button>
+          </div>
+          <div class="cl-person-total">${totals[p.id]||0} pts/wk</div>
+        </div>
+        ${ticketsHtml}
+      </div>`;
+    }).join('');
+  }
+
+  function refreshChoreBadge(choreId){
+    const chore = state.chores.find(c => c.id === choreId);
+    if(!chore) return;
+    const badge = document.querySelector(`[data-pts-badge="${choreId}"]`);
+    if(badge) badge.innerHTML = choreTotalAtCurrentSplit(chore) + ' pts/wk<small>at current split</small>';
+    const totalEl = document.querySelector(`[data-split-total="${choreId}"]`);
+    if(totalEl){
+      const total = splitTotal(choreId);
+      totalEl.textContent = total + '%';
+      totalEl.className = 'cl-split-total ' + (total === 100 ? 'good' : (total === 0 ? '' : 'bad'));
+    }
+  }
+  function refreshPeopleTotalsAndTickets(){
+    renderPeople();
+    renderBeam();
+  }
+
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+
+    if(t.matches('input[data-field][data-chore]')){
+      const chore = state.chores.find(c => c.id === t.dataset.chore);
+      if(!chore) return;
+      if(t.dataset.field === 'name') chore.name = t.value;
+      if(t.dataset.field === 'timesPerWeek') chore.timesPerWeek = Math.max(0, parseFloat(t.value) || 0);
+      if(t.dataset.field === 'minutes') chore.minutes = Math.max(0, parseFloat(t.value) || 0);
+      refreshChoreBadge(chore.id);
+      refreshPeopleTotalsAndTickets();
+      debounceSave(`chore-fields-${chore.id}`, () =>
+              sb.from('household_chores').update({
+                name: chore.name, times_per_week: chore.timesPerWeek, minutes: chore.minutes
+              }).eq('id', chore.id)
+      );
+    }
+
+    if(t.matches('input[data-dislike-chore][data-dislike-person]')){
+      const choreId = t.dataset.dislikeChore;
+      const personId = t.dataset.dislikePerson;
+      const chore = state.chores.find(c => c.id === choreId);
+      if(!chore) return;
+      const val = Math.min(10, Math.max(1, parseInt(t.value,10) || 1));
+      chore.dislike = chore.dislike || {};
+      chore.dislike[personId] = val;
+      refreshChoreBadge(choreId);
+      refreshPeopleTotalsAndTickets();
+      debounceSave(`dislike-${choreId}-${personId}`, () =>
+              sb.from('chore_dislikes').upsert({chore_id: choreId, person_id: personId, dislike: val})
+      );
+    }
+
+    if(t.matches('input[data-split-chore][data-split-person]')){
+      const choreId = t.dataset.splitChore;
+      const personId = t.dataset.splitPerson;
+      const pct = Math.min(100, Math.max(0, parseInt(t.value,10) || 0));
+      state.assignments[choreId] = state.assignments[choreId] || {};
+      state.assignments[choreId][personId] = pct;
+      refreshChoreBadge(choreId);
+      refreshPeopleTotalsAndTickets();
+      debounceSave(`split-${choreId}-${personId}`, () =>
+              sb.from('chore_assignments').upsert({chore_id: choreId, person_id: personId, pct})
+      );
+    }
+
+    if(t.matches('input[data-person-name]')){
+      const p = state.people.find(p => p.id === t.dataset.personName);
+      if(!p) return;
+      p.name = t.value;
+      renderBeam();
+      renderChores();
+      renderPeople();
+      debounceSave(`person-name-${p.id}`, () =>
+              sb.from('household_people').update({name: p.name}).eq('id', p.id)
+      );
+    }
+  });
+
+  document.addEventListener('click', async (e) => {
+    const t = e.target;
+
+    if(t.matches('[data-del-chore]')){
+      const id = t.getAttribute('data-del-chore');
+      state.chores = state.chores.filter(c => c.id !== id);
+      delete state.assignments[id];
+      render();
+      try{
+        await sb.from('household_chores').delete().eq('id', id);
+      } catch(err){ setStatus('Could not delete chore.'); }
+    }
+
+    if(t.matches('[data-del-person]')){
+      if(state.people.length <= 1){ setStatus('Keep at least one person.'); return; }
+      const id = t.getAttribute('data-del-person');
+      state.people = state.people.filter(p => p.id !== id);
+      state.chores.forEach(c => { if(c.dislike) delete c.dislike[id]; });
+      Object.keys(state.assignments).forEach(cid => {
+        if(state.assignments[cid]) delete state.assignments[cid][id];
+      });
+      render();
+      try{
+        await sb.from('household_people').delete().eq('id', id);
+      } catch(err){ setStatus('Could not delete person.'); }
+    }
+
+    if(t.id === 'cl-add-chore'){
+      const input = document.getElementById('cl-new-chore-name');
+      const name = input.value.trim();
+      if(!name) return;
+
+      try{
+        const {data, error} = await sb.from('household_chores')
+                .insert({name, times_per_week: 1, minutes: 15})
+                .select()
+                .single();
+        if(error || !data){ setStatus('Could not add chore.'); return; }
+        const id = data.id;
+
+        const dislike = {};
+        state.people.forEach(p => dislike[p.id] = DEFAULT_DISLIKE);
+        if(state.people.length){
+          await sb.from('chore_dislikes').upsert(
+                  state.people.map(p => ({chore_id: id, person_id: p.id, dislike: DEFAULT_DISLIKE}))
+          );
+        }
+        const firstPerson = state.people[0];
+        if(firstPerson){
+          await sb.from('chore_assignments').upsert({chore_id: id, person_id: firstPerson.id, pct: 100});
+        }
+
+        state.chores.push({id, name, timesPerWeek: 1, minutes: 15, dislike});
+        state.assignments[id] = firstPerson ? {[firstPerson.id]: 100} : {};
+        input.value = '';
+        render();
+      } catch(err){
+        setStatus('Could not add chore.');
+      }
+    }
+
+    if(t.id === 'cl-add-person'){
+      const input = document.getElementById('cl-new-person-name');
+      const name = input.value.trim();
+      if(!name) return;
+
+      try{
+        const {data, error} = await sb.from('household_people')
+                .insert({name})
+                .select()
+                .single();
+        if(error || !data){ setStatus('Could not add person.'); return; }
+        const id = data.id;
+
+        if(state.chores.length){
+          await sb.from('chore_dislikes').upsert(
+                  state.chores.map(c => ({chore_id: c.id, person_id: id, dislike: DEFAULT_DISLIKE}))
+          );
+        }
+
+        state.people.push({id, name});
+        state.chores.forEach(c => {
+          c.dislike = c.dislike || {};
+          c.dislike[id] = DEFAULT_DISLIKE;
+        });
+        input.value = '';
+        render();
+      } catch(err){
+        setStatus('Could not add person.');
+      }
+    }
+
+    if(t.id === 'cl-auto-balance'){
+      await autoBalance();
+      setStatus('Balanced.');
+    }
+
+    if(t.id === 'cl-clear-assign'){
+      const first = state.people[0];
+      state.chores.forEach(c => {
+        state.assignments[c.id] = first ? {[first.id]: 100} : {};
+      });
+      render();
+      setStatus('Reset — everything assigned 100% to the first person.');
+
+      try{
+        const choreIds = state.chores.map(c => c.id);
+        if(choreIds.length){
+          await sb.from('chore_assignments').delete().in('chore_id', choreIds);
+          if(first){
+            await sb.from('chore_assignments').insert(
+                    choreIds.map(cid => ({chore_id: cid, person_id: first.id, pct: 100}))
+            );
+          }
+        }
+      } catch(err){
+        setStatus('Reset locally, but could not save.');
+      }
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){
+      if(e.target.id === 'cl-new-chore-name') document.getElementById('cl-add-chore').click();
+      if(e.target.id === 'cl-new-person-name') document.getElementById('cl-add-person').click();
+    }
+  });
+
+  document.addEventListener('app:ready', load, { once: true });
+})();
