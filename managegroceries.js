@@ -12,11 +12,6 @@
         return [...aisles].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     }
 
-    function aisleName(id){
-        const a = aisles.find(a => a.id === id);
-        return a ? a.name : null;
-    }
-
     function aisleOptionsHtml(selectedId){
         const blank = `<option value="">Unassigned</option>`;
         const opts = sortedAisles().map(a =>

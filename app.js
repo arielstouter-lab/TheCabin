@@ -263,23 +263,24 @@ function getInitial(email) {
     .toUpperCase();
 }
 
-
-function getFriendlyAuthError(error) {
-  if (!error) {
-    return "Something went wrong. Please try again.";
-  }
-
-  switch (error.message) {
-    case "Invalid login credentials":
-      return "Incorrect email or password.";
-
-    case "Email not confirmed":
-      return "Your account has not been confirmed.";
-
-    default:
-      return error.message || "Unable to sign in.";
-  }
+function todayStr(d) {
+  const t = d ? new Date(d) : new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
+
+function getSeason(date) {
+  const d = date ? new Date(date) : new Date();
+  const m = d.getMonth() + 1; // 1-12
+  const day = d.getDate();
+
+  if ((m === 3 && day >= 20) || m === 4 || m === 5 || (m === 6 && day < 21)) return 'spring';
+  if ((m === 6 && day >= 21) || m === 7 || m === 8 || (m === 9 && day < 22)) return 'summer';
+  if ((m === 9 && day >= 22) || m === 10 || m === 11 || (m === 12 && day < 21)) return 'fall';
+  return 'winter';
+}
+
+window.todayStr = todayStr;
+window.getSeason = getSeason;
 
 /* -----------------------------
    Shared UI Helpers

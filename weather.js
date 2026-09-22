@@ -247,35 +247,3 @@ if (window.initAppPage) {
 } else {
     document.addEventListener("app:ready", initWeather, { once: true });
 }
-
-// ---- Seasonal background ------------------------------------------
-(function initSeasonalBackground() {
-    if (!document.body.classList.contains('cal-page')) return;
-
-    function getSeason(date) {
-        const m = date.getMonth() + 1; // 1-12
-        const d = date.getDate();
-        if ((m === 3 && d >= 20) || m === 4 || m === 5 || (m === 6 && d < 21)) return 'spring';
-        if ((m === 6 && d >= 21) || m === 7 || m === 8 || (m === 9 && d < 22)) return 'summer';
-        if ((m === 9 && d >= 22) || m === 10 || m === 11 || (m === 12 && d < 21)) return 'fall';
-        return 'winter';
-    }
-
-    const seasonImages = {
-        spring: 'spring.jpg',
-        summer: 'summer.jpg',
-        fall: 'fall.jpg',
-        winter: 'winter.jpg'
-    };
-
-    const season = getSeason(new Date());
-    const el = document.body;
-    el.dataset.season = season;
-
-    const img = new Image();
-    img.onload = () => {
-        el.style.setProperty('--season-img', `url(${seasonImages[season]})`);
-        el.classList.add('img-loaded');
-    };
-    img.src = seasonImages[season];
-})();

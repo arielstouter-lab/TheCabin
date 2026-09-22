@@ -13,10 +13,7 @@
     let groceryAisles = [];
     let groceryItemMemory = [];
 
-    function todayStr(){
-        const t = new Date();
-        return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
-    }
+    const todayStr = window.todayStr;
 
     function isPermanent(sec){
         return sec && PERMANENT_TABS.includes(sec.name);

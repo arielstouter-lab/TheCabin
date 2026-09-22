@@ -310,11 +310,6 @@ textarea {
   color: var(--line);
 }
 
-.sidebar-menu {
-  flex: 1 1 auto;
-  overflow-y: auto;
-}
-
 .sidebar-brand {
   display: flex;
   align-items: center;
@@ -649,6 +644,15 @@ textarea {
   padding: 4px 0 12px;
 }
 
+.panel-search {
+  padding: 10px 14px 4px;
+}
+
+.action-footer {
+  margin-top: 16px;
+  text-align: center;
+}
+
 /* Canonical text input used in "add new ..." rows */
 .text-input {
   flex: 1;
@@ -739,26 +743,6 @@ input[type=date]:focus {
   border-color: var(--line);
   border-bottom: 1px solid var(--card); /* Blends into the card below */
   z-index: 2;
-}
-
-/* Tab delete button */
-.tab-del {
-  background: transparent;
-  border: none;
-  color: var(--ink-soft);
-  font-size: 11px;
-  cursor: pointer;
-  padding: 0 2px;
-  border-radius: 4px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tab-del:hover {
-  color: var(--danger);
-  background: rgba(166, 67, 47, 0.1);
 }
 
 .subrow-label { font-size: 10.5px; color: var(--ink-soft); margin: 0 0 2px; text-transform: none; white-space: nowrap; }
@@ -1133,8 +1117,6 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 70%);
 }
 
-.wc-top { position: relative; display: flex; justify-content: space-between; align-items: flex-start; }
-
 .wc-updated {
   display: block;
   margin-top: 2px;
@@ -1142,8 +1124,6 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   color: rgba(246,245,241,0.7);
   text-align: right;
 }
-
-.wc-icon { width: 46px; height: 46px; flex-shrink: 0; }
 
 .wc-temp-row { position: relative; display: flex; align-items: baseline; gap: 6px; margin-top: 18px; }
 
@@ -1275,10 +1255,6 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     flex-direction: column;
     gap: 8px;
     padding: 8px 0;
-  }
-
-  .menu-item {
-    justify-content: center;
   }
 
   .topbar {

@@ -1,18 +1,10 @@
 (function(){
     const sb = window.supabaseClient;
+    const getSeason = window.getSeason;
+    const todayStr = window.todayStr;
     let viewYear, viewMonth; // 0-indexed month
     let selectedDate; // 'YYYY-MM-DD'
     let eventsByDate = {}; // {'YYYY-MM-DD': [{id, title}]}
-
-    function getSeason(date) {
-        const m = date.getMonth() + 1; // 1-12
-        const d = date.getDate();
-
-        if ((m === 3 && d >= 20) || m === 4 || m === 5 || (m === 6 && d < 21)) return 'spring';
-        if ((m === 6 && d >= 21) || m === 7 || m === 8 || (m === 9 && d < 22)) return 'summer';
-        if ((m === 9 && d >= 22) || m === 10 || m === 11 || (m === 12 && d < 21)) return 'fall';
-        return 'winter';
-    }
 
     const seasonImages = {
         spring: 'spring.jpg',
@@ -58,10 +50,6 @@
 
     function pad(n){ return String(n).padStart(2,'0'); }
     function toDateStr(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
-    function todayStr(){
-        const t = new Date();
-        return toDateStr(t.getFullYear(), t.getMonth(), t.getDate());
-    }
 
     async function loadMonth(){
         const first = toDateStr(viewYear, viewMonth, 1);
