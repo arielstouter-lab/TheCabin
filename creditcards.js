@@ -1,10 +1,12 @@
 (function () {
     const sb = window.supabaseClient;
     const CATEGORIES_TABLE = 'household_spending_categories';
+    const CARDS_TABLE = 'cards';
     const REWARDS_TABLE = 'card_rewards';
 
     let spendRows = [];    // {id, category, monthly_spend}
-    let rewardRows = [];   // {id, card, category, rate, fee}
+    let cardsRows = [];    // {id, name, annual_fee, base_rate}
+    let rewardRows = [];   // {id, card_id, category, rate, special_refund}
 
     let realtimeChannel = null;
     let realtimeDebounceTimer = null;
@@ -23,12 +25,9 @@
         return '$' + (Math.round(val * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function isDefaultRow(row) {
-        return !row.category || !row.category.trim();
-    }
-
     function render() {
         renderSpendGrid();
+        renderCardsGrid();
         renderRewardsGrid();
         renderCardOptions();
         renderComparison();
@@ -67,8 +66,47 @@
     }
 
     // -------------------------------------------------------------------
-    // Grid 2: Card Rewards
+    // Grid 2: Credit Cards (name, annual fee, base rate)
     // -------------------------------------------------------------------
+    function renderCardsGrid() {
+        const body = document.getElementById('cardsGridBody');
+        const empty = document.getElementById('cardsGridEmpty');
+        if (!body) return;
+
+        body.innerHTML = '';
+        if (empty) empty.style.display = cardsRows.length ? 'none' : 'block';
+
+        cardsRows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td><input type="text" class="text-input" value="${escapeHtml(row.name)}" data-field="name" style="width: 100%; min-width: 140px;"></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.annual_fee ?? 0}" data-field="annual_fee" style="width: 100%; min-width: 80px;"></div></td>
+              <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.base_rate ?? 0}" data-field="base_rate" style="width: 100%; min-width: 70px;"></div></td>
+              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete card">✕</button></td>
+            `;
+            tr.querySelectorAll('input').forEach(input => {
+                input.addEventListener('change', () => {
+                    const field = input.dataset.field;
+                    let val = input.value;
+                    if (field === 'annual_fee' || field === 'base_rate') val = parseFloat(val) || 0;
+                    updateCardRow(row.id, { [field]: val });
+                });
+            });
+            const delBtn = tr.querySelector('.icon-delete');
+            if (delBtn) delBtn.addEventListener('click', () => deleteCardRow(row.id));
+            body.appendChild(tr);
+        });
+    }
+
+    // -------------------------------------------------------------------
+    // Grid 3: Card Rewards (category-specific overrides)
+    // -------------------------------------------------------------------
+    function cardOptionsHtml(selectedId) {
+        return '<option value="">Choose a card…</option>' + cardsRows.map(c =>
+            `<option value="${escapeHtml(c.id)}"${c.id === selectedId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
+        ).join('');
+    }
+
     function renderRewardsGrid() {
         const body = document.getElementById('rewardsGridBody');
         const empty = document.getElementById('rewardsGridEmpty');
@@ -79,22 +117,18 @@
 
         rewardRows.forEach(row => {
             const tr = document.createElement('tr');
-            const catDisplay = isDefaultRow(row) ? '' : escapeHtml(row.category);
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.card)}" data-field="card" style="width: 100%; min-width: 120px;"></td>
-              <td>
-                <input type="text" class="text-input" value="${catDisplay}" data-field="category" placeholder="Everything else" style="width: 100%; min-width: 120px;">
-              </td>
+              <td><select class="text-input" data-field="card_id" style="width: 100%; min-width: 130px;">${cardOptionsHtml(row.card_id)}</select></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category)}" data-field="category" style="width: 100%; min-width: 120px;"></td>
               <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.rate ?? 0}" data-field="rate" style="width: 100%; min-width: 70px;"></div></td>
               <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.special_refund ?? 0}" data-field="special_refund" style="width: 100%; min-width: 80px;"></div></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.fee ?? 0}" data-field="fee" style="width: 100%; min-width: 80px;"></div></td>
               <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete row">✕</button></td>
             `;
-            tr.querySelectorAll('input').forEach(input => {
+            tr.querySelectorAll('input, select').forEach(input => {
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
-                    if (field === 'rate' || field === 'fee' || field === 'special_refund') val = parseFloat(val) || 0;
+                    if (field === 'rate' || field === 'special_refund') val = parseFloat(val) || 0;
                     updateRewardRow(row.id, { [field]: val });
                 });
             });
@@ -105,33 +139,43 @@
     }
 
     function renderCardOptions() {
-        const cards = [...new Set(rewardRows.map(r => r.card).filter(Boolean))].sort();
+        // Add-row dropdown for Card Rewards
+        const newRewardCard = document.getElementById('newRewardCard');
+        if (newRewardCard) {
+            const current = newRewardCard.value;
+            newRewardCard.innerHTML = cardOptionsHtml('');
+            const ids = cardsRows.map(c => c.id);
+            if (ids.includes(current)) newRewardCard.value = current;
+        }
+
+        // Head-to-head pickers — driven by the Credit Cards list, so a card
+        // with just a base rate (no overrides yet) still shows up. Options
+        // are keyed by card id so a rename never breaks the selection.
+        const sortedCards = [...cardsRows].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const aSel = document.getElementById('cardASelect');
         const bSel = document.getElementById('cardBSelect');
         if (!aSel || !bSel) return;
 
         [aSel, bSel].forEach(sel => {
             const current = sel.value;
-            sel.innerHTML = '<option value="">Choose a card…</option>' + cards.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-            if (cards.includes(current)) sel.value = current;
+            sel.innerHTML = '<option value="">Choose a card…</option>' + sortedCards.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+            if (sortedCards.some(c => c.id === current)) sel.value = current;
         });
     }
 
     // Effective rate (+ any special refund) for a card in a given category:
-    // exact match first, then the card's blank/default row, else nothing.
-    function getEffectiveRate(cardName, category) {
-        const cardRows = rewardRows.filter(r => r.card === cardName);
-        const exact = cardRows.find(r => !isDefaultRow(r) && r.category.trim().toLowerCase() === category.trim().toLowerCase());
+    // an exact category override first, else the card's base rate.
+    function getEffectiveRate(cardId, category) {
+        const exact = rewardRows.find(r => r.card_id === cardId && r.category && r.category.trim().toLowerCase() === category.trim().toLowerCase());
         if (exact) return { rate: exact.rate || 0, refund: exact.special_refund || 0, isDefault: false };
-        const def = cardRows.find(isDefaultRow);
-        if (def) return { rate: def.rate || 0, refund: def.special_refund || 0, isDefault: true };
+        const card = cardsRows.find(c => c.id === cardId);
+        if (card) return { rate: card.base_rate || 0, refund: 0, isDefault: true };
         return { rate: 0, refund: 0, isDefault: false, none: true };
     }
 
-    function getAnnualFee(cardName) {
-        const cardRows = rewardRows.filter(r => r.card === cardName);
-        const withFee = cardRows.find(r => r.fee);
-        return withFee ? withFee.fee : (cardRows[0] ? (cardRows[0].fee || 0) : 0);
+    function getAnnualFee(cardId) {
+        const card = cardsRows.find(c => c.id === cardId);
+        return card ? (card.annual_fee || 0) : 0;
     }
 
     // -------------------------------------------------------------------
@@ -142,14 +186,14 @@
         const bSel = document.getElementById('cardBSelect');
         if (!aSel || !bSel) return;
 
-        const aName = aSel.value;
-        const bName = bSel.value;
+        const aId = aSel.value;
+        const bId = bSel.value;
         const compareTable = document.getElementById('compareTable');
         const compareTableWrap = document.getElementById('compareTableWrap');
         const compareEmpty = document.getElementById('compareEmpty');
         const summaryGrid = document.getElementById('summaryGrid');
 
-        if (!aName || !bName || aName === bName || !spendRows.length) {
+        if (!aId || !bId || aId === bId || !spendRows.length) {
             if (compareTableWrap) compareTableWrap.style.display = 'none';
             else if (compareTable) compareTable.style.display = 'none';
             if (summaryGrid) summaryGrid.style.display = 'none';
@@ -157,12 +201,15 @@
                 compareEmpty.style.display = 'block';
                 compareEmpty.textContent = !spendRows.length
                     ? 'Add at least one spending category above to compare.'
-                    : (!aName || !bName)
+                    : (!aId || !bId)
                         ? 'Pick two different cards above to compare.'
                         : 'Pick two different cards to compare.';
             }
             return;
         }
+
+        const aName = (cardsRows.find(c => c.id === aId) || {}).name || '';
+        const bName = (cardsRows.find(c => c.id === bId) || {}).name || '';
 
         if (compareEmpty) compareEmpty.style.display = 'none';
         if (compareTableWrap) compareTableWrap.style.display = 'block';
@@ -174,8 +221,8 @@
         if (headA) headA.textContent = aName;
         if (headB) headB.textContent = bName;
 
-        const aFee = getAnnualFee(aName);
-        const bFee = getAnnualFee(bName);
+        const aFee = getAnnualFee(aId);
+        const bFee = getAnnualFee(bId);
 
         let aTotal = 0, bTotal = 0, bestTotal = 0;
         const tbody = document.getElementById('compareBody');
@@ -185,8 +232,8 @@
         const categoryResults = spendRows.map(catRow => {
             const cat = catRow.category;
             const spend = catRow.monthly_spend || 0;
-            const a = getEffectiveRate(aName, cat);
-            const b = getEffectiveRate(bName, cat);
+            const a = getEffectiveRate(aId, cat);
+            const b = getEffectiveRate(bId, cat);
             const aReward = (spend * a.rate / 100) + a.refund;
             const bReward = (spend * b.rate / 100) + b.refund;
             return { cat, spend, a, b, aReward, bReward, best: Math.max(aReward, bReward) };
@@ -205,8 +252,8 @@
             else if (bReward > aReward) winnerHtml = `<span class="win-b">${escapeHtml(bName)}</span><span class="badge b">+${fmt$(bReward - aReward)}</span>`;
             else winnerHtml = `<span class="tie">Tie</span>`;
 
-            const aCell = a.none ? '<span class="empty-state">no rate</span>' : `${a.rate.toFixed(1)}%${a.isDefault ? ' <span class="empty-state">(default)</span>' : ''} &rarr; ${fmt$(aReward)}${a.refund ? ' <span class="empty-state">(incl. ' + fmt$(a.refund) + ' refund)</span>' : ''}`;
-            const bCell = b.none ? '<span class="empty-state">no rate</span>' : `${b.rate.toFixed(1)}%${b.isDefault ? ' <span class="empty-state">(default)</span>' : ''} &rarr; ${fmt$(bReward)}${b.refund ? ' <span class="empty-state">(incl. ' + fmt$(b.refund) + ' refund)</span>' : ''}`;
+            const aCell = a.none ? '<span class="empty-state">no rate</span>' : `${a.rate.toFixed(1)}%${a.isDefault ? ' <span class="empty-state">(base)</span>' : ''} &rarr; ${fmt$(aReward)}${a.refund ? ' <span class="empty-state">(incl. ' + fmt$(a.refund) + ' refund)</span>' : ''}`;
+            const bCell = b.none ? '<span class="empty-state">no rate</span>' : `${b.rate.toFixed(1)}%${b.isDefault ? ' <span class="empty-state">(base)</span>' : ''} &rarr; ${fmt$(bReward)}${b.refund ? ' <span class="empty-state">(incl. ' + fmt$(b.refund) + ' refund)</span>' : ''}`;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -301,7 +348,67 @@
     }
 
     // -------------------------------------------------------------------
-    // Supabase CRUD — card rewards
+    // Supabase CRUD — cards
+    // -------------------------------------------------------------------
+    async function loadCards() {
+        if (!sb) return;
+        try {
+            const { data, error } = await sb.from(CARDS_TABLE).select('*').order('created_at', { ascending: true });
+            if (error) throw error;
+            cardsRows = data || [];
+        } catch (err) {
+            console.error('Error loading cards:', err);
+            if (window.setStatus) window.setStatus('Could not load cards.');
+            cardsRows = [];
+        }
+    }
+
+    async function addCardRow(data) {
+        if (!sb) return;
+        try {
+            const { data: inserted, error } = await sb.from(CARDS_TABLE).insert([data]).select().single();
+            if (error) throw error;
+            if (inserted) { cardsRows.push(inserted); render(); }
+            if (window.setStatus) window.setStatus('Added card.');
+        } catch (err) {
+            console.error('Could not add card:', err);
+            if (window.setStatus) window.setStatus('Could not add card: ' + (err.message || err));
+        }
+    }
+
+    async function updateCardRow(id, patch) {
+        if (!sb) return;
+        try {
+            const row = cardsRows.find(r => r.id === id);
+            if (row) Object.assign(row, patch);
+            // If the card's name changed, keep reward-row references in sync
+            // for display purposes only (the DB rows still store the old
+            // name until their own edit/save, since they're matched by id).
+            render();
+            const { error } = await sb.from(CARDS_TABLE).update(patch).eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Could not update card:', err);
+            if (window.setStatus) window.setStatus('Could not update card.');
+        }
+    }
+
+    async function deleteCardRow(id) {
+        if (!sb) return;
+        try {
+            const { error } = await sb.from(CARDS_TABLE).delete().eq('id', id);
+            if (error) throw error;
+            cardsRows = cardsRows.filter(r => r.id !== id);
+            render();
+            if (window.setStatus) window.setStatus('Deleted card.');
+        } catch (err) {
+            console.error('Could not delete card:', err);
+            if (window.setStatus) window.setStatus('Could not delete card.');
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Supabase CRUD — card rewards (category overrides)
     // -------------------------------------------------------------------
     async function loadRewards() {
         if (!sb) return;
@@ -322,7 +429,7 @@
             const { data: inserted, error } = await sb.from(REWARDS_TABLE).insert([data]).select().single();
             if (error) throw error;
             if (inserted) { rewardRows.push(inserted); render(); }
-            if (window.setStatus) window.setStatus('Added card reward.');
+            if (window.setStatus) window.setStatus('Added reward rate.');
         } catch (err) {
             console.error('Could not add row:', err);
             if (window.setStatus) window.setStatus('Could not add row: ' + (err.message || err));
@@ -358,12 +465,13 @@
     }
 
     // -------------------------------------------------------------------
-    // Realtime sync (both tables)
+    // Realtime sync (all three tables)
     // -------------------------------------------------------------------
     function setupRealtime() {
         if (realtimeChannel || !sb) return;
         realtimeChannel = sb.channel('credit_cards_changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: CATEGORIES_TABLE }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: CARDS_TABLE }, () => debounceReload())
             .on('postgres_changes', { event: '*', schema: 'public', table: REWARDS_TABLE }, () => debounceReload())
             .subscribe();
     }
@@ -375,7 +483,7 @@
             if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
                 return;
             }
-            await Promise.all([loadCategories(), loadRewards()]);
+            await Promise.all([loadCategories(), loadCards(), loadRewards()]);
             render();
         }, 400);
     }
@@ -385,7 +493,7 @@
     });
 
     async function loadAll() {
-        await Promise.all([loadCategories(), loadRewards()]);
+        await Promise.all([loadCategories(), loadCards(), loadRewards()]);
         render();
         setupRealtime();
     }
@@ -411,33 +519,57 @@
         });
     }
 
-    const addRewardBtn = document.getElementById('addRewardBtn');
-    if (addRewardBtn) {
-        addRewardBtn.addEventListener('click', () => {
-            const cardInput = document.getElementById('newCard');
-            const catInput = document.getElementById('newRewardCategory');
-            const rateInput = document.getElementById('newRate');
-            const refundInput = document.getElementById('newSpecialRefund');
-            const feeInput = document.getElementById('newFee');
+    const addCardBtn = document.getElementById('addCardBtn');
+    if (addCardBtn) {
+        addCardBtn.addEventListener('click', () => {
+            const nameInput = document.getElementById('newCardName');
+            const feeInput = document.getElementById('newCardFee');
+            const baseRateInput = document.getElementById('newCardBaseRate');
 
-            const card = cardInput.value.trim();
-            const category = catInput.value.trim(); // blank = "everything else"
-            const rate = parseFloat(rateInput.value) || 0;
-            const special_refund = parseFloat(refundInput.value) || 0;
-            const fee = parseFloat(feeInput.value) || 0;
+            const name = nameInput.value.trim();
+            const annual_fee = parseFloat(feeInput.value) || 0;
+            const base_rate = parseFloat(baseRateInput.value) || 0;
 
-            if (!card) {
+            if (!name) {
                 if (window.setStatus) window.setStatus('Card name is required.');
                 return;
             }
 
-            addRewardRow({ card, category, rate, special_refund, fee });
-            cardInput.value = '';
+            addCardRow({ name, annual_fee, base_rate });
+            nameInput.value = '';
+            feeInput.value = '';
+            baseRateInput.value = '';
+            nameInput.focus();
+        });
+    }
+
+    const addRewardBtn = document.getElementById('addRewardBtn');
+    if (addRewardBtn) {
+        addRewardBtn.addEventListener('click', () => {
+            const cardSelect = document.getElementById('newRewardCard');
+            const catInput = document.getElementById('newRewardCategory');
+            const rateInput = document.getElementById('newRate');
+            const refundInput = document.getElementById('newSpecialRefund');
+
+            const card = cardSelect.value; // this is now a card id
+            const category = catInput.value.trim();
+            const rate = parseFloat(rateInput.value) || 0;
+            const special_refund = parseFloat(refundInput.value) || 0;
+
+            if (!card) {
+                if (window.setStatus) window.setStatus('Choose a card first — add one above if it\'s not listed yet.');
+                return;
+            }
+            if (!category) {
+                if (window.setStatus) window.setStatus('Category is required for a reward override.');
+                return;
+            }
+
+            addRewardRow({ card_id: card, category, rate, special_refund });
             catInput.value = '';
             rateInput.value = '';
             refundInput.value = '';
-            feeInput.value = '';
-            cardInput.focus();
+            catInput.focus();
         });
     }
 
@@ -451,7 +583,9 @@
             const targetId = e.target.id;
             if (['newCategory', 'newCategorySpend'].includes(targetId)) {
                 if (addCategoryBtn) addCategoryBtn.click();
-            } else if (['newCard', 'newRewardCategory', 'newRate', 'newSpecialRefund', 'newFee'].includes(targetId)) {
+            } else if (['newCardName', 'newCardFee', 'newCardBaseRate'].includes(targetId)) {
+                if (addCardBtn) addCardBtn.click();
+            } else if (['newRewardCategory', 'newRate', 'newSpecialRefund'].includes(targetId)) {
                 if (addRewardBtn) addRewardBtn.click();
             }
         }
