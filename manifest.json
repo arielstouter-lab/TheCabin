@@ -1,0 +1,24 @@
+{
+  "name": "The Cabin",
+  "short_name": "The Cabin",
+  "description": "Household calendar, chores, lists, recipes, and weather for The Cabin.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#EFEBDD",
+  "theme_color": "#37533F",
+  "icons": [
+    {
+      "src": "pinecone.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "pinecone.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
