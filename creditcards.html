@@ -70,6 +70,7 @@
                                 <th>Card</th>
                                 <th>Category</th>
                                 <th class="col-num">Reward Rate</th>
+                                <th class="col-num">Special Refund</th>
                                 <th class="col-num">Annual Fee</th>
                                 <th class="col-action"></th>
                             </tr>
@@ -87,12 +88,15 @@
                                 <input type="number" class="text-input" id="newRate" placeholder="Rate %" min="0" step="0.1" />
                             </div>
                             <div class="num-wrap money">
+                                <input type="number" class="text-input" id="newSpecialRefund" placeholder="Special refund" min="0" step="1" />
+                            </div>
+                            <div class="num-wrap money">
                                 <input type="number" class="text-input" id="newFee" placeholder="Fee / yr" min="0" step="1" />
                             </div>
                         </div>
                         <button class="button-inline" id="addRewardBtn" style="white-space: nowrap;">Add rate</button>
                     </div>
-                    <p class="empty-state" style="margin-top: 10px;">Annual fee only needs to be entered once per card &mdash; it applies to every row for that card automatically.</p>
+                    <p class="empty-state" style="margin-top: 10px;">Annual fee only needs to be entered once per card &mdash; it applies to every row for that card automatically. Special refund is a flat $/mo add-on for that specific card + category (e.g. a fixed statement credit), on top of the percentage reward.</p>
                 </div>
             </div>
 

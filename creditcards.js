@@ -3,7 +3,6 @@
     const CATEGORIES_TABLE = 'household_spending_categories';
     const REWARDS_TABLE = 'card_rewards';
 
-
     let spendRows = [];    // {id, category, monthly_spend}
     let rewardRows = [];   // {id, card, category, rate, fee}
 
@@ -87,6 +86,7 @@
                 <input type="text" class="text-input" value="${catDisplay}" data-field="category" placeholder="Everything else" style="width: 100%; min-width: 120px;">
               </td>
               <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.rate ?? 0}" data-field="rate" style="width: 100%; min-width: 70px;"></div></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.special_refund ?? 0}" data-field="special_refund" style="width: 100%; min-width: 80px;"></div></td>
               <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.fee ?? 0}" data-field="fee" style="width: 100%; min-width: 80px;"></div></td>
               <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete row">✕</button></td>
             `;
@@ -94,7 +94,7 @@
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
-                    if (field === 'rate' || field === 'fee') val = parseFloat(val) || 0;
+                    if (field === 'rate' || field === 'fee' || field === 'special_refund') val = parseFloat(val) || 0;
                     updateRewardRow(row.id, { [field]: val });
                 });
             });
@@ -117,15 +117,15 @@
         });
     }
 
-    // Effective rate for a card in a given category: exact match first,
-    // then the card's blank/default row, else 0.
+    // Effective rate (+ any special refund) for a card in a given category:
+    // exact match first, then the card's blank/default row, else nothing.
     function getEffectiveRate(cardName, category) {
         const cardRows = rewardRows.filter(r => r.card === cardName);
         const exact = cardRows.find(r => !isDefaultRow(r) && r.category.trim().toLowerCase() === category.trim().toLowerCase());
-        if (exact) return { rate: exact.rate || 0, isDefault: false };
+        if (exact) return { rate: exact.rate || 0, refund: exact.special_refund || 0, isDefault: false };
         const def = cardRows.find(isDefaultRow);
-        if (def) return { rate: def.rate || 0, isDefault: true };
-        return { rate: 0, isDefault: false, none: true };
+        if (def) return { rate: def.rate || 0, refund: def.special_refund || 0, isDefault: true };
+        return { rate: 0, refund: 0, isDefault: false, none: true };
     }
 
     function getAnnualFee(cardName) {
@@ -182,13 +182,19 @@
         if (!tbody) return;
         tbody.innerHTML = '';
 
-        spendRows.forEach(catRow => {
+        const categoryResults = spendRows.map(catRow => {
             const cat = catRow.category;
             const spend = catRow.monthly_spend || 0;
             const a = getEffectiveRate(aName, cat);
             const b = getEffectiveRate(bName, cat);
-            const aReward = spend * a.rate / 100;
-            const bReward = spend * b.rate / 100;
+            const aReward = (spend * a.rate / 100) + a.refund;
+            const bReward = (spend * b.rate / 100) + b.refund;
+            return { cat, spend, a, b, aReward, bReward, best: Math.max(aReward, bReward) };
+        });
+
+        categoryResults.sort((x, y) => y.best - x.best);
+
+        categoryResults.forEach(({ cat, spend, a, b, aReward, bReward }) => {
             aTotal += aReward;
             bTotal += bReward;
             bestTotal += Math.max(aReward, bReward);
@@ -199,8 +205,8 @@
             else if (bReward > aReward) winnerHtml = `<span class="win-b">${escapeHtml(bName)}</span><span class="badge b">+${fmt$(bReward - aReward)}</span>`;
             else winnerHtml = `<span class="tie">Tie</span>`;
 
-            const aCell = a.none ? '<span class="empty-state">no rate</span>' : `${a.rate.toFixed(1)}%${a.isDefault ? ' <span class="empty-state">(default)</span>' : ''} &rarr; ${fmt$(aReward)}`;
-            const bCell = b.none ? '<span class="empty-state">no rate</span>' : `${b.rate.toFixed(1)}%${b.isDefault ? ' <span class="empty-state">(default)</span>' : ''} &rarr; ${fmt$(bReward)}`;
+            const aCell = a.none ? '<span class="empty-state">no rate</span>' : `${a.rate.toFixed(1)}%${a.isDefault ? ' <span class="empty-state">(default)</span>' : ''} &rarr; ${fmt$(aReward)}${a.refund ? ' <span class="empty-state">(incl. ' + fmt$(a.refund) + ' refund)</span>' : ''}`;
+            const bCell = b.none ? '<span class="empty-state">no rate</span>' : `${b.rate.toFixed(1)}%${b.isDefault ? ' <span class="empty-state">(default)</span>' : ''} &rarr; ${fmt$(bReward)}${b.refund ? ' <span class="empty-state">(incl. ' + fmt$(b.refund) + ' refund)</span>' : ''}`;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -214,21 +220,24 @@
         });
 
         if (summaryGrid) {
+            const aNet = aTotal - aFee / 12;
+            const bNet = bTotal - bFee / 12;
+            const bestNet = bestTotal - (aFee + bFee) / 12;
             summaryGrid.innerHTML = `
             <div class="summary-card">
               <div class="label">${escapeHtml(aName)}</div>
-              <div class="value">${fmt$(aTotal)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo</span></div>
-              <div class="foot">Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) &middot; Net ${fmt$(aTotal - aFee / 12)}/mo</div>
+              <div class="value">${fmt$(aNet)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo net</span></div>
+              <div class="foot">Rewards ${fmt$(aTotal)}/mo &middot; Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) &middot; Net ${fmt$(aNet)}/mo</div>
             </div>
             <div class="summary-card">
               <div class="label">${escapeHtml(bName)}</div>
-              <div class="value">${fmt$(bTotal)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo</span></div>
-              <div class="foot">Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) &middot; Net ${fmt$(bTotal - bFee / 12)}/mo</div>
+              <div class="value">${fmt$(bNet)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo net</span></div>
+              <div class="foot">Rewards ${fmt$(bTotal)}/mo &middot; Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) &middot; Net ${fmt$(bNet)}/mo</div>
             </div>
             <div class="summary-card best">
               <div class="label">Best of Both (optimal routing)</div>
-              <div class="value">${fmt$(bestTotal)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo</span></div>
-              <div class="foot">If you used whichever card wins each category &middot; minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestTotal - (aFee + bFee) / 12)}/mo</div>
+              <div class="value">${fmt$(bestNet)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo net</span></div>
+              <div class="foot">Rewards ${fmt$(bestTotal)}/mo if you used whichever card wins each category &middot; minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestNet)}/mo</div>
             </div>
           `;
         }
@@ -408,11 +417,13 @@
             const cardInput = document.getElementById('newCard');
             const catInput = document.getElementById('newRewardCategory');
             const rateInput = document.getElementById('newRate');
+            const refundInput = document.getElementById('newSpecialRefund');
             const feeInput = document.getElementById('newFee');
 
             const card = cardInput.value.trim();
             const category = catInput.value.trim(); // blank = "everything else"
             const rate = parseFloat(rateInput.value) || 0;
+            const special_refund = parseFloat(refundInput.value) || 0;
             const fee = parseFloat(feeInput.value) || 0;
 
             if (!card) {
@@ -420,10 +431,11 @@
                 return;
             }
 
-            addRewardRow({ card, category, rate, fee });
+            addRewardRow({ card, category, rate, special_refund, fee });
             cardInput.value = '';
             catInput.value = '';
             rateInput.value = '';
+            refundInput.value = '';
             feeInput.value = '';
             cardInput.focus();
         });
@@ -439,7 +451,7 @@
             const targetId = e.target.id;
             if (['newCategory', 'newCategorySpend'].includes(targetId)) {
                 if (addCategoryBtn) addCategoryBtn.click();
-            } else if (['newCard', 'newRewardCategory', 'newRate', 'newFee'].includes(targetId)) {
+            } else if (['newCard', 'newRewardCategory', 'newRate', 'newSpecialRefund', 'newFee'].includes(targetId)) {
                 if (addRewardBtn) addRewardBtn.click();
             }
         }
