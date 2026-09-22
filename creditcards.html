@@ -24,148 +24,165 @@
         </header>
 
         <section class="content">
-            <div class="panel">
-                <div class="panel-head">
-                    <h2 class="panel-title">Head-to-Head Comparison</h2>
-                </div>
-                <div class="panel-body" style="padding: 16px;">
-                    <div class="compare-pickers">
-                        <div class="picker">
-                            <label for="cardASelect">Card A</label>
-                            <select id="cardASelect"><option value="">Choose a card…</option></select>
-                        </div>
-                        <div class="picker">
-                            <label for="cardBSelect">Card B</label>
-                            <select id="cardBSelect"><option value="">Choose a card…</option></select>
-                        </div>
-                    </div>
-
-                    <p id="compareEmpty" class="empty-state" style="text-align: center; margin: 20px 0;">Add spending categories and at least two cards above, then pick them here.</p>
-
-                    <div class="table-wrap" id="compareTableWrap" style="display:none; margin-top: 16px;">
-                        <table class="cc-table" id="compareTable">
-                            <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th class="col-num">Monthly Spend</th>
-                                <th class="col-num" id="headA">Card A</th>
-                                <th class="col-num" id="headB">Card B</th>
-                                <th>Best</th>
-                            </tr>
-                            </thead>
-                            <tbody id="compareBody"></tbody>
-                        </table>
-                    </div>
-
-                    <div id="summaryGrid" class="summary-grid" style="display:none;"></div>
-                </div>
+            <div class="tabs-container" id="cc-tabs">
+                <button type="button" class="tab active" data-tab="budget">
+                    <span>Budget</span>
+                </button>
+                <button type="button" class="tab" data-tab="comparison">
+                    <span>Credit Card Comparison</span>
+                </button>
             </div>
 
-            <div class="panel">
-                <div class="panel-head">
-                    <h2 class="panel-title">Household Spending</h2>
-                    <span class="panel-sub">Monthly spend per category &mdash; shared across every card</span>
-                </div>
-                <div class="panel-body" style="padding: 16px;">
-                    <div class="table-wrap">
-                        <table class="cc-table">
-                            <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th class="col-num">Monthly Spend</th>
-                                <th class="col-action"></th>
-                            </tr>
-                            </thead>
-                            <tbody id="spendGridBody"></tbody>
-                        </table>
+            <!-- Tab 1: Budget -->
+            <div id="tab-budget" class="tab-pane">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Household Spending</h2>
+                        <span class="panel-sub">Monthly spend per category &mdash; shared across every card</span>
                     </div>
-                    <p id="spendGridEmpty" class="empty-state" style="display:none; text-align: center; margin: 16px 0;">No categories yet &mdash; add your first one below.</p>
-
-                    <div class="cc-add-form">
-                        <div class="cc-add-fields">
-                            <input type="text" class="text-input" id="newCategory" placeholder="Category (e.g. Dining, Gas)" />
-                            <div class="num-wrap money">
-                                <input type="number" class="text-input" id="newCategorySpend" placeholder="Spend / mo" min="0" step="1" />
-                            </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="spendGridBody"></tbody>
+                            </table>
                         </div>
-                        <button class="button-inline" id="addCategoryBtn" style="white-space: nowrap;">Add category</button>
+                        <p id="spendGridEmpty" class="empty-state" style="display:none;">No categories yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newCategory" placeholder="Category (e.g. Dining, Gas)" />
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newCategorySpend" placeholder="Spend / mo" min="0" step="1" />
+                                </div>
+                            </div>
+                            <button class="button-inline" id="addCategoryBtn">Add category</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="panel">
-                <div class="panel-head">
-                    <h2 class="panel-title">Credit Cards</h2>
-                    <span class="panel-sub">Annual fee &amp; base rate ("everything else") for each card</span>
-                </div>
-                <div class="panel-body" style="padding: 16px;">
-                    <div class="table-wrap">
-                        <table class="cc-table">
-                            <thead>
-                            <tr>
-                                <th>Card</th>
-                                <th class="col-num">Annual Fee</th>
-                                <th class="col-num">Base Rate</th>
-                                <th class="col-action"></th>
-                            </tr>
-                            </thead>
-                            <tbody id="cardsGridBody"></tbody>
-                        </table>
+            <!-- Tab 2: Credit Card Comparison -->
+            <div id="tab-comparison" class="tab-pane" style="display:none;">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Head-to-Head Comparison</h2>
                     </div>
-                    <p id="cardsGridEmpty" class="empty-state" style="display:none; text-align: center; margin: 16px 0;">No cards yet &mdash; add your first one below.</p>
+                    <div class="panel-body">
+                        <div id="bestComboContainer" style="display:none;"></div>
 
-                    <div class="cc-add-form">
-                        <div class="cc-add-fields">
-                            <input type="text" class="text-input" id="newCardName" placeholder="Card name (e.g. Amex Gold)" />
-                            <div class="num-wrap money">
-                                <input type="number" class="text-input" id="newCardFee" placeholder="Fee / yr" min="0" step="1" />
+                        <div class="compare-pickers">
+                            <div class="picker">
+                                <label for="cardASelect">Card A</label>
+                                <select id="cardASelect"><option value="">Choose a card…</option></select>
                             </div>
-                            <div class="num-wrap pct">
-                                <input type="number" class="text-input" id="newCardBaseRate" placeholder="Base rate %" min="0" step="0.1" />
+                            <div class="picker">
+                                <label for="cardBSelect">Card B</label>
+                                <select id="cardBSelect"><option value="">Choose a card…</option></select>
                             </div>
                         </div>
-                        <button class="button-inline" id="addCardBtn" style="white-space: nowrap;">Add card</button>
-                    </div>
-                    <p class="empty-state" style="margin-top: 10px;">Base rate applies to any category that doesn't have its own rate set below.</p>
-                </div>
-            </div>
 
-            <div class="panel">
-                <div class="panel-head">
-                    <h2 class="panel-title">Card Rewards</h2>
-                    <span class="panel-sub">Category-specific rates that override a card's base rate</span>
-                </div>
-                <div class="panel-body" style="padding: 16px;">
-                    <div class="table-wrap">
-                        <table class="cc-table">
-                            <thead>
-                            <tr>
-                                <th>Card</th>
-                                <th>Category</th>
-                                <th class="col-num">Reward Rate</th>
-                                <th class="col-num">Special Refund</th>
-                                <th class="col-action"></th>
-                            </tr>
-                            </thead>
-                            <tbody id="rewardsGridBody"></tbody>
-                        </table>
-                    </div>
-                    <p id="rewardsGridEmpty" class="empty-state" style="display:none; text-align: center; margin: 16px 0;">No overrides yet &mdash; add one below, or add a card above and rely on its base rate.</p>
+                        <p id="compareEmpty" class="empty-state">Add spending categories in the Budget tab and at least two cards, then pick them here.</p>
 
-                    <div class="cc-add-form">
-                        <div class="cc-add-fields">
-                            <select class="text-input" id="newRewardCard"><option value="">Choose a card…</option></select>
-                            <input type="text" class="text-input" id="newRewardCategory" placeholder="Category (e.g. Dining, Gas)" />
-                            <div class="num-wrap pct">
-                                <input type="number" class="text-input" id="newRate" placeholder="Rate %" min="0" step="0.1" />
-                            </div>
-                            <div class="num-wrap money">
-                                <input type="number" class="text-input" id="newSpecialRefund" placeholder="Special refund" min="0" step="1" />
-                            </div>
+                        <div class="table-wrap" id="compareTableWrap" style="display:none;">
+                            <table class="cc-table" id="compareTable">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-num" id="headA">Card A</th>
+                                    <th class="col-num" id="headB">Card B</th>
+                                    <th>Best</th>
+                                </tr>
+                                </thead>
+                                <tbody id="compareBody"></tbody>
+                            </table>
                         </div>
-                        <button class="button-inline" id="addRewardBtn" style="white-space: nowrap;">Add rate</button>
+
+                        <div id="summaryGrid" class="summary-grid" style="display:none;"></div>
                     </div>
-                    <p class="empty-state" style="margin-top: 10px;">Special refund is a flat $/mo add-on for that specific card + category (e.g. a fixed statement credit), on top of the percentage reward.</p>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Credit Cards</h2>
+                        <span class="panel-sub">Annual fee &amp; base rate ("everything else") for each card</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Card</th>
+                                    <th class="col-num">Annual Fee</th>
+                                    <th class="col-num">Base Rate</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="cardsGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="cardsGridEmpty" class="empty-state" style="display:none;">No cards yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newCardName" placeholder="Card name (e.g. Amex Gold)" />
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newCardFee" placeholder="Fee / yr" min="0" step="1" />
+                                </div>
+                                <div class="num-wrap pct">
+                                    <input type="number" class="text-input" id="newCardBaseRate" placeholder="Base rate %" min="0" step="0.1" />
+                                </div>
+                            </div>
+                            <button class="button-inline" id="addCardBtn">Add card</button>
+                        </div>
+                        <p class="form-note">Base rate applies to any category that doesn't have its own rate set below.</p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Card Rewards</h2>
+                        <span class="panel-sub">Category-specific rates that override a card's base rate</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Card</th>
+                                    <th>Category</th>
+                                    <th class="col-num">Reward Rate</th>
+                                    <th class="col-num">Special Refund</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="rewardsGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="rewardsGridEmpty" class="empty-state" style="display:none;">No overrides yet &mdash; add one below, or add a card above and rely on its base rate.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <select class="text-input" id="newRewardCard"><option value="">Choose a card…</option></select>
+                                <input type="text" class="text-input" id="newRewardCategory" placeholder="Category (e.g. Dining, Gas)" />
+                                <div class="num-wrap pct">
+                                    <input type="number" class="text-input" id="newRate" placeholder="Rate %" min="0" step="0.1" />
+                                </div>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newSpecialRefund" placeholder="Special refund" min="0" step="1" />
+                                </div>
+                            </div>
+                            <button class="button-inline" id="addRewardBtn">Add rate</button>
+                        </div>
+                        <p class="form-note">Special refund is a flat $/mo add-on for that specific card + category (e.g. a fixed statement credit), on top of the percentage reward.</p>
+                    </div>
                 </div>
             </div>
         </section>

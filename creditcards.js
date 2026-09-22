@@ -22,7 +22,9 @@
 
     function fmt$(n) {
         const val = typeof n === 'number' && !isNaN(n) ? n : 0;
-        return '$' + (Math.round(val * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const sign = val < 0 ? '-' : '';
+        const absVal = Math.abs(val);
+        return sign + '$' + (Math.round(absVal * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function render() {
@@ -30,6 +32,7 @@
         renderCardsGrid();
         renderRewardsGrid();
         renderCardOptions();
+        renderBestCombo();
         renderComparison();
     }
 
@@ -179,6 +182,103 @@
     }
 
     // -------------------------------------------------------------------
+    // Best Two-Card Combination
+    // -------------------------------------------------------------------
+    function findBestTwoCardCombo() {
+        if (cardsRows.length < 2 || !spendRows.length) return null;
+
+        let bestCombo = null;
+
+        for (let i = 0; i < cardsRows.length; i++) {
+            for (let j = i + 1; j < cardsRows.length; j++) {
+                const cardA = cardsRows[i];
+                const cardB = cardsRows[j];
+                const aFee = getAnnualFee(cardA.id);
+                const bFee = getAnnualFee(cardB.id);
+
+                let grossTotal = 0;
+                spendRows.forEach(catRow => {
+                    const cat = catRow.category;
+                    const spend = catRow.monthly_spend || 0;
+                    const a = getEffectiveRate(cardA.id, cat);
+                    const b = getEffectiveRate(cardB.id, cat);
+                    const aReward = (spend * a.rate / 100) + a.refund;
+                    const bReward = (spend * b.rate / 100) + b.refund;
+                    grossTotal += Math.max(aReward, bReward);
+                });
+
+                const combinedMonthlyFee = (aFee + bFee) / 12;
+                const netMonthly = grossTotal - combinedMonthlyFee;
+                const netAnnual = netMonthly * 12;
+
+                if (!bestCombo || netMonthly > bestCombo.netMonthly) {
+                    bestCombo = {
+                        cardA,
+                        cardB,
+                        grossTotal,
+                        aFee,
+                        bFee,
+                        combinedMonthlyFee,
+                        netMonthly,
+                        netAnnual
+                    };
+                }
+            }
+        }
+
+        return bestCombo;
+    }
+
+    function renderBestCombo() {
+        const container = document.getElementById('bestComboContainer');
+        if (!container) return;
+
+        if (cardsRows.length < 2 || !spendRows.length) {
+            container.innerHTML = '';
+            container.style.display = 'none';
+            return;
+        }
+
+        const combo = findBestTwoCardCombo();
+        if (!combo) {
+            container.innerHTML = '';
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+        container.innerHTML = `
+          <div class="best-combo-card">
+            <div class="combo-info">
+              <span class="combo-tag">Top 2-Card Combination</span>
+              <div class="combo-title">${escapeHtml(combo.cardA.name)} + ${escapeHtml(combo.cardB.name)}</div>
+              <div class="combo-sub">
+                Gross rewards ${fmt$(combo.grossTotal)}/mo &middot; Combined fees ${fmt$(combo.aFee + combo.bFee)}/yr (${fmt$(combo.combinedMonthlyFee)}/mo)
+              </div>
+            </div>
+            <div class="combo-value-wrap">
+              <div class="combo-value">${fmt$(combo.netMonthly)}<span class="combo-unit">/mo net</span></div>
+              <div class="combo-value-sub">${fmt$(combo.netAnnual)}/yr net</div>
+              <button type="button" class="button-inline" id="loadBestComboBtn" style="margin-top: 6px; font-size: 12px; padding: 4px 10px;">Compare this pair</button>
+            </div>
+          </div>
+        `;
+
+        const loadBtn = document.getElementById('loadBestComboBtn');
+        if (loadBtn) {
+            loadBtn.addEventListener('click', () => {
+                const aSel = document.getElementById('cardASelect');
+                const bSel = document.getElementById('cardBSelect');
+                if (aSel && bSel) {
+                    aSel.value = combo.cardA.id;
+                    bSel.value = combo.cardB.id;
+                    renderComparison();
+                }
+            });
+        }
+    }
+
+    // -------------------------------------------------------------------
     // Comparison
     // -------------------------------------------------------------------
     function renderComparison() {
@@ -200,7 +300,7 @@
             if (compareEmpty) {
                 compareEmpty.style.display = 'block';
                 compareEmpty.textContent = !spendRows.length
-                    ? 'Add at least one spending category above to compare.'
+                    ? 'Add spending categories in the Budget tab and at least two cards to compare.'
                     : (!aId || !bId)
                         ? 'Pick two different cards above to compare.'
                         : 'Pick two different cards to compare.';
@@ -577,6 +677,42 @@
     const cardBSelect = document.getElementById('cardBSelect');
     if (cardASelect) cardASelect.addEventListener('change', renderComparison);
     if (cardBSelect) cardBSelect.addEventListener('change', renderComparison);
+
+    // -------------------------------------------------------------------
+    // Tabs Navigation
+    // -------------------------------------------------------------------
+    let activeTab = 'budget';
+
+    function switchTab(tabKey) {
+        if (!tabKey) return;
+        activeTab = tabKey;
+        const tabBtns = document.querySelectorAll('#cc-tabs .tab');
+        tabBtns.forEach(btn => {
+            if (btn.dataset.tab === tabKey) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        const budgetPane = document.getElementById('tab-budget');
+        const comparisonPane = document.getElementById('tab-comparison');
+        if (budgetPane) budgetPane.style.display = tabKey === 'budget' ? 'block' : 'none';
+        if (comparisonPane) comparisonPane.style.display = tabKey === 'comparison' ? 'block' : 'none';
+    }
+
+    function setupTabs() {
+        const tabsContainer = document.getElementById('cc-tabs');
+        if (!tabsContainer) return;
+        tabsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.tab');
+            if (btn && btn.dataset.tab) {
+                switchTab(btn.dataset.tab);
+            }
+        });
+    }
+
+    setupTabs();
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
