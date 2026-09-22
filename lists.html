@@ -56,6 +56,7 @@
         let activeSectionId = null;
         let recipes = [];
         let recipeSearchQuery = '';
+        let reorderSaveToken = 0;
 
         function todayStr(){
             const t = new Date();
@@ -332,9 +333,11 @@
         </div>`;
         }
 
+
         async function reorderItems(sectionId, fromIndex, toIndex){
             if(isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
 
+            const previousItems = (itemsBySection[sectionId] || []).map(item => ({ ...item }));
             const allItems = sortItems(itemsBySection[sectionId] || []);
             const unchecked = allItems.filter(i => !i.checked);
             const checked = allItems.filter(i => i.checked);
@@ -353,20 +356,34 @@
                 item.sort_order = unchecked.length + idx + 1;
             });
 
-            itemsBySection[sectionId] = [...unchecked, ...checked];
+            const orderedItems = [...unchecked, ...checked];
+
+            itemsBySection[sectionId] = orderedItems;
             render();
 
+            const saveToken = ++reorderSaveToken;
+            const itemOrders = orderedItems.map(item => ({
+                id: item.id,
+                sort_order: item.sort_order
+            }));
+
             try {
-                const updates = [...unchecked, ...checked].map(item =>
-                    sb.from('household_list_items')
-                        .update({ sort_order: item.sort_order })
-                        .eq('id', item.id)
-                );
-                await Promise.all(updates);
+                const { error } = await sb.rpc('update_list_item_order', {
+                    item_orders: itemOrders
+                });
+
+                if(error) throw error;
             } catch (err) {
                 console.error('Failed to save item order:', err);
+
+                if(saveToken === reorderSaveToken){
+                    itemsBySection[sectionId] = previousItems;
+                    render();
+                    setStatus('Could not save item order.');
+                }
             }
         }
+
 
         function render(){
             renderTabs();
