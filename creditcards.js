@@ -1,8 +1,12 @@
 (function () {
     const sb = window.supabaseClient;
-    const TABLE = 'card_rewards';
+    const CATEGORIES_TABLE = 'household_spending_categories';
+    const REWARDS_TABLE = 'card_rewards';
 
-    let rows = []; // {id, card, category, spend, rate, fee}
+
+    let spendRows = [];    // {id, category, monthly_spend}
+    let rewardRows = [];   // {id, card, category, rate, fee}
+
     let realtimeChannel = null;
     let realtimeDebounceTimer = null;
 
@@ -20,51 +24,88 @@
         return '$' + (Math.round(val * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    function isDefaultRow(row) {
+        return !row.category || !row.category.trim();
+    }
+
     function render() {
-        renderGrid();
+        renderSpendGrid();
+        renderRewardsGrid();
         renderCardOptions();
         renderComparison();
     }
 
-    function renderGrid() {
-        const gridBody = document.getElementById('gridBody');
-        const gridEmpty = document.getElementById('gridEmpty');
-        if (!gridBody) return;
+    // -------------------------------------------------------------------
+    // Grid 1: Household Spending
+    // -------------------------------------------------------------------
+    function renderSpendGrid() {
+        const body = document.getElementById('spendGridBody');
+        const empty = document.getElementById('spendGridEmpty');
+        if (!body) return;
 
-        gridBody.innerHTML = '';
-        if (gridEmpty) gridEmpty.style.display = rows.length ? 'none' : 'block';
+        body.innerHTML = '';
+        if (empty) empty.style.display = spendRows.length ? 'none' : 'block';
 
-        rows.forEach(row => {
+        spendRows.forEach(row => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.card)}" data-field="card" style="width: 100%; min-width: 120px;"></td>
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category)}" data-field="category" style="width: 100%; min-width: 100px;"></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.spend ?? 0}" data-field="spend" style="width: 100%; min-width: 80px;"></div></td>
-              <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.rate ?? 0}" data-field="rate" style="width: 100%; min-width: 70px;"></div></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.fee ?? 0}" data-field="fee" style="width: 100%; min-width: 80px;"></div></td>
-              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete row">✕</button></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category)}" data-field="category" style="width: 100%; min-width: 140px;"></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.monthly_spend ?? 0}" data-field="monthly_spend" style="width: 100%; min-width: 90px;"></div></td>
+              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete category">✕</button></td>
             `;
-
             tr.querySelectorAll('input').forEach(input => {
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
-                    if (field === 'spend' || field === 'rate' || field === 'fee') val = parseFloat(val) || 0;
-                    updateRow(row.id, { [field]: val });
+                    if (field === 'monthly_spend') val = parseFloat(val) || 0;
+                    updateCategoryRow(row.id, { [field]: val });
                 });
             });
-
             const delBtn = tr.querySelector('.icon-delete');
-            if (delBtn) {
-                delBtn.addEventListener('click', () => deleteRow(row.id));
-            }
+            if (delBtn) delBtn.addEventListener('click', () => deleteCategoryRow(row.id));
+            body.appendChild(tr);
+        });
+    }
 
-            gridBody.appendChild(tr);
+    // -------------------------------------------------------------------
+    // Grid 2: Card Rewards
+    // -------------------------------------------------------------------
+    function renderRewardsGrid() {
+        const body = document.getElementById('rewardsGridBody');
+        const empty = document.getElementById('rewardsGridEmpty');
+        if (!body) return;
+
+        body.innerHTML = '';
+        if (empty) empty.style.display = rewardRows.length ? 'none' : 'block';
+
+        rewardRows.forEach(row => {
+            const tr = document.createElement('tr');
+            const catDisplay = isDefaultRow(row) ? '' : escapeHtml(row.category);
+            tr.innerHTML = `
+              <td><input type="text" class="text-input" value="${escapeHtml(row.card)}" data-field="card" style="width: 100%; min-width: 120px;"></td>
+              <td>
+                <input type="text" class="text-input" value="${catDisplay}" data-field="category" placeholder="Everything else" style="width: 100%; min-width: 120px;">
+              </td>
+              <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.rate ?? 0}" data-field="rate" style="width: 100%; min-width: 70px;"></div></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.fee ?? 0}" data-field="fee" style="width: 100%; min-width: 80px;"></div></td>
+              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete row">✕</button></td>
+            `;
+            tr.querySelectorAll('input').forEach(input => {
+                input.addEventListener('change', () => {
+                    const field = input.dataset.field;
+                    let val = input.value;
+                    if (field === 'rate' || field === 'fee') val = parseFloat(val) || 0;
+                    updateRewardRow(row.id, { [field]: val });
+                });
+            });
+            const delBtn = tr.querySelector('.icon-delete');
+            if (delBtn) delBtn.addEventListener('click', () => deleteRewardRow(row.id));
+            body.appendChild(tr);
         });
     }
 
     function renderCardOptions() {
-        const cards = [...new Set(rows.map(r => r.card).filter(Boolean))].sort();
+        const cards = [...new Set(rewardRows.map(r => r.card).filter(Boolean))].sort();
         const aSel = document.getElementById('cardASelect');
         const bSel = document.getElementById('cardBSelect');
         if (!aSel || !bSel) return;
@@ -76,6 +117,26 @@
         });
     }
 
+    // Effective rate for a card in a given category: exact match first,
+    // then the card's blank/default row, else 0.
+    function getEffectiveRate(cardName, category) {
+        const cardRows = rewardRows.filter(r => r.card === cardName);
+        const exact = cardRows.find(r => !isDefaultRow(r) && r.category.trim().toLowerCase() === category.trim().toLowerCase());
+        if (exact) return { rate: exact.rate || 0, isDefault: false };
+        const def = cardRows.find(isDefaultRow);
+        if (def) return { rate: def.rate || 0, isDefault: true };
+        return { rate: 0, isDefault: false, none: true };
+    }
+
+    function getAnnualFee(cardName) {
+        const cardRows = rewardRows.filter(r => r.card === cardName);
+        const withFee = cardRows.find(r => r.fee);
+        return withFee ? withFee.fee : (cardRows[0] ? (cardRows[0].fee || 0) : 0);
+    }
+
+    // -------------------------------------------------------------------
+    // Comparison
+    // -------------------------------------------------------------------
     function renderComparison() {
         const aSel = document.getElementById('cardASelect');
         const bSel = document.getElementById('cardBSelect');
@@ -88,15 +149,17 @@
         const compareEmpty = document.getElementById('compareEmpty');
         const summaryGrid = document.getElementById('summaryGrid');
 
-        if (!aName || !bName || aName === bName) {
+        if (!aName || !bName || aName === bName || !spendRows.length) {
             if (compareTableWrap) compareTableWrap.style.display = 'none';
             else if (compareTable) compareTable.style.display = 'none';
             if (summaryGrid) summaryGrid.style.display = 'none';
             if (compareEmpty) {
                 compareEmpty.style.display = 'block';
-                compareEmpty.textContent = (!aName || !bName)
-                    ? 'Pick two different cards above to compare.'
-                    : 'Pick two different cards to compare.';
+                compareEmpty.textContent = !spendRows.length
+                    ? 'Add at least one spending category above to compare.'
+                    : (!aName || !bName)
+                        ? 'Pick two different cards above to compare.'
+                        : 'Pick two different cards to compare.';
             }
             return;
         }
@@ -111,44 +174,40 @@
         if (headA) headA.textContent = aName;
         if (headB) headB.textContent = bName;
 
-        const aRows = rows.filter(r => r.card === aName);
-        const bRows = rows.filter(r => r.card === bName);
-        const aFee = aRows.length ? (aRows.find(r => r.fee) ? aRows.find(r => r.fee).fee : aRows[0].fee || 0) : 0;
-        const bFee = bRows.length ? (bRows.find(r => r.fee) ? bRows.find(r => r.fee).fee : bRows[0].fee || 0) : 0;
-
-        const categories = [...new Set([...aRows.map(r => r.category), ...bRows.map(r => r.category)].filter(Boolean))];
+        const aFee = getAnnualFee(aName);
+        const bFee = getAnnualFee(bName);
 
         let aTotal = 0, bTotal = 0, bestTotal = 0;
         const tbody = document.getElementById('compareBody');
         if (!tbody) return;
         tbody.innerHTML = '';
 
-        categories.forEach(cat => {
-            const aRow = aRows.find(r => r.category === cat);
-            const bRow = bRows.find(r => r.category === cat);
-            const spends = [aRow?.spend, bRow?.spend].filter(v => v !== undefined && v !== null);
-            const spend = spends.length ? spends.reduce((s, v) => s + v, 0) / spends.length : 0;
-            const aRate = aRow ? (aRow.rate || 0) : 0;
-            const bRate = bRow ? (bRow.rate || 0) : 0;
-            const aReward = spend * aRate / 100;
-            const bReward = spend * bRate / 100;
+        spendRows.forEach(catRow => {
+            const cat = catRow.category;
+            const spend = catRow.monthly_spend || 0;
+            const a = getEffectiveRate(aName, cat);
+            const b = getEffectiveRate(bName, cat);
+            const aReward = spend * a.rate / 100;
+            const bReward = spend * b.rate / 100;
             aTotal += aReward;
             bTotal += bReward;
             bestTotal += Math.max(aReward, bReward);
 
             let winnerHtml;
-            if (!aRow) winnerHtml = `<span class="win-b">${escapeHtml(bName)}</span><span class="badge b">only B</span>`;
-            else if (!bRow) winnerHtml = `<span class="win-a">${escapeHtml(aName)}</span><span class="badge a">only A</span>`;
+            if (a.none && b.none) winnerHtml = `<span class="tie">No rate set</span>`;
             else if (aReward > bReward) winnerHtml = `<span class="win-a">${escapeHtml(aName)}</span><span class="badge a">+${fmt$(aReward - bReward)}</span>`;
             else if (bReward > aReward) winnerHtml = `<span class="win-b">${escapeHtml(bName)}</span><span class="badge b">+${fmt$(bReward - aReward)}</span>`;
             else winnerHtml = `<span class="tie">Tie</span>`;
+
+            const aCell = a.none ? '<span class="empty-state">no rate</span>' : `${a.rate.toFixed(1)}%${a.isDefault ? ' <span class="empty-state">(default)</span>' : ''} &rarr; ${fmt$(aReward)}`;
+            const bCell = b.none ? '<span class="empty-state">no rate</span>' : `${b.rate.toFixed(1)}%${b.isDefault ? ' <span class="empty-state">(default)</span>' : ''} &rarr; ${fmt$(bReward)}`;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
               <td>${escapeHtml(cat)}</td>
               <td class="col-num">${fmt$(spend)}</td>
-              <td class="col-num">${aRow ? aRate.toFixed(1) + '% &rarr; ' + fmt$(aReward) : '<span class="empty-state">no data</span>'}</td>
-              <td class="col-num">${bRow ? bRate.toFixed(1) + '% &rarr; ' + fmt$(bReward) : '<span class="empty-state">no data</span>'}</td>
+              <td class="col-num">${aCell}</td>
+              <td class="col-num">${bCell}</td>
               <td>${winnerHtml}</td>
             `;
             tbody.appendChild(tr);
@@ -175,37 +234,85 @@
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // Supabase CRUD
-    // ---------------------------------------------------------------------------
-    async function loadRows() {
-        if (!sb) {
-            console.error('Supabase client not initialized.');
-            return;
-        }
+    // -------------------------------------------------------------------
+    // Supabase CRUD — categories
+    // -------------------------------------------------------------------
+    async function loadCategories() {
+        if (!sb) return;
         try {
-            const { data, error } = await sb.from(TABLE).select('*').order('created_at', { ascending: true });
+            const { data, error } = await sb.from(CATEGORIES_TABLE).select('*').order('created_at', { ascending: true });
             if (error) throw error;
-            rows = data || [];
-            render();
-            setupRealtime();
+            spendRows = data || [];
         } catch (err) {
-            console.error('Error loading card rewards:', err);
-            if (window.setStatus) window.setStatus('Could not load card rewards.');
-            rows = [];
-            render();
+            console.error('Error loading categories:', err);
+            if (window.setStatus) window.setStatus('Could not load spending categories.');
+            spendRows = [];
         }
     }
 
-    async function addRow(data) {
+    async function addCategoryRow(data) {
         if (!sb) return;
         try {
-            const { data: inserted, error } = await sb.from(TABLE).insert([data]).select().single();
+            const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([data]).select().single();
             if (error) throw error;
-            if (inserted) {
-                rows.push(inserted);
-                render();
-            }
+            if (inserted) { spendRows.push(inserted); render(); }
+            if (window.setStatus) window.setStatus('Added category.');
+        } catch (err) {
+            console.error('Could not add category:', err);
+            if (window.setStatus) window.setStatus('Could not add category: ' + (err.message || err));
+        }
+    }
+
+    async function updateCategoryRow(id, patch) {
+        if (!sb) return;
+        try {
+            const row = spendRows.find(r => r.id === id);
+            if (row) Object.assign(row, patch);
+            render();
+            const { error } = await sb.from(CATEGORIES_TABLE).update(patch).eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Could not update category:', err);
+            if (window.setStatus) window.setStatus('Could not update category.');
+        }
+    }
+
+    async function deleteCategoryRow(id) {
+        if (!sb) return;
+        try {
+            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq('id', id);
+            if (error) throw error;
+            spendRows = spendRows.filter(r => r.id !== id);
+            render();
+            if (window.setStatus) window.setStatus('Deleted category.');
+        } catch (err) {
+            console.error('Could not delete category:', err);
+            if (window.setStatus) window.setStatus('Could not delete category.');
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Supabase CRUD — card rewards
+    // -------------------------------------------------------------------
+    async function loadRewards() {
+        if (!sb) return;
+        try {
+            const { data, error } = await sb.from(REWARDS_TABLE).select('*').order('created_at', { ascending: true });
+            if (error) throw error;
+            rewardRows = data || [];
+        } catch (err) {
+            console.error('Error loading card rewards:', err);
+            if (window.setStatus) window.setStatus('Could not load card rewards.');
+            rewardRows = [];
+        }
+    }
+
+    async function addRewardRow(data) {
+        if (!sb) return;
+        try {
+            const { data: inserted, error } = await sb.from(REWARDS_TABLE).insert([data]).select().single();
+            if (error) throw error;
+            if (inserted) { rewardRows.push(inserted); render(); }
             if (window.setStatus) window.setStatus('Added card reward.');
         } catch (err) {
             console.error('Could not add row:', err);
@@ -213,15 +320,13 @@
         }
     }
 
-    async function updateRow(id, patch) {
+    async function updateRewardRow(id, patch) {
         if (!sb) return;
         try {
-            const row = rows.find(r => r.id === id);
+            const row = rewardRows.find(r => r.id === id);
             if (row) Object.assign(row, patch);
-            renderCardOptions();
-            renderComparison();
-
-            const { error } = await sb.from(TABLE).update(patch).eq('id', id);
+            render();
+            const { error } = await sb.from(REWARDS_TABLE).update(patch).eq('id', id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update row:', err);
@@ -229,12 +334,12 @@
         }
     }
 
-    async function deleteRow(id) {
+    async function deleteRewardRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(TABLE).delete().eq('id', id);
+            const { error } = await sb.from(REWARDS_TABLE).delete().eq('id', id);
             if (error) throw error;
-            rows = rows.filter(r => r.id !== id);
+            rewardRows = rewardRows.filter(r => r.id !== id);
             render();
             if (window.setStatus) window.setStatus('Deleted row.');
         } catch (err) {
@@ -243,26 +348,26 @@
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // Realtime Sync
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------
+    // Realtime sync (both tables)
+    // -------------------------------------------------------------------
     function setupRealtime() {
         if (realtimeChannel || !sb) return;
-        realtimeChannel = sb.channel('card_rewards_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, () => {
-                debounceReload();
-            })
+        realtimeChannel = sb.channel('credit_cards_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: CATEGORIES_TABLE }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: REWARDS_TABLE }, () => debounceReload())
             .subscribe();
     }
 
     function debounceReload() {
         clearTimeout(realtimeDebounceTimer);
-        realtimeDebounceTimer = setTimeout(() => {
+        realtimeDebounceTimer = setTimeout(async () => {
             const activeEl = document.activeElement;
             if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
                 return;
             }
-            loadRows();
+            await Promise.all([loadCategories(), loadRewards()]);
+            render();
         }, 400);
     }
 
@@ -270,33 +375,54 @@
         if (realtimeChannel && sb) sb.removeChannel(realtimeChannel);
     });
 
-    // ---------------------------------------------------------------------------
+    async function loadAll() {
+        await Promise.all([loadCategories(), loadRewards()]);
+        render();
+        setupRealtime();
+    }
+
+    // -------------------------------------------------------------------
     // Wire up UI
-    // ---------------------------------------------------------------------------
-    const addRowBtn = document.getElementById('addRowBtn');
-    if (addRowBtn) {
-        addRowBtn.addEventListener('click', () => {
-            const cardInput = document.getElementById('newCard');
+    // -------------------------------------------------------------------
+    const addCategoryBtn = document.getElementById('addCategoryBtn');
+    if (addCategoryBtn) {
+        addCategoryBtn.addEventListener('click', () => {
             const catInput = document.getElementById('newCategory');
-            const spendInput = document.getElementById('newSpend');
+            const spendInput = document.getElementById('newCategorySpend');
+            const category = catInput.value.trim();
+            const monthly_spend = parseFloat(spendInput.value) || 0;
+            if (!category) {
+                if (window.setStatus) window.setStatus('Category name is required.');
+                return;
+            }
+            addCategoryRow({ category, monthly_spend });
+            catInput.value = '';
+            spendInput.value = '';
+            catInput.focus();
+        });
+    }
+
+    const addRewardBtn = document.getElementById('addRewardBtn');
+    if (addRewardBtn) {
+        addRewardBtn.addEventListener('click', () => {
+            const cardInput = document.getElementById('newCard');
+            const catInput = document.getElementById('newRewardCategory');
             const rateInput = document.getElementById('newRate');
             const feeInput = document.getElementById('newFee');
 
             const card = cardInput.value.trim();
-            const category = catInput.value.trim();
-            const spend = parseFloat(spendInput.value) || 0;
+            const category = catInput.value.trim(); // blank = "everything else"
             const rate = parseFloat(rateInput.value) || 0;
             const fee = parseFloat(feeInput.value) || 0;
 
-            if (!card || !category) {
-                if (window.setStatus) window.setStatus('Card and category are required.');
+            if (!card) {
+                if (window.setStatus) window.setStatus('Card name is required.');
                 return;
             }
 
-            addRow({ card, category, spend, rate, fee });
+            addRewardRow({ card, category, rate, fee });
             cardInput.value = '';
             catInput.value = '';
-            spendInput.value = '';
             rateInput.value = '';
             feeInput.value = '';
             cardInput.focus();
@@ -311,18 +437,20 @@
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const targetId = e.target.id;
-            if (['newCard', 'newCategory', 'newSpend', 'newRate', 'newFee'].includes(targetId)) {
-                if (addRowBtn) addRowBtn.click();
+            if (['newCategory', 'newCategorySpend'].includes(targetId)) {
+                if (addCategoryBtn) addCategoryBtn.click();
+            } else if (['newCard', 'newRewardCategory', 'newRate', 'newFee'].includes(targetId)) {
+                if (addRewardBtn) addRewardBtn.click();
             }
         }
     });
 
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------
     // Init
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------
     if (window.initAppPage) {
-        window.initAppPage(loadRows);
+        window.initAppPage(loadAll);
     } else {
-        document.addEventListener('app:ready', loadRows, { once: true });
+        document.addEventListener('app:ready', loadAll, { once: true });
     }
 })();

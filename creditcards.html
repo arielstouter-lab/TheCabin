@@ -19,15 +19,48 @@
         <header class="topbar">
             <div class="text-center">
                 <h1>Credit Card Rewards</h1>
-                <p>Build out your cards' reward categories, then compare any two head-to-head.</p>
+                <p>Log your household spending by category, set up each card's reward rates, then compare any two head-to-head.</p>
             </div>
         </header>
 
         <section class="content">
+
             <div class="panel">
                 <div class="panel-head">
-                    <h2 class="panel-title">Reward Grid</h2>
-                    <span class="panel-sub">Annual fee applies across comparison automatically</span>
+                    <h2 class="panel-title">Household Spending</h2>
+                    <span class="panel-sub">Monthly spend per category &mdash; shared across every card</span>
+                </div>
+                <div class="panel-body" style="padding: 16px;">
+                    <div class="table-wrap">
+                        <table class="cc-table">
+                            <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th class="col-num">Monthly Spend</th>
+                                <th class="col-action"></th>
+                            </tr>
+                            </thead>
+                            <tbody id="spendGridBody"></tbody>
+                        </table>
+                    </div>
+                    <p id="spendGridEmpty" class="empty-state" style="display:none; text-align: center; margin: 16px 0;">No categories yet &mdash; add your first one below.</p>
+
+                    <div class="cc-add-form">
+                        <div class="cc-add-fields">
+                            <input type="text" class="text-input" id="newCategory" placeholder="Category (e.g. Dining, Gas)" />
+                            <div class="num-wrap money">
+                                <input type="number" class="text-input" id="newCategorySpend" placeholder="Spend / mo" min="0" step="1" />
+                            </div>
+                        </div>
+                        <button class="button-inline" id="addCategoryBtn" style="white-space: nowrap;">Add category</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h2 class="panel-title">Card Rewards</h2>
+                    <span class="panel-sub">Leave category blank for a card's "everything else" rate</span>
                 </div>
                 <div class="panel-body" style="padding: 16px;">
                     <div class="table-wrap">
@@ -36,24 +69,20 @@
                             <tr>
                                 <th>Card</th>
                                 <th>Category</th>
-                                <th class="col-num">Monthly Spend</th>
                                 <th class="col-num">Reward Rate</th>
                                 <th class="col-num">Annual Fee</th>
                                 <th class="col-action"></th>
                             </tr>
                             </thead>
-                            <tbody id="gridBody"></tbody>
+                            <tbody id="rewardsGridBody"></tbody>
                         </table>
                     </div>
-                    <p id="gridEmpty" class="empty-state" style="display:none; text-align: center; margin: 16px 0;">No rows yet &mdash; add your first card and category below.</p>
+                    <p id="rewardsGridEmpty" class="empty-state" style="display:none; text-align: center; margin: 16px 0;">No cards yet &mdash; add your first reward rate below.</p>
 
                     <div class="cc-add-form">
                         <div class="cc-add-fields">
-                            <input type="text" class="text-input" id="newCard" placeholder="Card name (e.g. Chase Sapphire)" />
-                            <input type="text" class="text-input" id="newCategory" placeholder="Category (e.g. Dining)" />
-                            <div class="num-wrap money">
-                                <input type="number" class="text-input" id="newSpend" placeholder="Spend / mo" min="0" step="1" />
-                            </div>
+                            <input type="text" class="text-input" id="newCard" placeholder="Card name (e.g. Amex Gold)" />
+                            <input type="text" class="text-input" id="newRewardCategory" placeholder="Category (blank = everything else)" />
                             <div class="num-wrap pct">
                                 <input type="number" class="text-input" id="newRate" placeholder="Rate %" min="0" step="0.1" />
                             </div>
@@ -61,8 +90,9 @@
                                 <input type="number" class="text-input" id="newFee" placeholder="Fee / yr" min="0" step="1" />
                             </div>
                         </div>
-                        <button class="button-inline" id="addRowBtn" style="white-space: nowrap;">Add row</button>
+                        <button class="button-inline" id="addRewardBtn" style="white-space: nowrap;">Add rate</button>
                     </div>
+                    <p class="empty-state" style="margin-top: 10px;">Annual fee only needs to be entered once per card &mdash; it applies to every row for that card automatically.</p>
                 </div>
             </div>
 
@@ -82,7 +112,7 @@
                         </div>
                     </div>
 
-                    <p id="compareEmpty" class="empty-state" style="text-align: center; margin: 20px 0;">Add at least two cards to the grid above, then pick them here.</p>
+                    <p id="compareEmpty" class="empty-state" style="text-align: center; margin: 20px 0;">Add spending categories and at least two cards above, then pick them here.</p>
 
                     <div class="table-wrap" id="compareTableWrap" style="display:none; margin-top: 16px;">
                         <table class="cc-table" id="compareTable">
