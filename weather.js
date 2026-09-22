@@ -242,7 +242,11 @@ async function initWeather(){
     }
 }
 
-document.addEventListener("DOMContentLoaded", initWeather);
+if (window.initAppPage) {
+    window.initAppPage(initWeather);
+} else {
+    document.addEventListener("app:ready", initWeather, { once: true });
+}
 
 // ---- Seasonal background ------------------------------------------
 (function initSeasonalBackground() {

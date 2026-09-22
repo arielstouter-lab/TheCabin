@@ -269,13 +269,37 @@
         }
     });
 
+    let realtimeChannel = null;
+    let realtimeDebounceTimer = null;
+
+    function setupRealtime(){
+        if(realtimeChannel || !sb) return;
+        realtimeChannel = sb.channel('calendar-realtime-channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_events' }, () => {
+                clearTimeout(realtimeDebounceTimer);
+                realtimeDebounceTimer = setTimeout(() => {
+                    loadMonth();
+                }, 300);
+            })
+            .subscribe();
+    }
+
     function init(){
         const now = new Date();
         viewYear = now.getFullYear();
         viewMonth = now.getMonth();
         selectedDate = todayStr();
         loadMonth();
+        setupRealtime();
     }
 
-    document.addEventListener('app:ready', init, { once: true });
+    window.addEventListener('beforeunload', () => {
+        if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
+    });
+
+    if(window.initAppPage){
+        window.initAppPage(init);
+    } else {
+        document.addEventListener('app:ready', init, { once: true });
+    }
 })();

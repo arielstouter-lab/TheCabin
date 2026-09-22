@@ -65,6 +65,7 @@
             groceryItems = [];
         }
         render();
+        setupRealtime();
     }
 
     // ---- Aisles ---------------------------------------------------
@@ -391,5 +392,36 @@
         onReorder: (fromIndex, toIndex) => reorderAisles(fromIndex, toIndex)
     });
 
-    document.addEventListener('app:ready', loadAll, { once: true });
+    let realtimeChannel = null;
+    let realtimeDebounceTimer = null;
+
+    function setupRealtime(){
+        if(realtimeChannel || !sb) return;
+        realtimeChannel = sb.channel('manage-groceries-realtime-channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_grocery_aisles' }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_grocery_item_memory' }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_list_items' }, () => debounceReload())
+            .subscribe();
+    }
+
+    function debounceReload(){
+        clearTimeout(realtimeDebounceTimer);
+        realtimeDebounceTimer = setTimeout(() => {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT')) {
+                return;
+            }
+            loadAll();
+        }, 400);
+    }
+
+    window.addEventListener('beforeunload', () => {
+        if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
+    });
+
+    if(window.initAppPage){
+        window.initAppPage(loadAll);
+    } else {
+        document.addEventListener('app:ready', loadAll, { once: true });
+    }
 })();

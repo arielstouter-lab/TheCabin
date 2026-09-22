@@ -63,6 +63,67 @@
     // for an item by id" blocks that used to live inline in the event
     // handlers (delete, quantity +/-, checkbox toggle, add-to-groceries).
 
+    const CACHE_KEY = 'thecabin_cached_lists';
+    let realtimeChannel = null;
+    let realtimeDebounceTimer = null;
+
+    function saveToLocalCache(){
+        try{
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+                sections,
+                itemsBySection,
+                people,
+                recipes,
+                groceryAisles,
+                groceryItemMemory,
+                activeSectionId,
+                timestamp: Date.now()
+            }));
+        } catch(e){}
+    }
+
+    function loadFromLocalCache(){
+        try{
+            const raw = localStorage.getItem(CACHE_KEY);
+            if(!raw) return false;
+            const data = JSON.parse(raw);
+            if(!data || !Array.isArray(data.sections) || data.sections.length === 0) return false;
+            sections = data.sections || [];
+            itemsBySection = data.itemsBySection || {};
+            people = data.people || [];
+            recipes = data.recipes || [];
+            groceryAisles = data.groceryAisles || [];
+            groceryItemMemory = data.groceryItemMemory || [];
+            if(data.activeSectionId && sections.some(s => s.id === data.activeSectionId)){
+                activeSectionId = data.activeSectionId;
+            } else {
+                const groceries = sections.find(s => s.name === 'Groceries');
+                activeSectionId = groceries ? groceries.id : (sections[0] && sections[0].id) || null;
+            }
+            return true;
+        } catch(e){
+            return false;
+        }
+    }
+
+    function setupRealtime(){
+        if(realtimeChannel || !sb) return;
+        realtimeChannel = sb.channel('lists-realtime-channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_list_items' }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_list_sections' }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_recipes' }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_grocery_aisles' }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_grocery_item_memory' }, () => debounceReload())
+            .subscribe();
+    }
+
+    function debounceReload(){
+        clearTimeout(realtimeDebounceTimer);
+        realtimeDebounceTimer = setTimeout(() => {
+            loadAll({ silent: true });
+        }, 300);
+    }
+
     function findItemById(id){
         for(const secId of Object.keys(itemsBySection)){
             const item = (itemsBySection[secId] || []).find(i => i.id === id);
@@ -80,6 +141,7 @@
                 return updated;
             });
         });
+        saveToLocalCache();
         return updated;
     }
 
@@ -87,6 +149,7 @@
         Object.keys(itemsBySection).forEach(secId => {
             itemsBySection[secId] = itemsBySection[secId].filter(i => i.id !== id);
         });
+        saveToLocalCache();
     }
 
     function sleep(ms){
@@ -183,7 +246,13 @@
         }
     }
 
-    async function loadAll(){
+    async function loadAll(options = {}){
+        const isSilent = options && options.silent;
+        if(!isSilent && sections.length === 0){
+            if(loadFromLocalCache()){
+                render();
+            }
+        }
         try{
             const [
                 peopleResult,
@@ -227,15 +296,12 @@
                 itemsBySection[item.section_id].push(item);
             });
             await ensurePermanentSections();
+            saveToLocalCache();
         } catch(e){
             console.error('Could not load lists:', e);
-            setStatus('Could not load lists.');
-            sections = [];
-            itemsBySection = {};
-            people = [];
-            recipes = [];
-            groceryAisles = [];
-            groceryItemMemory = [];
+            if(!isSilent && sections.length === 0){
+                setStatus('Could not load lists.');
+            }
         }
 
         if(!activeSectionId || !sections.find(s => s.id === activeSectionId)){
@@ -244,6 +310,7 @@
         }
 
         render();
+        setupRealtime();
     }
 
     function personName(id){
@@ -789,5 +856,13 @@
         }
     });
 
-    document.addEventListener('app:ready', loadAll, { once: true });
+    window.addEventListener('beforeunload', () => {
+        if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
+    });
+
+    if(window.initAppPage){
+        window.initAppPage(loadAll);
+    } else {
+        document.addEventListener('app:ready', loadAll, { once: true });
+    }
 })();

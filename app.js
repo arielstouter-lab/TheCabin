@@ -6,6 +6,28 @@ const supabaseClient = createClient(
 );
 window.supabaseClient = supabaseClient;
 
+// Register Service Worker for PWA and offline resilience
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => {
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
+
+// Global session store & unified page initialization helper
+window.__appSession = null;
+window.initAppPage = function(callback) {
+  if (typeof callback !== 'function') return;
+  if (window.__appSession) {
+    callback(window.__appSession);
+  } else {
+    document.addEventListener('app:ready', (e) => {
+      callback(e.detail.session);
+    }, { once: true });
+  }
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
   const currentPage = window.location.pathname.split("/").pop() || "index.html";
 
@@ -185,6 +207,7 @@ function setupApp(session) {
       window.location.href = "index.html";
     }
   });
+  window.__appSession = session;
   document.dispatchEvent(new CustomEvent('app:ready', { detail: { session } }));
 }
 
@@ -276,22 +299,112 @@ function escapeAttr(str) {
   return escapeHtml(str);
 }
 
-function setStatus(msg, targetId) {
+/* -----------------------------
+   Unified Toast & Status System
+----------------------------- */
+
+function showToast(options, optionalType, optionalDuration) {
+  let message = '';
+  let type = 'info';
+  let duration = 3000;
+
+  if (typeof options === 'string') {
+    message = options;
+    if (typeof optionalType === 'string') type = optionalType;
+    if (typeof optionalDuration === 'number') duration = optionalDuration;
+  } else if (options && typeof options === 'object') {
+    message = options.message || '';
+    type = options.type || 'info';
+    duration = options.duration ?? 3000;
+  }
+
+  if (!message) return null;
+
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    container.setAttribute('aria-live', 'polite');
+    document.body.appendChild(container);
+  }
+
+  const icons = {
+    success: '✓',
+    error: '⚠',
+    warning: '!',
+    info: 'ℹ'
+  };
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.setAttribute('role', 'status');
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || 'ℹ'}</span>
+    <span class="toast-message">${escapeHtml(message)}</span>
+    <button type="button" class="toast-close" aria-label="Close">✕</button>
+  `;
+
+  const removeToast = () => {
+    if (toast.classList.contains('toast-hiding')) return;
+    toast.classList.remove('toast-visible');
+    toast.classList.add('toast-hiding');
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 300);
+  };
+
+  toast.querySelector('.toast-close').addEventListener('click', removeToast);
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add('toast-visible');
+  });
+
+  if (duration > 0) {
+    setTimeout(removeToast, duration);
+  }
+
+  return toast;
+}
+
+function setStatus(msg, targetIdOrType, maybeType) {
+  if (!msg) return;
+  let type = 'info';
+  let targetId = null;
+
+  if (typeof targetIdOrType === 'string') {
+    if (['info', 'success', 'error', 'warning'].includes(targetIdOrType)) {
+      type = targetIdOrType;
+    } else {
+      targetId = targetIdOrType;
+    }
+  }
+  if (typeof maybeType === 'string') {
+    type = maybeType;
+  }
+
+  if (type === 'info' && /could not|failed|error|invalid|unable/i.test(msg)) {
+    type = 'error';
+  } else if (type === 'info' && /saved|updated|added|copied|success|reordered|balanced/i.test(msg)) {
+    type = 'success';
+  }
+
   const el = (targetId && document.getElementById(targetId)) ||
              document.querySelector('.status-line') ||
              document.getElementById('status-line') ||
              document.getElementById('lst-status');
-  if (!el) return;
-  el.textContent = msg || '';
-  if (msg) {
+  if (el) {
+    el.textContent = msg;
     setTimeout(() => {
       if (el.textContent === msg) el.textContent = '';
-    }, 2200);
+    }, 2400);
   }
+
+  showToast(msg, type, 3000);
 }
 
-window.escapeHtml = escapeHtml;
-window.escapeAttr = escapeAttr;
+window.showToast = showToast;
 window.setStatus = setStatus;
 
 /* -----------------------------

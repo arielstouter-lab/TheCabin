@@ -76,6 +76,7 @@
       state = {people: [], chores: [], assignments: {}};
     }
     render();
+    setupRealtime();
   }
 
   function totalsByPerson(){
@@ -495,5 +496,37 @@
     }
   });
 
-  document.addEventListener('app:ready', load, { once: true });
+  let realtimeChannel = null;
+  let realtimeDebounceTimer = null;
+
+  function setupRealtime(){
+    if(realtimeChannel || !sb) return;
+    realtimeChannel = sb.channel('chores-realtime-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'household_people' }, () => debounceReload())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'household_chores' }, () => debounceReload())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chore_dislikes' }, () => debounceReload())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chore_assignments' }, () => debounceReload())
+      .subscribe();
+  }
+
+  function debounceReload(){
+    clearTimeout(realtimeDebounceTimer);
+    realtimeDebounceTimer = setTimeout(() => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+      }
+      load();
+    }, 400);
+  }
+
+  window.addEventListener('beforeunload', () => {
+    if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
+  });
+
+  if(window.initAppPage){
+    window.initAppPage(load);
+  } else {
+    document.addEventListener('app:ready', load, { once: true });
+  }
 })();
