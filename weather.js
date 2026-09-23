@@ -80,7 +80,7 @@ function moonPhaseIcon(phase){
     const angle = phase * 2 * Math.PI;
     const rx = Math.abs(Math.cos(angle)) * r;
     const sweepOuter = phase < 0.5 ? 1 : 0;
-    const sweepInner = (phase < 0.25 || phase > 0.75) ? sweepOuter : 1 - sweepOuter;
+    const sweepInner = (phase >= 0.25 && phase <= 0.75) ? sweepOuter : 1 - sweepOuter;
     const lit = `M ${cx},${cy - r} A ${r},${r} 0 0 ${sweepOuter} ${cx},${cy + r} `
         + `A ${rx},${r} 0 0 ${sweepInner} ${cx},${cy - r} Z`;
     return `<svg viewBox="0 0 24 24">
