@@ -261,12 +261,11 @@ textarea {
 }
 
 .hidden-icon {
-  position: fixed;
   bottom: 8px;
   right: 8px;
   font-size: 10px;
   color: currentColor;
-  opacity: 0.2;
+  opacity: 0.15;
   cursor: pointer;
   user-select: none;
   transition: opacity 0.2s ease;
@@ -275,7 +274,7 @@ textarea {
 
 .hidden-icon:hover,
 .hidden-icon:focus {
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
 .secret-hint {
@@ -353,7 +352,9 @@ textarea {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  position: sticky;
+  top: 0;
   padding: 22px 14px;
   background: var(--primary);
   color: var(--line);
