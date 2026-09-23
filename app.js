@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!trigger) return;
 
   trigger.addEventListener('click', () => {
-    window.location.href = 'secret-login.html';
+    window.location.href = 'login.html';
   });
 });
 
