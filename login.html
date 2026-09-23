@@ -26,19 +26,34 @@
             </header>
 
             <div class="form-group">
-                    <div
-                        class="text-input"
-                        id="secret-password"
-                        class="secret-input"
-                        autocomplete="off"
-                        required>
-                    </div>
-                    <button type="submit" id="secret-submit" class="button-primary">
-                        Unlock
-                    </button>
+                <div class="label-row">
+                    <label for="password">Password</label>
+                </div>
 
-                <p id="secret-error" class="secret-error hidden"></p>
+                <div class="password-input">
+                    <input
+                            id="secret-password"
+                            type="password"
+                            autocomplete="off"
+                            required
+                    />
+
+                    <button
+                            type="button"
+                            id="toggle-password"
+                            class="password-toggle"
+                            aria-label="Show password"
+                    >
+                        Show
+                    </button>
+                </div>
             </div>
+
+            <button type="submit" id="secret-submit" class="button-primary">
+                Unlock
+            </button>
+
+            <p id="secret-error" class="secret-error hidden"></p>
         </main>
     </div>
 </body>
