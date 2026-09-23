@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="head-loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js" defer></script>
+    <script src="app.js" defer></script>
+    <script src="weather.js" defer></script>
+    <script src="login.js" defer></script>
+</head>
+<body>
+
+<main class="secret-page">
+    <div class="secret-card">
+        <h1 class="secret-title">Enter password</h1>
+        <p class="secret-hint">Hint: ask the site owner if you don't know this one.</p>
+
+        <form id="secret-form" class="secret-form">
+            <input
+                    type="password"
+                    id="secret-password"
+                    class="secret-input"
+                    placeholder="Password"
+                    autocomplete="off"
+                    required
+            />
+            <button type="submit" id="secret-submit" class="secret-button">
+                Unlock
+            </button>
+        </form>
+
+        <p id="secret-error" class="secret-error hidden"></p>
+    </div>
+</main>
+
+</body>
+</html>

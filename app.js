@@ -211,6 +211,19 @@ function setupApp(session) {
   document.dispatchEvent(new CustomEvent('app:ready', { detail: { session } }));
 }
 
+// hidden-icon.js
+// Attaches the click behavior for the hidden icon trigger.
+// On click, navigates to the separate password-gated page.
+
+document.addEventListener('DOMContentLoaded', () => {
+  const trigger = document.getElementById('hidden-icon');
+  if (!trigger) return;
+
+  trigger.addEventListener('click', () => {
+    window.location.href = 'secret-login.html';
+  });
+});
+
 
 /* -----------------------------
    Helpers
