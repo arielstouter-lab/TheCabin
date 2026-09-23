@@ -25,7 +25,7 @@
                 </div>
             </header>
 
-            <div class="form-group">
+            <div class="form-group" id="secret-form">
                 <div class="password-input">
                     <input
                             id="secret-password"
@@ -43,14 +43,16 @@
                         Show
                     </button>
 
-                    <button type="submit" id="secret-submit" class="button-primary">
-                        Unlock
-                    </button>
-
                 </div>
             </div>
 
-            <p id="secret-error" class="secret-error hidden"></p>
+            <div id="secret-error" class="form-error" hidden></div>
+
+            <button type="submit" id="secret-submit" class="button button-primary">
+                <span id="login-button-text">Unlock</span>
+                <span id="login-spinner" class="spinner" hidden></span>
+            </button>
+
         </main>
     </div>
 </body>
