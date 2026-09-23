@@ -20,14 +20,12 @@
         <header class="topbar">
             <div class="text-center">
                 <h1>Enter Password</h1>
-                <p>if I go missing</p>
-                <p class="secret-hint">Hint: ask the site owner if you don't know this one.</p>
-            </div>
+                <span class="secret-hint" tabindex="0" data-hint="Here's the hint">Hover if I go missing</span>            </div>
         </header>
 
         <section class="content">
 
-            <form id="secret-form" class="secret-form">
+            <form id="secret-form" class="text-input">
                 <input
                         type="password"
                         id="secret-password"
@@ -36,7 +34,7 @@
                         autocomplete="off"
                         required
                 />
-                <button type="submit" id="secret-submit" class="secret-button">
+                <button type="submit" id="secret-submit" class="button-primary">
                     Unlock
                 </button>
             </form>

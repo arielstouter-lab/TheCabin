@@ -278,6 +278,37 @@ textarea {
   opacity: 0.4;
 }
 
+.secret-hint {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+}
+
+.secret-hint::after {
+  content: attr(data-hint);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: var(--card);
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+}
+
+.secret-hint:hover::after,
+.secret-hint:focus::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-10px);
+}
+
 .form-error {
   margin: -4px 0 16px;
   padding: 11px 12px;
