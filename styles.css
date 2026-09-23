@@ -726,7 +726,7 @@ select {
 
 .hidden-icon {
   display: block;
-  text-align: right;
+  text-align: center;
   padding: 0 10px 4px;
   font-size: 10px;
   color: var(--line);
