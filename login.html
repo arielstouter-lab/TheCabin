@@ -10,38 +10,36 @@
     <script src="weather.js" defer></script>
     <script src="login.js" defer></script>
 </head>
+
 <body class="app-page">
-<div class="app-shell">
-    <main class="main-content">
-        <a href="app.html" class="brand-link">
-            <div class="brand-mark"></div>
-        </a>
+    <div class="app-shell">
+        <main class="main-content">
+            <a href="app.html" class="brand-link">
+                <div class="brand-mark"></div>
+            </a>
 
-        <header class="topbar">
-            <div class="text-center">
-                <h1>Enter Password</h1>
-                <span class="secret-hint" tabindex="0" data-hint="Here's the hint">Hover if I go missing</span>            </div>
-        </header>
+            <header class="topbar">
+                <div class="text-center">
+                    <h1>Enter Password</h1>
+                    <span class="secret-hint" tabindex="0" data-hint="Here's the hint">Hover if I go missing</span>
+                </div>
+            </header>
 
-        <section class="content">
-
-            <form id="secret-form" class="text-input">
-                <input
-                        type="password"
+            <div class="form-group">
+                    <div
+                        class="text-input"
                         id="secret-password"
                         class="secret-input"
-                        placeholder="Password"
                         autocomplete="off"
-                        required
-                />
-                <button type="submit" id="secret-submit" class="button-primary">
-                    Unlock
-                </button>
-            </form>
+                        required>
+                    </div>
+                    <button type="submit" id="secret-submit" class="button-primary">
+                        Unlock
+                    </button>
 
-            <p id="secret-error" class="secret-error hidden"></p>
-        </section>
-    </main>
-</div>
+                <p id="secret-error" class="secret-error hidden"></p>
+            </div>
+        </main>
+    </div>
 </body>
 </html>
