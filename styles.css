@@ -109,7 +109,7 @@ textarea {
   display: block;
   width: 34px;
   height: 34px;
-  margin: 0 auto;
+  margin: 10px auto 10px;
 }
 
 .auth-header {
@@ -353,8 +353,7 @@ textarea {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow-y: auto;
+  min-height: 100vh;
   padding: 22px 14px;
   background: var(--primary);
   color: var(--line);
@@ -1242,7 +1241,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .wc-meta-item { display: flex; align-items: center; gap: 6px; }
 .wc-meta-item svg { width: 18px; height: 18px; flex-shrink: 0; }
 
-.weather-page { max-width: 520px; margin: 0 auto; padding: 32px 20px 60px; }
+.weather-page { max-width: 520px; margin: 0 auto; padding: 10px 20px 60px; }
 
 .wf-list {
   margin-top: 20px;
