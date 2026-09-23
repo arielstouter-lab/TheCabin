@@ -266,7 +266,7 @@ textarea {
   right: 8px;
   font-size: 10px;
   color: currentColor;
-  opacity: 0.1;
+  opacity: 0.2;
   cursor: pointer;
   user-select: none;
   transition: opacity 0.2s ease;
@@ -275,7 +275,7 @@ textarea {
 
 .hidden-icon:hover,
 .hidden-icon:focus {
-  opacity: 0.3;
+  opacity: 0.4;
 }
 
 .form-error {
