@@ -19,36 +19,68 @@
 
             <header class="topbar">
                 <div class="text-center">
-                    <h1>If I go missing</h1>
-                    <span class="secret-hint" tabindex="0" data-hint="Here's the hint">Hover for password hint</span>
+                    <h1>Ariel's Section</h1>
                 </div>
             </header>
 
-            <form class="form-group" id="secret-form">
-                <div class="password-input">
-                    <input
-                            id="secret-password"
-                            type="password"
-                            autocomplete="off"
-                            required
-                    />
-                    <button
-                            type="button"
-                            id="toggle-password"
-                            class="password-toggle"
-                            aria-label="Show password"
-                    >
-                        Show
+            <section class="content">
+
+                <div class="tabs-container" id="ariel-tabs">
+                    <button type="button" class="tab active" data-tab="login">
+                        <span>Login</span>
+                    </button>
+                    <button type="button" class="tab" data-tab="period">
+                        <span>Period Tracker</span>
                     </button>
                 </div>
 
-                <div id="secret-error" class="form-error" hidden></div>
+                <!-- Tab 1: Login -->
+                <div id="tab-login" class="tab-pane">
+                    <div class="panel">
+                        <div class="panel-head">
+                            <span class="secret-hint" tabindex="0" data-hint="Look under the mat for the password">Hover if I go missing</span>
+                        </div>
+                        <div class="panel-body">
+                            <form class="form-group" id="secret-form">
+                                <div class="password-input">
+                                    <input
+                                            id="secret-password"
+                                            type="password"
+                                            autocomplete="off"
+                                            required
+                                    />
+                                    <button
+                                            type="button"
+                                            id="toggle-password"
+                                            class="password-toggle"
+                                            aria-label="Show password"
+                                    >
+                                        Show
+                                    </button>
+                                </div>
 
-                <button type="submit" id="secret-submit" class="button button-primary">
-                    <span id="login-button-text">Unlock</span>
-                    <span id="login-spinner" class="spinner" hidden></span>
-                </button>
-            </form>
+                                <div id="secret-error" class="form-error" hidden></div>
+
+                                <button type="submit" id="secret-submit" class="button button-primary">
+                                    <span id="login-button-text">Unlock</span>
+                                    <span id="login-spinner" class="spinner" hidden></span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Period Calendar -->
+                <div id="tab-period" class="tab-pane">
+                    <div class="panel">
+                        <div class="panel-head">
+                        </div>
+                        <div class="panel-body">
+                        </div>
+                    </div>
+                </div>
+
+            </section>
         </main>
     </div>
 </body>
