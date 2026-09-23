@@ -260,6 +260,24 @@ textarea {
   color: var(--danger);
 }
 
+.hidden-icon {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  font-size: 10px;
+  color: currentColor;
+  opacity: 0.1;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.hidden-icon:hover,
+.hidden-icon:focus {
+  opacity: 0.3;
+}
+
 .form-error {
   margin: -4px 0 16px;
   padding: 11px 12px;
