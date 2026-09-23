@@ -85,26 +85,32 @@ async function bootstrapAuth() {
   return verified?.session ?? null
 }
 
+// Global password toggle handler for any .password-toggle button inside .password-input
+document.addEventListener("click", (e) => {
+  const toggleBtn = e.target.closest(".password-toggle");
+  if (!toggleBtn) return;
+
+  const container = toggleBtn.closest(".password-input");
+  const input = container?.querySelector("input");
+  if (!input) return;
+
+  const isPassword = input.type === "password";
+  input.type = isPassword ? "text" : "password";
+  toggleBtn.textContent = isPassword ? "Hide" : "Show";
+  toggleBtn.setAttribute(
+      "aria-label",
+      isPassword ? "Hide password" : "Show password"
+  );
+});
+
 function setupLogin() {
   const form = document.getElementById("login-form");
   const usernameInput = document.getElementById("username");
   const passwordInput = document.getElementById("password");
-  const togglePassword = document.getElementById("toggle-password");
   const errorElement = document.getElementById("login-error");
   const button = document.getElementById("login-button");
   const buttonText = document.getElementById("login-button-text");
   const spinner = document.getElementById("login-spinner");
-
-  togglePassword.addEventListener("click", () => {
-    const isPassword = passwordInput.type === "password";
-
-    passwordInput.type = isPassword ? "text" : "password";
-    togglePassword.textContent = isPassword ? "Hide" : "Show";
-    togglePassword.setAttribute(
-      "aria-label",
-      isPassword ? "Hide password" : "Show password"
-    );
-  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
