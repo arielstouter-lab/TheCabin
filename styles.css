@@ -1,16 +1,25 @@
+/* ==========================================================================
+   1. DESIGN TOKENS & RESET
+   ========================================================================== */
+
 :root {
-  --primary: #37533F;        /* was also --green, --sidebar */
-  --primary-hover: #5C7A67;  /* was also --green-soft */
-  --danger: #A6432F;         /* was also --brick */
-  --danger-bg: #fef3f2;
+  --primary: #37533F;        /* Main brand green */
+  --primary-hover: #5C7A67;  /* Soft green hover */
+  --danger: #A6432F;         /* Brick red danger */
+  --danger-bg: #fef3f2;      /* Light red alert background */
   --sidebar-active: #ffffff;
-  --paper:#EFEBDD;
-  --card:#FBF8EF;
-  --ink:#24261F;
-  --ink-soft:#5B5B4E;
-  --ochre:#B8862E;
-  --line:#C9C2A8;
-  --accent:#37533F; /* dynamically overridden elsewhere (e.g. weather) — do not merge with --primary */
+  --paper: #EFEBDD;
+  --card: #FBF8EF;
+  --ink: #24261F;
+  --ink-soft: #5B5B4E;
+  --ochre: #B8862E;
+  --line: #C9C2A8;
+  --subtle-border: rgba(201, 194, 168, 0.4);
+  --success-bg: #f4f8f4;
+  --success-card: #f0f4f0;
+  --warning-bg: #fdfaf3;
+  --priority-bg: #fbf1ee;
+  --accent: #37533F;         /* Dynamically overridden elsewhere (e.g. weather) */
   --font-serif: 'Fraunces', Georgia, serif;
   --radius: 12px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
@@ -46,155 +55,116 @@ textarea {
 
 .visually-hidden {
   position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
 }
 
-/* =========================
-   Login
-========================= */
 
-.auth-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background:
-    radial-gradient(circle at top left, var(--card) 0, transparent 35%),
-    var(--paper);
-}
+/* ==========================================================================
+   2. BASE TYPOGRAPHY & UTILITIES
+   ========================================================================== */
 
-.auth-container {
-  width: 100%;
-  max-width: 420px;
-}
-
-.auth-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 40px;
-  box-shadow: var(--shadow);
-}
-
-.brand {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 36px;
-}
-
-.brand h1 {
-  margin: 0;
-  font-size: 18px;
+.eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.brand-mark {
+.text-center {
+  text-align: center;
+  flex-grow: 1;
   width: 100%;
-  height: 100%;
-  border-radius: 9px;
-  background-image: url('pinecone.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
 }
 
-/* Brand link for sub-page top brand navigation */
-.brand-link {
-  display: block;
-  width: 34px;
-  height: 34px;
-  margin: 10px auto 10px;
-}
-
-.auth-header {
-  margin-bottom: 28px;
-}
-
-.auth-header h2 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  letter-spacing: -0.5px;
-}
-
-.auth-header p {
-  margin: 0;
+/* Base Chips & Badges */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 12px;
   color: var(--ink-soft);
-  font-size: 14px;
 }
 
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 7px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.label-row {
-  display: flex;
-  justify-content: space-between;
-}
-
-.form-group input {
-  width: 100%;
-  height: 46px;
-  padding: 0 13px;
-  border: 1px solid #d1d5db;
-  border-radius: 9px;
-  outline: none;
-  color: var(--ink);
-  background: white;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.form-group input::placeholder {
-  color: #9ca3af;
-}
-
-.form-group input:focus {
-  border-color: #6b7280;
-  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
-}
-
-.password-input {
-  position: relative;
-}
-
-.password-input input {
-  padding-right: 65px;
-}
-
-.password-toggle {
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
+.chip input[type=number] {
+  width: auto;
+  min-width: 2.5ch;
+  field-sizing: content;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.password-toggle:hover {
+  padding: 3px 5px;
   color: var(--ink);
+  border-radius: 4px;
+  text-align: right;
 }
 
-/* =========================
-   Buttons (canonical — use these everywhere;
-   do not create new page-specific button classes)
-========================= */
+.chip input[type=number]:focus {
+  outline: none;
+  border-color: var(--primary);
+}
 
+.chip--w52 input[type=number] { width: 52px; }
+.chip--w40 input[type=number] { width: 40px; }
+.chip--w36 input[type=number] { width: 36px; }
+
+.chip-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--paper);
+}
+
+.chip-danger input[type=number] {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.chip-danger input[type=number]:focus {
+  outline: none;
+  border-color: var(--paper);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.badge.a {
+  background: rgba(55, 83, 63, 0.12);
+  color: var(--primary);
+}
+
+.badge.b {
+  background: rgba(184, 134, 46, 0.14);
+  color: var(--ochre);
+}
+
+
+/* ==========================================================================
+   3. SHARED CORE COMPONENTS
+   ========================================================================== */
+
+/* Buttons */
 .button {
   width: auto;
   height: 46px;
@@ -224,9 +194,8 @@ textarea {
   background: var(--primary-hover);
 }
 
-/* Compact inline button used inside panels (calendar/lists "Add" actions) */
 .button-inline {
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   font-weight: 600;
   font-size: 13px;
   padding: 8px 14px;
@@ -237,6 +206,7 @@ textarea {
   border-radius: 9px;
   text-decoration: none;
   white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .button-inline:hover {
@@ -244,7 +214,6 @@ textarea {
   border-color: var(--primary-hover);
 }
 
-/* Canonical small icon-only delete/remove button */
 .icon-delete {
   background: none;
   border: none;
@@ -260,54 +229,146 @@ textarea {
   color: var(--danger);
 }
 
-.hidden-icon {
-  bottom: 8px;
-  right: 8px;
-  font-size: 10px;
-  color: currentColor;
-  opacity: 0.15;
-  cursor: pointer;
-  user-select: none;
-  transition: opacity 0.2s ease;
-  z-index: 10;
+/* Form Controls */
+.form-group {
+  margin-bottom: 20px;
 }
 
-.hidden-icon:hover,
-.hidden-icon:focus {
-  opacity: 0.3;
+.form-group label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.secret-hint {
-  position: relative;
-  display: inline-block;
-  cursor: help;
-  border-bottom: 1px dotted currentColor;
+.label-row {
+  display: flex;
+  justify-content: space-between;
 }
 
-.secret-hint::after {
-  content: attr(data-hint);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-6px);
-  background: var(--card);
+.form-group input,
+.text-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  outline: none;
   color: var(--ink);
-  padding: 6px 10px;
-  border-radius: 4px;
+  background: var(--paper);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+
+.form-group input {
+  height: 46px;
+  padding: 0 13px;
+  background: white;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  font-size: 13.5px;
+}
+
+.form-group input::placeholder,
+.text-input::placeholder {
+  color: var(--ink-soft);
+  opacity: 0.7;
+}
+
+.form-group input:focus,
+.text-input:focus,
+select:focus,
+input[type=date]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(55, 83, 63, 0.12);
+}
+
+select,
+input[type=date] {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background-color: var(--paper);
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  box-sizing: border-box;
+  max-width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+select {
+  cursor: pointer;
+}
+
+.password-input {
+  position: relative;
+}
+
+.password-input input {
+  padding-right: 65px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  color: var(--ink);
+}
+
+.add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.stepper-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 8px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.stepper-btn:hover {
+  background: var(--paper);
+}
+
+.stepper-val {
   font-size: 12px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  z-index: 20;
+  font-weight: 600;
+  padding: 0 4px;
+  min-width: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
-.secret-hint:hover::after,
-.secret-hint:focus::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(-10px);
-}
-
+/* Feedback & Progress Indicators */
 .form-error {
   margin: -4px 0 16px;
   padding: 11px 12px;
@@ -337,10 +398,209 @@ textarea {
   to { transform: rotate(360deg); }
 }
 
+.status-line {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+  min-height: 14px;
+}
 
-/* =========================
-   App shell
-========================= */
+.empty-state {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-style: italic;
+  padding: 4px 0 12px;
+  text-align: center;
+  margin: 16px 0;
+}
+
+.form-note {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 10px;
+  line-height: 1.4;
+}
+
+/* Layout Containers & Panels */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  margin-bottom: 20px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  gap: 10px;
+}
+
+.panel-title {
+  font-family: var(--font-serif), serif;
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0;
+}
+
+.panel-sub {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  text-align: right;
+  line-height: 1.4;
+}
+
+.panel-body {
+  padding: 16px;
+}
+
+.panel-search {
+  padding: 10px 14px 4px;
+}
+
+.action-footer {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.welcome-card {
+  padding: 30px;
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.welcome-card h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+}
+
+.welcome-card p {
+  max-width: 600px;
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.card-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.card-label {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.card-row strong {
+  font-size: 18px;
+}
+
+/* Tabs System */
+.tabs-container {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  bottom: -1px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.tab:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.tab.active {
+  background: var(--card);
+  color: var(--primary);
+  font-weight: 600;
+  border-color: var(--line);
+  border-bottom: 1px solid var(--card);
+  z-index: 2;
+}
+
+/* Drag & Drop System */
+.drag-handle {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+  padding: 1px 4px 0 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.draggable-item {
+  touch-action: pan-y;
+}
+
+.draggable-item.is-dragging {
+  opacity: 0.4;
+  background: var(--card);
+}
+
+.draggable-item.is-drag-over {
+  border-color: var(--primary);
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+
+/* ==========================================================================
+   4. GLOBAL APP SHELL
+   ========================================================================== */
 
 .app-shell {
   min-height: 100vh;
@@ -464,6 +724,54 @@ textarea {
   color: var(--paper);
 }
 
+.hidden-icon {
+  display: block;
+  text-align: right;
+  padding: 0 10px 4px;
+  font-size: 10px;
+  color: var(--line);
+  opacity: 0.25;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+.hidden-icon:hover,
+.hidden-icon:focus {
+  opacity: 0.7;
+}
+
+.secret-hint {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+}
+
+.secret-hint::after {
+  content: attr(data-hint);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: var(--card);
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+}
+
+.secret-hint:hover::after,
+.secret-hint:focus::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-10px);
+}
+
 .main-content {
   flex: 1 1 auto;
   min-width: 0;
@@ -498,322 +806,83 @@ textarea {
   padding: 20px 40px;
 }
 
-/* Canonical bordered card box — used for the dashboard welcome
-   message and any other full-width info box (was duplicated as
-   .welcome-card + .full-width-box) */
-.welcome-card {
-  padding: 30px;
-  margin-bottom: 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+
+/* ==========================================================================
+   5. PAGE-SPECIFIC MODULES
+   ========================================================================== */
+
+/* --- Auth / Login --- */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, var(--card) 0, transparent 35%),
+    var(--paper);
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-card {
   background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 40px;
   box-shadow: var(--shadow);
 }
 
-.eyebrow {
-  display: block;
-  margin-bottom: 8px;
-  color: #6b7280;
-  font-size: 11px;
+.brand {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 36px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-.welcome-card h2 {
-  margin: 0 0 10px;
-  font-size: 24px;
+.brand-mark {
+  width: 100%;
+  height: 100%;
+  border-radius: 9px;
+  background-image: url('pinecone.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
-.welcome-card p {
-  max-width: 600px;
+.brand-link {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 10px auto 10px;
+}
+
+.auth-header {
+  margin-bottom: 28px;
+}
+
+.auth-header h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+}
+
+.auth-header p {
   margin: 0;
   color: var(--ink-soft);
-  line-height: 1.6;
   font-size: 14px;
 }
 
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
-}
 
-.card-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
-}
-
-.card-label {
-  color: var(--ink-soft);
-  font-size: 12px;
-}
-
-.card-row strong {
-  font-size: 18px;
-}
-
-.text-center {
-  text-align: center;
-  flex-grow: 1;
-  width: 100%;
-}
-
-/* =========================
-   Chips & Input Badges (canonical)
-========================= */
-
-.cl-chip-groups {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 20px;
-  align-items: flex-start;
-}
-
-.cl-chip-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 3px 6px;
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.chip input[type=number] {
-  width: auto;
-  min-width: 2.5ch;
-  field-sizing: content;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  font-variant-numeric: tabular-nums;
-  font-size: 13px;
-  padding: 3px 5px;
-  color: var(--ink);
-  border-radius: 4px;
-  text-align: right;
-}
-
-.chip input[type=number]:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-/* Width modifiers — apply on top of .chip depending on context
-   (was baked separately into .cl-field / .cl-split-chip / .cl-dislike-chip) */
-.chip--w52 input[type=number] { width: 52px; }
-.chip--w40 input[type=number] { width: 40px; }
-.chip--w36 input[type=number] { width: 36px; }
-
-/* Danger/dislike variant */
-.chip-danger {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: var(--paper);
-}
-
-.chip-danger input[type=number] {
-  background: var(--paper);
-  color: var(--ink);
-  border-color: var(--line);
-}
-
-.chip-danger input[type=number]:focus {
-  outline: none;
-  border-color: var(--paper);
-}
-
-/* =========================
-   Shared panel system (canonical — used by
-   Calendar, Chores, and Lists pages)
-========================= */
-
-.panel {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  max-width: 100%;
-  margin-bottom: 20px;
-}
-
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
-  gap: 10px;
-}
-
-.panel-title {
-  font-family: var(--font-serif), serif;
-  font-weight: 600;
-  font-size: 18px;
-  margin: 0;
-}
-
-.panel-sub {
-  font-size: 11.5px;
-  color: var(--ink-soft);
-  text-align: right;
-  line-height: 1.4;
-}
-
-.panel-body {
-  padding: 16px;
-}
-
-/* Canonical status line under a page heading */
-.status-line {
-  font-size: 11.5px;
-  color: var(--ink-soft);
-  margin-bottom: 10px;
-  min-height: 14px;
-}
-
-/* Canonical empty-state message */
-.empty-state {
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  font-style: italic;
-  padding: 4px 0 12px;
-  text-align: center;
-  margin: 16px 0;
-}
-
-.form-note {
-  font-size: 11.5px;
-  color: var(--ink-soft);
-  margin-top: 10px;
-  line-height: 1.4;
-}
-
-.panel-search {
-  padding: 10px 14px 4px;
-}
-
-.action-footer {
-  margin-top: 16px;
-  text-align: center;
-}
-
-/* Canonical text input used in "add new ..." rows */
-.text-input {
-  flex: 1;
-  min-width: 0;
-  padding: 7px 9px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--paper);
-  font-family: 'Inter', sans-serif;
-  font-size: 13.5px;
-  color: var(--ink);
-}
-
-/* Base select and date input styling consistent with cabin theme */
-select,
-input[type=date] {
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background-color: var(--paper);
-  font-family: 'Inter', sans-serif;
-  font-size: 12.5px;
-  color: var(--ink);
-  box-sizing: border-box;
-  max-width: 100%;
-}
-
-select {
-  cursor: pointer;
-}
-
-.text-input:focus,
-select:focus,
-input[type=date]:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-.add-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-/* =========================
-   Shared tabs system
-========================= */
-.tabs-container {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: thin; /* Hides bulky scrollbars on Firefox */
-  border-bottom: 2px solid var(--line);
-  padding-bottom: 4px;
-  margin-bottom: 10px;
-}
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  font-family: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--ink-soft);
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-bottom: none; /* Flat bottom edge */
-  border-radius: 10px 10px 0 0; /* Rounded top corners: TL TR BR BL */
-  cursor: pointer;
-  white-space: nowrap;
-  position: relative;
-  bottom: -1px; /* Sits over the container's bottom border */
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.tab:hover {
-  background: var(--card);
-  color: var(--ink);
-}
-
-.tab.active {
-  background: var(--card); /* Matches the list panel background */
-  color: var(--primary);
-  font-weight: 600;
-  border-color: var(--line);
-  border-bottom: 1px solid var(--card); /* Blends into the card below */
-  z-index: 2;
-}
-
-.subrow-label { font-size: 10.5px; color: var(--ink-soft); margin: 0 0 2px; text-transform: none; white-space: nowrap; }
-
-/* ==========================================
-   Calendar page
-========================================== */
-
+/* --- Calendar --- */
 .cal-grid-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; }
 
 .cal-nav { display: flex; align-items: center; gap: 10px; }
@@ -870,9 +939,7 @@ input[type=date]:focus {
 }
 .cal-event-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* ==========================================
-   Calendar page — seasonal background fade
-========================================== */
+/* Calendar page — seasonal background fade */
 body.cal-page {
   --season-img: none;
   position: relative;
@@ -903,9 +970,8 @@ body.cal-page[data-season="summer"] { background-color: var(--primary); }
 body.cal-page[data-season="fall"]   { background-color: var(--ink); }
 body.cal-page[data-season="winter"] { background-color: var(--card); }
 
-/* ==========================================
-   Chores List page
-========================================== */
+
+/* --- Chores List --- */
 .cl-beam-label { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 12px; }
 .cl-beam-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .cl-beam-row:last-child,
@@ -957,6 +1023,21 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 }
 .cl-pts-badge small { display: block; font-weight: 500; color: var(--ink-soft); font-size: 10px; }
 
+.cl-chip-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: flex-start;
+}
+
+.cl-chip-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .cl-chip-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .cl-split-total { font-size: 11px; color: var(--ink-soft); margin-left: 2px; }
 .cl-split-total.bad { color: var(--danger); font-weight: 600; }
@@ -986,45 +1067,8 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 
 .cl-note { font-size: 11.5px; color: var(--ink-soft); margin-top: 16px; line-height: 1.5; }
 
-/* ==========================================
-   Shared Drag & Drop Styles
-   ========================================== */
-.drag-handle {
-  cursor: grab;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-  color: var(--ink-soft);
-  font-size: 14px;
-  padding: 1px 4px 0 0;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-}
 
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.draggable-item {
-  touch-action: pan-y;
-}
-
-.draggable-item.is-dragging {
-  opacity: 0.4;
-  background: var(--card);
-}
-
-.draggable-item.is-drag-over {
-  border-color: var(--primary);
-  background: var(--card);
-  box-shadow: 0 0 0 1px var(--primary);
-}
-
-/* ==========================================
-   Lists page
-   ========================================== */
+/* --- Lists & Pantry --- */
 .lst-items { padding: 10px 14px 4px; flex: 1; }
 
 .lst-item {
@@ -1045,7 +1089,6 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   cursor: pointer;
 }
 
-/* Align entire pantry item on a single line */
 .lst-item-row {
   display: flex;
   flex-direction: row;
@@ -1067,7 +1110,6 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   flex-shrink: 0;
 }
 
-/* Completed item state */
 .lst-item.checked {
   opacity: 0.6;
 }
@@ -1077,12 +1119,11 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   color: var(--ink-soft);
 }
 
-/* Dim chip badges on completed items */
 .lst-item.checked .lst-chip {
   opacity: 0.7;
 }
 
-.lst-item.priority { border-color: var(--danger); background: #fbf1ee; }
+.lst-item.priority { border-color: var(--danger); background: var(--priority-bg); }
 .lst-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .lst-item-text { font-size: 13.5px; color: var(--ink); word-break: break-word; }
 .lst-item.priority .lst-item-text { font-weight: 600; color: var(--danger); }
@@ -1118,45 +1159,10 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; cursor: pointer; user-select: none;
 }
 .lst-priority-toggle input { margin: 0; }
-
-/* Minimal inline stepper */
-.stepper {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--card);
-  overflow: hidden;
-}
-
-.stepper-btn {
-  background: transparent;
-  border: none;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 2px 8px;
-  cursor: pointer;
-  line-height: 1.2;
-}
-
-.stepper-btn:hover {
-  background: var(--paper);
-}
-
-.stepper-val {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 0 4px;
-  min-width: 18px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
+.subrow-label { font-size: 10.5px; color: var(--ink-soft); margin: 0 0 2px; text-transform: none; white-space: nowrap; }
 
 
-/* ==========================================
-   Weather Card and page
-========================================== */
+/* --- Weather Card & Forecast --- */
 .weather-card {
   position: relative;
   width: 100%;
@@ -1269,10 +1275,8 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 .wf-temps { text-align: right; white-space: nowrap; }
 .wf-lo { margin-left: 6px; }
 
-/* ==========================================
-   Credit Cards Rewards page
-========================================== */
 
+/* --- Credit Cards Rewards & Financial --- */
 .table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -1298,7 +1302,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 
 .cc-table td {
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(201, 194, 168, 0.4);
+  border-bottom: 1px solid var(--subtle-border);
   vertical-align: middle;
 }
 
@@ -1401,26 +1405,6 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   font-style: italic;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  margin-left: 6px;
-}
-
-.badge.a {
-  background: rgba(55, 83, 63, 0.12);
-  color: var(--primary);
-}
-
-.badge.b {
-  background: rgba(184, 134, 46, 0.14);
-  color: var(--ochre);
-}
-
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1438,12 +1422,12 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 }
 
 .summary-card.best {
-  background: #f0f4f0;
+  background: var(--success-card);
   border-color: var(--primary);
 }
 
 .summary-card.surplus {
-  background: #f0f4f0;
+  background: var(--success-card);
   border-color: var(--primary);
 }
 
@@ -1469,7 +1453,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 }
 
 .best-combo-card {
-  background: #f0f4f0;
+  background: var(--success-card);
   border: 1px solid var(--primary);
   border-radius: var(--radius);
   padding: 14px 18px;
@@ -1557,13 +1541,128 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   margin-top: auto;
 }
 
-/* ==========================================
-   Mobile / Responsive Overrides
-========================================== */
+
+/* ==========================================================================
+   6. OVERLAYS & PORTALS
+   ========================================================================== */
+
+/* Toast Notification System */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  width: calc(100% - 48px);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 13.5px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(20px);
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.toast.toast-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.toast.toast-hiding {
+  transform: translateY(12px);
+  opacity: 0;
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.toast-message {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  color: var(--ink);
+}
+
+.toast-success {
+  border-color: var(--primary);
+  background: var(--success-bg);
+}
+.toast-success .toast-icon {
+  color: var(--primary);
+}
+
+.toast-error {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.toast-error .toast-icon {
+  color: var(--danger);
+}
+
+.toast-warning {
+  border-color: var(--ochre);
+  background: var(--warning-bg);
+}
+.toast-warning .toast-icon {
+  color: var(--ochre);
+}
+
+.toast-info {
+  border-color: var(--line);
+  background: var(--card);
+}
+.toast-info .toast-icon {
+  color: var(--ink-soft);
+}
+
+
+/* ==========================================================================
+   7. RESPONSIVE BREAKPOINTS (CONSOLIDATED)
+   ========================================================================== */
 
 @media (max-width: 780px) {
-
-  .wc-temp { font-size: 52px; }
+  .wc-temp {
+    font-size: 52px;
+  }
 
   .sidebar {
     width: 64px;
@@ -1672,119 +1771,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     flex-direction: column;
     align-items: flex-start;
   }
-}
 
-/* ==========================================
-   Toast Notification System
-========================================== */
-.toast-container {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 380px;
-  width: calc(100% - 48px);
-  pointer-events: none;
-}
-
-.toast {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  background: var(--card);
-  border: 1px solid var(--line);
-  color: var(--ink);
-  font-size: 13.5px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  transform: translateY(20px);
-  opacity: 0;
-  transition: transform 0.25s ease, opacity 0.25s ease;
-}
-
-.toast.toast-visible {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.toast.toast-hiding {
-  transform: translateY(12px);
-  opacity: 0;
-}
-
-.toast-icon {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.toast-message {
-  flex: 1;
-  min-width: 0;
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.toast-close {
-  background: none;
-  border: none;
-  color: var(--ink-soft);
-  cursor: pointer;
-  padding: 2px 4px;
-  font-size: 14px;
-  line-height: 1;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.toast-close:hover {
-  color: var(--ink);
-}
-
-.toast-success {
-  border-color: var(--primary);
-  background: #f4f8f4;
-}
-.toast-success .toast-icon {
-  color: var(--primary);
-}
-
-.toast-error {
-  border-color: var(--danger);
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-.toast-error .toast-icon {
-  color: var(--danger);
-}
-
-.toast-warning {
-  border-color: var(--ochre);
-  background: #fdfaf3;
-}
-.toast-warning .toast-icon {
-  color: var(--ochre);
-}
-
-.toast-info {
-  border-color: var(--line);
-  background: var(--card);
-}
-.toast-info .toast-icon {
-  color: var(--ink-soft);
-}
-
-@media (max-width: 780px) {
   .toast-container {
     bottom: 16px;
     right: 16px;
