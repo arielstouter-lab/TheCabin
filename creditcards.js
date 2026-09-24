@@ -112,6 +112,16 @@
         }, 0);
     }
 
+    function getRentalMortgage(propertyName) {
+        const expenses = getRentalExpenses(propertyName);
+        return expenses
+            .filter(r => (r.category || '').trim().toLowerCase() === 'mortgage')
+            .reduce((sum, r) => {
+                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
+                return sum + calcMonthlyAmount(amt, r.frequency);
+            }, 0);
+    }
+
     function getRentalTaxSettings(propertyName) {
         const row = taxRows.find(t => (t[COL_TAX_STREAM] || t.income_stream) === propertyName);
         return {
@@ -124,10 +134,11 @@
     function getRentalTax(propertyName) {
         const rent = getRentalRent(propertyName);
         const expenses = getRentalOperatingExpenses(propertyName);
+        const mortgage = getRentalMortgage(propertyName);
         const settings = getRentalTaxSettings(propertyName);
         const monthlyDep = settings.depreciation / 12;
         const monthlyInt = settings.mortgage_interest / 12;
-        const taxableIncome = rent - expenses - monthlyDep - monthlyInt;
+        const taxableIncome = rent - (expenses - mortgage) - monthlyDep - monthlyInt;
         const rate = settings.tax_rate / 100;
         return taxableIncome > 0 ? (taxableIncome * rate) : 0;
     }
