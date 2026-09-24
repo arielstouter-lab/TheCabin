@@ -338,6 +338,45 @@
                             <button class="button-inline" id="sanJacintoAddCategoryBtn">Add expense</button>
                         </div>
 
+                        <!-- Taxes line right above summary -->
+                        <div class="compare-pickers rental-tax-row" id="sanJacintoTaxRow">
+                            <div class="picker">
+                                <label>Rent</label>
+                                <span id="sanJacintoTaxRent" class="tax-val">$0.00</span>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label>Expenses</label>
+                                <span id="sanJacintoTaxExpenses" class="tax-val">$0.00</span>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label for="sanJacintoDepreciation">Depreciation (yr)</label>
+                                <div class="num-wrap money" style="width: 130px;">
+                                    <input type="number" class="text-input" id="sanJacintoDepreciation" placeholder="Annual" min="0" step="any" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label for="sanJacintoMortgageInterest">Mortgage Int (yr)</label>
+                                <div class="num-wrap money" style="width: 130px;">
+                                    <input type="number" class="text-input" id="sanJacintoMortgageInterest" placeholder="Annual" min="0" step="any" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">&times;</span>
+                            <div class="picker">
+                                <label for="sanJacintoTaxRate">Tax Rate</label>
+                                <div class="num-wrap pct" style="width: 95px;">
+                                    <input type="number" class="text-input" id="sanJacintoTaxRate" placeholder="Rate" min="0" step="0.1" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">=</span>
+                            <div class="picker">
+                                <label>Taxes</label>
+                                <span id="sanJacintoTaxSum" class="tax-val" style="font-weight: 700;">$0.00/mo</span>
+                            </div>
+                        </div>
+
                         <!-- Profit totaled at the bottom -->
                         <div id="sanJacintoProfitSummary" class="summary-grid"></div>
                     </div>
@@ -390,6 +429,45 @@
                                 </div>
                             </div>
                             <button class="button-inline" id="countyLineAddCategoryBtn">Add expense</button>
+                        </div>
+
+                        <!-- Taxes line right above summary -->
+                        <div class="compare-pickers rental-tax-row" id="countyLineTaxRow">
+                            <div class="picker">
+                                <label>Rent</label>
+                                <span id="countyLineTaxRent" class="tax-val">$0.00</span>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label>Expenses</label>
+                                <span id="countyLineTaxExpenses" class="tax-val">$0.00</span>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label for="countyLineDepreciation">Depreciation (yr)</label>
+                                <div class="num-wrap money" style="width: 130px;">
+                                    <input type="number" class="text-input" id="countyLineDepreciation" placeholder="Annual" min="0" step="any" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label for="countyLineMortgageInterest">Mortgage Int (yr)</label>
+                                <div class="num-wrap money" style="width: 130px;">
+                                    <input type="number" class="text-input" id="countyLineMortgageInterest" placeholder="Annual" min="0" step="any" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">&times;</span>
+                            <div class="picker">
+                                <label for="countyLineTaxRate">Tax Rate</label>
+                                <div class="num-wrap pct" style="width: 95px;">
+                                    <input type="number" class="text-input" id="countyLineTaxRate" placeholder="Rate" min="0" step="0.1" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">=</span>
+                            <div class="picker">
+                                <label>Taxes</label>
+                                <span id="countyLineTaxSum" class="tax-val" style="font-weight: 700;">$0.00/mo</span>
+                            </div>
                         </div>
 
                         <!-- Profit totaled at the bottom -->

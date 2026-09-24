@@ -3,6 +3,7 @@
     const CATEGORIES_TABLE = 'income_expense_categories';
     const CARDS_TABLE = 'credit_cards';
     const REWARDS_TABLE = 'card_rewards';
+    const TAX_TABLE = 'income_tax';
 
     // Categories Table Columns
     const COL_CAT_ID = 'id';
@@ -23,6 +24,14 @@
     const COL_REWARD_ID = 'id';
     const COL_REWARD_CREATED_AT = 'created_at';
 
+    // Income Tax Table Columns
+    const COL_TAX_ID = 'id';
+    const COL_TAX_STREAM = 'income_stream';
+    const COL_TAX_RATE = 'tax_rate';
+    const COL_TAX_DEPRECIATION = 'depreciation';
+    const COL_TAX_MORTGAGE_INTEREST = 'mortgage_interest';
+    const COL_TAX_CREATED_AT = 'created_at';
+
     const RENTAL_PROPERTIES = ['San Jacinto', 'County Line'];
 
     let spendRows = [];       // {id, category, frequency, amount, monthly_spend, account_type: 'credit_cards', type: 'spending'}
@@ -31,6 +40,7 @@
     let rentalRows = [];      // {id, property, category, frequency, amount, monthly_spend, account_type: 'rental', type: 'income'|'spending'}
     let cardsRows = [];       // {id, name, annual_fee, base_rate}
     let rewardRows = [];      // {id, card_id, category, rate, special_refund}
+    let taxRows = [];         // {id, income_stream, tax_rate, depreciation, mortgage_interest}
 
     let realtimeChannel = null;
     let realtimeDebounceTimer = null;
@@ -94,12 +104,36 @@
         return rentalRows.filter(r => r.property === propertyName && r.type === 'spending');
     }
 
-    function getRentalTotalExpenses(propertyName) {
+    function getRentalOperatingExpenses(propertyName) {
         const expenses = getRentalExpenses(propertyName);
         return expenses.reduce((sum, r) => {
             const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
             return sum + calcMonthlyAmount(amt, r.frequency);
         }, 0);
+    }
+
+    function getRentalTaxSettings(propertyName) {
+        const row = taxRows.find(t => (t[COL_TAX_STREAM] || t.income_stream) === propertyName);
+        return {
+            depreciation: row ? (parseFloat(row[COL_TAX_DEPRECIATION] ?? row.depreciation) || 0) : 0,
+            mortgage_interest: row ? (parseFloat(row[COL_TAX_MORTGAGE_INTEREST] ?? row.mortgage_interest) || 0) : 0,
+            tax_rate: row ? (parseFloat(row[COL_TAX_RATE] ?? row.tax_rate) || 0) : 0
+        };
+    }
+
+    function getRentalTax(propertyName) {
+        const rent = getRentalRent(propertyName);
+        const expenses = getRentalOperatingExpenses(propertyName);
+        const settings = getRentalTaxSettings(propertyName);
+        const monthlyDep = settings.depreciation / 12;
+        const monthlyInt = settings.mortgage_interest / 12;
+        const taxableIncome = rent - expenses - monthlyDep - monthlyInt;
+        const rate = settings.tax_rate / 100;
+        return taxableIncome > 0 ? (taxableIncome * rate) : 0;
+    }
+
+    function getRentalTotalExpenses(propertyName) {
+        return getRentalOperatingExpenses(propertyName) + getRentalTax(propertyName);
     }
 
     function getRentalProfit(propertyName) {
@@ -315,14 +349,26 @@
             rentInputId: 'sanJacintoRentInput',
             spendGridBodyId: 'sanJacintoSpendGridBody',
             spendGridEmptyId: 'sanJacintoSpendGridEmpty',
-            profitSummaryId: 'sanJacintoProfitSummary'
+            profitSummaryId: 'sanJacintoProfitSummary',
+            taxRentId: 'sanJacintoTaxRent',
+            taxExpensesId: 'sanJacintoTaxExpenses',
+            depreciationInputId: 'sanJacintoDepreciation',
+            mortgageInterestInputId: 'sanJacintoMortgageInterest',
+            taxRateInputId: 'sanJacintoTaxRate',
+            taxSumId: 'sanJacintoTaxSum'
         });
 
         renderPropertySection('County Line', {
             rentInputId: 'countyLineRentInput',
             spendGridBodyId: 'countyLineSpendGridBody',
             spendGridEmptyId: 'countyLineSpendGridEmpty',
-            profitSummaryId: 'countyLineProfitSummary'
+            profitSummaryId: 'countyLineProfitSummary',
+            taxRentId: 'countyLineTaxRent',
+            taxExpensesId: 'countyLineTaxExpenses',
+            depreciationInputId: 'countyLineDepreciation',
+            mortgageInterestInputId: 'countyLineMortgageInterest',
+            taxRateInputId: 'countyLineTaxRate',
+            taxSumId: 'countyLineTaxSum'
         });
     }
 
@@ -370,10 +416,39 @@
             });
         }
 
-        // 3. Profit Total at the bottom
+        // 3. Taxes Line
+        const rent = getRentalRent(propertyName);
+        const operatingExpenses = getRentalOperatingExpenses(propertyName);
+        const taxSettings = getRentalTaxSettings(propertyName);
+        const monthlyTax = getRentalTax(propertyName);
+
+        const taxRentEl = document.getElementById(elements.taxRentId);
+        if (taxRentEl) taxRentEl.textContent = fmt$(rent);
+
+        const taxExpensesEl = document.getElementById(elements.taxExpensesId);
+        if (taxExpensesEl) taxExpensesEl.textContent = fmt$(operatingExpenses);
+
+        const depInput = document.getElementById(elements.depreciationInputId);
+        if (depInput && document.activeElement !== depInput) {
+            depInput.value = taxSettings.depreciation ? taxSettings.depreciation : '';
+        }
+
+        const mortgageInput = document.getElementById(elements.mortgageInterestInputId);
+        if (mortgageInput && document.activeElement !== mortgageInput) {
+            mortgageInput.value = taxSettings.mortgage_interest ? taxSettings.mortgage_interest : '';
+        }
+
+        const taxRateInput = document.getElementById(elements.taxRateInputId);
+        if (taxRateInput && document.activeElement !== taxRateInput) {
+            taxRateInput.value = taxSettings.tax_rate ? taxSettings.tax_rate : '';
+        }
+
+        const taxSumEl = document.getElementById(elements.taxSumId);
+        if (taxSumEl) taxSumEl.textContent = `${fmt$(monthlyTax)}/mo`;
+
+        // 4. Profit Total at the bottom
         const summary = document.getElementById(elements.profitSummaryId);
         if (summary) {
-            const rent = getRentalRent(propertyName);
             const totalExpenses = getRentalTotalExpenses(propertyName);
             const profit = rent - totalExpenses;
             const annualProfit = profit * 12;
@@ -390,7 +465,7 @@
               <div class="summary-card">
                 <div class="label">Total Expenses</div>
                 <div class="value">${fmt$(totalExpenses)}<span class="combo-unit">/mo</span></div>
-                <div class="foot">${fmt$(totalExpenses * 12)}/yr across ${expenses.length} expense${expenses.length === 1 ? '' : 's'}</div>
+                <div class="foot">${fmt$(operatingExpenses)}/mo expenses + ${fmt$(monthlyTax)}/mo tax &middot; ${fmt$(totalExpenses * 12)}/yr</div>
               </div>
               <div class="summary-card ${statusClass}">
                 <div class="label">${statusText}</div>
@@ -1253,7 +1328,59 @@
     }
 
     // -------------------------------------------------------------------
-    // Realtime sync (Consolidated table + cards + rewards)
+    // Supabase CRUD — income tax
+    // -------------------------------------------------------------------
+    async function loadIncomeTax() {
+        if (!sb) return;
+        try {
+            const { data, error } = await sb.from(TAX_TABLE).select('*');
+            if (error) throw error;
+            taxRows = data || [];
+        } catch (err) {
+            console.warn('Could not load income_tax table:', err);
+            taxRows = [];
+        }
+    }
+
+    async function updateTaxRow(streamName, patch) {
+        let row = taxRows.find(r => (r[COL_TAX_STREAM] || r.income_stream) === streamName);
+        if (!row) {
+            row = {
+                [COL_TAX_STREAM]: streamName,
+                [COL_TAX_RATE]: 0,
+                [COL_TAX_DEPRECIATION]: 0,
+                [COL_TAX_MORTGAGE_INTEREST]: 0
+            };
+            taxRows.push(row);
+        }
+        Object.assign(row, patch);
+        render();
+
+        if (!sb) return;
+        try {
+            const payload = {
+                [COL_TAX_STREAM]: streamName,
+                [COL_TAX_RATE]: parseFloat(row[COL_TAX_RATE] ?? row.tax_rate) || 0,
+                [COL_TAX_DEPRECIATION]: parseFloat(row[COL_TAX_DEPRECIATION] ?? row.depreciation) || 0,
+                [COL_TAX_MORTGAGE_INTEREST]: parseFloat(row[COL_TAX_MORTGAGE_INTEREST] ?? row.mortgage_interest) || 0
+            };
+            if (row[COL_TAX_ID] || row.id) {
+                const { error } = await sb.from(TAX_TABLE).update(payload).eq(COL_TAX_ID, row[COL_TAX_ID] || row.id);
+                if (error) throw error;
+            } else {
+                const { data: upserted, error } = await sb.from(TAX_TABLE).upsert([payload], { onConflict: COL_TAX_STREAM }).select().single();
+                if (error) throw error;
+                if (upserted) {
+                    Object.assign(row, upserted);
+                }
+            }
+        } catch (err) {
+            console.error('Could not save tax settings:', err);
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Realtime sync (Consolidated table + cards + rewards + tax)
     // -------------------------------------------------------------------
     function setupRealtime() {
         if (realtimeChannel || !sb) return;
@@ -1261,6 +1388,7 @@
             .on('postgres_changes', { event: '*', schema: 'public', table: CATEGORIES_TABLE }, () => debounceReload())
             .on('postgres_changes', { event: '*', schema: 'public', table: CARDS_TABLE }, () => debounceReload())
             .on('postgres_changes', { event: '*', schema: 'public', table: REWARDS_TABLE }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: TAX_TABLE }, () => debounceReload())
             .subscribe();
     }
 
@@ -1271,7 +1399,7 @@
             if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
                 return;
             }
-            await Promise.all([loadSpendingCategories(), loadCards(), loadRewards()]);
+            await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax()]);
             render();
         }, 400);
     }
@@ -1281,7 +1409,7 @@
     });
 
     async function loadAll() {
-        await Promise.all([loadSpendingCategories(), loadCards(), loadRewards()]);
+        await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax()]);
         render();
         setupRealtime();
     }
@@ -1384,6 +1512,22 @@
         });
     }
 
+    ['sanJacintoDepreciation', 'sanJacintoMortgageInterest', 'sanJacintoTaxRate'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('change', () => {
+                const dep = parseFloat(document.getElementById('sanJacintoDepreciation')?.value) || 0;
+                const mortgage = parseFloat(document.getElementById('sanJacintoMortgageInterest')?.value) || 0;
+                const rate = parseFloat(document.getElementById('sanJacintoTaxRate')?.value) || 0;
+                updateTaxRow('San Jacinto', {
+                    [COL_TAX_DEPRECIATION]: dep,
+                    [COL_TAX_MORTGAGE_INTEREST]: mortgage,
+                    [COL_TAX_RATE]: rate
+                });
+            });
+        }
+    });
+
     // 5. County Line Rental UI
     const countyLineRentInput = document.getElementById('countyLineRentInput');
     if (countyLineRentInput) {
@@ -1412,6 +1556,22 @@
             catInput.focus();
         });
     }
+
+    ['countyLineDepreciation', 'countyLineMortgageInterest', 'countyLineTaxRate'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('change', () => {
+                const dep = parseFloat(document.getElementById('countyLineDepreciation')?.value) || 0;
+                const mortgage = parseFloat(document.getElementById('countyLineMortgageInterest')?.value) || 0;
+                const rate = parseFloat(document.getElementById('countyLineTaxRate')?.value) || 0;
+                updateTaxRow('County Line', {
+                    [COL_TAX_DEPRECIATION]: dep,
+                    [COL_TAX_MORTGAGE_INTEREST]: mortgage,
+                    [COL_TAX_RATE]: rate
+                });
+            });
+        }
+    });
 
     // 6. Credit Cards & Rewards
     const addCardBtn = document.getElementById('addCardBtn');
@@ -1528,6 +1688,8 @@
                 if (countyLineRentInput) countyLineRentInput.blur();
             } else if (['countyLineNewCategory', 'countyLineNewCategoryAmount'].includes(targetId)) {
                 if (countyLineAddCategoryBtn) countyLineAddCategoryBtn.click();
+            } else if (['sanJacintoDepreciation', 'sanJacintoMortgageInterest', 'sanJacintoTaxRate', 'countyLineDepreciation', 'countyLineMortgageInterest', 'countyLineTaxRate'].includes(targetId)) {
+                if (e.target && typeof e.target.blur === 'function') e.target.blur();
             } else if (['newCardName', 'newCardFee', 'newCardBaseRate'].includes(targetId)) {
                 if (addCardBtn) addCardBtn.click();
             } else if (['newRewardCategory', 'newRate', 'newSpecialRefund'].includes(targetId)) {

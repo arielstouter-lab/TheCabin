@@ -23,6 +23,9 @@
   --font-serif: 'Fraunces', Georgia, serif;
   --radius: 12px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  /* Shared gradient used by both the weather card and the forecast list.
+     Kept as one token so the two surfaces can never drift out of sync. */
+  --weather-bg: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0d1420));
 }
 
 * {
@@ -34,13 +37,13 @@ body {
   margin: 0;
   min-height: 100%;
   font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
   color: var(--ink);
   background: var(--paper);
 }
@@ -86,6 +89,17 @@ textarea {
   width: 100%;
 }
 
+/* Truncation utility — was previously repeated inline in .user-info span
+   and .cl-beam-name. Any element that needs single-line ellipsis truncation
+   can share this rule; the two current consumers are grouped below and keep
+   only their own layout-specific properties in their own rule blocks. */
+.user-info span,
+.cl-beam-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Base Chips & Badges */
 .chip {
   display: inline-flex;
@@ -100,7 +114,10 @@ textarea {
 }
 
 .chip input[type=number] {
-  width: auto;
+  /* Width now driven by a custom property instead of three near-duplicate
+     width-only classes. .chip--w52/40/36 below each set just one variable
+     rather than repeating the full declaration block. */
+  width: var(--chip-w, 2.5ch);
   min-width: 2.5ch;
   field-sizing: content;
   border: 1px solid var(--line);
@@ -118,9 +135,9 @@ textarea {
   border-color: var(--primary);
 }
 
-.chip--w52 input[type=number] { width: 52px; }
-.chip--w40 input[type=number] { width: 40px; }
-.chip--w36 input[type=number] { width: 36px; }
+.chip--w52 input[type=number] { --chip-w: 52px; }
+.chip--w40 input[type=number] { --chip-w: 40px; }
+.chip--w36 input[type=number] { --chip-w: 36px; }
 
 .chip-danger {
   background: var(--danger);
@@ -139,6 +156,8 @@ textarea {
   border-color: var(--paper);
 }
 
+/* Badge variants share one shape (tinted pill); each modifier only sets the
+   two colors via custom properties instead of repeating background/color. */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -147,16 +166,18 @@ textarea {
   font-size: 11px;
   font-weight: 600;
   margin-left: 6px;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
 }
 
 .badge.a {
-  background: rgba(55, 83, 63, 0.12);
-  color: var(--primary);
+  --badge-bg: rgba(55, 83, 63, 0.12);
+  --badge-fg: var(--primary);
 }
 
 .badge.b {
-  background: rgba(184, 134, 46, 0.14);
-  color: var(--ochre);
+  --badge-bg: rgba(184, 134, 46, 0.14);
+  --badge-fg: var(--ochre);
 }
 
 
@@ -421,11 +442,27 @@ select {
   line-height: 1.4;
 }
 
-/* Layout Containers & Panels */
-.panel {
-  background: var(--card);
+/* Layout Containers & Panels
+   .panel / .welcome-card / .card-row / .rental-tax-row all shared an
+   identical "1px line border + var(--radius) corners" pair, previously
+   repeated four times. .summary-card used the same border/radius with a
+   different background, so it's grouped for the border/radius only. */
+.panel,
+.welcome-card,
+.card-row,
+.rental-tax-row,
+.summary-card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
+}
+
+.panel,
+.card-row,
+.rental-tax-row {
+  background: var(--card);
+}
+
+.panel {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -472,8 +509,6 @@ select {
 .welcome-card {
   padding: 30px;
   margin-bottom: 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
   background: var(--card);
   box-shadow: var(--shadow);
 }
@@ -503,9 +538,6 @@ select {
   flex-direction: column;
   gap: 8px;
   padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
 }
 
 .card-label {
@@ -703,11 +735,8 @@ select {
 
 .user-info span {
   display: block;
-  overflow: hidden;
   color: #e5e7eb;
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .logout-button {
@@ -819,8 +848,8 @@ select {
   justify-content: center;
   padding: 24px;
   background:
-    radial-gradient(circle at top left, var(--card) 0, transparent 35%),
-    var(--paper);
+          radial-gradient(circle at top left, var(--card) 0, transparent 35%),
+          var(--paper);
 }
 
 .auth-container {
@@ -980,7 +1009,6 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 }
 .cl-beam-name {
   width: 110px; flex: 0 0 auto; font-size: 14px; font-weight: 600;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .cl-beam-track {
   position: relative; flex: 1; height: 20px;
@@ -1171,7 +1199,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border-radius: 18px;
   padding: 28px 26px 22px;
   color: var(--paper);
-  background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0d1420));
+  background: var(--weather-bg);
   box-shadow: 0 18px 40px -18px rgba(20,25,35,0.45);
   overflow: hidden;
   transition: background 0.6s ease;
@@ -1255,7 +1283,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   border-radius: 14px;
   overflow: hidden;
   color: rgba(246,245,241,0.85);
-  background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0d1420));
+  background: var(--weather-bg);
   border: 1px solid var(--line, rgba(28,37,49,0.12));
 }
 
@@ -1390,6 +1418,27 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   color: var(--ink-soft);
 }
 
+.rental-tax-row {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--card);
+  gap: 12px;
+  align-items: center;
+}
+
+.rental-tax-row .tax-val {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.rental-tax-op {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  user-select: none;
+}
+
 .win-a {
   font-weight: 600;
   color: var(--primary);
@@ -1414,18 +1463,16 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 
 .summary-card {
   background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
 }
 
-.summary-card.best {
-  background: var(--success-card);
-  border-color: var(--primary);
-}
-
+/* .best and .surplus are visually identical containers; .surplus additionally
+   recolors .value. Grouped so the shared look only has to be declared once.
+   See the HTML-update note about optionally retiring .best in favor of
+   .surplus if the two are never meant to look different. */
+.summary-card.best,
 .summary-card.surplus {
   background: var(--success-card);
   border-color: var(--primary);
@@ -1546,7 +1593,10 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
    6. OVERLAYS & PORTALS
    ========================================================================== */
 
-/* Toast Notification System */
+/* Toast Notification System
+   Each variant previously repeated border-color/background/icon-color as
+   three separate declarations. Now the base .toast rule reads from two
+   custom properties, and each variant sets just those two. */
 .toast-container {
   position: fixed;
   bottom: 24px;
@@ -1567,8 +1617,8 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   gap: 12px;
   padding: 12px 16px;
   border-radius: var(--radius);
-  background: var(--card);
-  border: 1px solid var(--line);
+  border: 1px solid var(--toast-border, var(--line));
+  background: var(--toast-bg, var(--card));
   color: var(--ink);
   font-size: 13.5px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
@@ -1596,6 +1646,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   justify-content: center;
   font-weight: 700;
   font-size: 14px;
+  color: var(--toast-icon, var(--ink-soft));
 }
 
 .toast-message {
@@ -1622,36 +1673,27 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
 }
 
 .toast-success {
-  border-color: var(--primary);
-  background: var(--success-bg);
-}
-.toast-success .toast-icon {
-  color: var(--primary);
+  --toast-border: var(--primary);
+  --toast-bg: var(--success-bg);
+  --toast-icon: var(--primary);
 }
 
 .toast-error {
-  border-color: var(--danger);
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-.toast-error .toast-icon {
+  --toast-border: var(--danger);
+  --toast-bg: var(--danger-bg);
+  --toast-icon: var(--danger);
   color: var(--danger);
 }
 
 .toast-warning {
-  border-color: var(--ochre);
-  background: var(--warning-bg);
-}
-.toast-warning .toast-icon {
-  color: var(--ochre);
+  --toast-border: var(--ochre);
+  --toast-bg: var(--warning-bg);
+  --toast-icon: var(--ochre);
 }
 
 .toast-info {
-  border-color: var(--line);
-  background: var(--card);
-}
-.toast-info .toast-icon {
-  color: var(--ink-soft);
+  --toast-border: var(--line);
+  --toast-bg: var(--card);
 }
 
 
