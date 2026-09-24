@@ -59,7 +59,7 @@
                                 <tbody id="spendGridBody"></tbody>
                             </table>
                         </div>
-                        <p id="spendGridEmpty" class="empty-state" style="display:none;">No credit card categories yet &mdash; add your first one below.</p>
+                        <p id="spendGridEmpty" class="empty-state" hidden>No credit card categories yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -73,7 +73,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="newCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input" id="newCategoryNotes" placeholder="Notes (optional)" style="font-size: 11.5px;" />
+                                <input type="text" class="text-input form-note" id="newCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="addCategoryBtn">Add category</button>
                         </div>
@@ -101,7 +101,7 @@
                                 <tbody id="bankSpendGridBody"></tbody>
                             </table>
                         </div>
-                        <p id="bankSpendGridEmpty" class="empty-state" style="display:none;">No bank account expenses yet &mdash; add your first one below.</p>
+                        <p id="bankSpendGridEmpty" class="empty-state" hidden>No bank account expenses yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -115,7 +115,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="newBankCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input" id="newBankCategoryNotes" placeholder="Notes (optional)" style="font-size: 11.5px;" />
+                                <input type="text" class="text-input form-note" id="newBankCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="addBankCategoryBtn">Add expense</button>
                         </div>
@@ -143,7 +143,7 @@
                                 <tbody id="incomeGridBody"></tbody>
                             </table>
                         </div>
-                        <p id="incomeGridEmpty" class="empty-state" style="display:none;">No income sources yet &mdash; add your first one below.</p>
+                        <p id="incomeGridEmpty" class="empty-state" hidden>No income sources yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -157,7 +157,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="newIncomeAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input" id="newIncomeNotes" placeholder="Notes (optional)" style="font-size: 11.5px;" />
+                                <input type="text" class="text-input form-note" id="newIncomeNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="addIncomeBtn">Add income</button>
                         </div>
@@ -176,13 +176,13 @@
             </div>
 
             <!-- Tab 2: Credit Card Comparison -->
-            <div id="tab-comparison" class="tab-pane" style="display:none;">
+            <div id="tab-comparison" class="tab-pane" hidden>
                 <div class="panel">
                     <div class="panel-head">
                         <h2 class="panel-title">Head-to-Head Comparison</h2>
                     </div>
                     <div class="panel-body">
-                        <div id="bestComboContainer" style="display:none;"></div>
+                        <div id="bestComboContainer" hidden></div>
 
                         <div class="compare-pickers">
                             <div class="picker">
@@ -197,7 +197,7 @@
 
                         <p id="compareEmpty" class="empty-state">Add spending categories in the Budget tab and at least two cards, then pick them here.</p>
 
-                        <div class="table-wrap" id="compareTableWrap" style="display:none;">
+                        <div class="table-wrap" id="compareTableWrap" hidden>
                             <table class="cc-table" id="compareTable">
                                 <thead>
                                 <tr>
@@ -212,7 +212,7 @@
                             </table>
                         </div>
 
-                        <div id="summaryGrid" class="summary-grid" style="display:none;"></div>
+                        <div id="summaryGrid" class="summary-grid" hidden></div>
                     </div>
                 </div>
 
@@ -235,7 +235,7 @@
                                 <tbody id="cardsGridBody"></tbody>
                             </table>
                         </div>
-                        <p id="cardsGridEmpty" class="empty-state" style="display:none;">No cards yet &mdash; add your first one below.</p>
+                        <p id="cardsGridEmpty" class="empty-state" hidden>No cards yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -273,7 +273,7 @@
                                 <tbody id="rewardsGridBody"></tbody>
                             </table>
                         </div>
-                        <p id="rewardsGridEmpty" class="empty-state" style="display:none;">No overrides yet &mdash; add one below, or add a card above and rely on its base rate.</p>
+                        <p id="rewardsGridEmpty" class="empty-state" hidden>No overrides yet &mdash; add one below, or add a card above and rely on its base rate.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -294,7 +294,7 @@
             </div>
 
             <!-- Tab 3: Rental Income/Loss -->
-            <div id="tab-rental" class="tab-pane" style="display:none;">
+            <div id="tab-rental" class="tab-pane" hidden>
                 <div class="panel">
                     <div class="panel-head">
                         <h2 class="panel-title">San Jacinto</h2>
@@ -327,7 +327,7 @@
                                 <tbody id="sanJacintoSpendGridBody"></tbody>
                             </table>
                         </div>
-                        <p id="sanJacintoSpendGridEmpty" class="empty-state" style="display:none;">No expenses yet &mdash; add your first one below.</p>
+                        <p id="sanJacintoSpendGridEmpty" class="empty-state" hidden>No expenses yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -341,7 +341,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="sanJacintoNewCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input" id="sanJacintoNewCategoryNotes" placeholder="Notes (optional)" style="font-size: 11.5px;" />
+                                <input type="text" class="text-input form-note" id="sanJacintoNewCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="sanJacintoAddCategoryBtn">Add expense</button>
                         </div>
@@ -360,28 +360,28 @@
                             <span class="rental-tax-op">&minus;</span>
                             <div class="picker">
                                 <label for="sanJacintoDepreciation">Depreciation (yr)</label>
-                                <div class="num-wrap money" style="width: 130px;">
+                                <div class="num-wrap money">
                                     <input type="number" class="text-input" id="sanJacintoDepreciation" placeholder="Annual" min="0" step="any" />
                                 </div>
                             </div>
                             <span class="rental-tax-op">&minus;</span>
                             <div class="picker">
                                 <label for="sanJacintoMortgageInterest">Mortgage Int (yr)</label>
-                                <div class="num-wrap money" style="width: 130px;">
+                                <div class="num-wrap money">
                                     <input type="number" class="text-input" id="sanJacintoMortgageInterest" placeholder="Annual" min="0" step="any" />
                                 </div>
                             </div>
                             <span class="rental-tax-op">&times;</span>
                             <div class="picker">
                                 <label for="sanJacintoTaxRate">Tax Rate</label>
-                                <div class="num-wrap pct" style="width: 95px;">
+                                <div class="num-wrap pct">
                                     <input type="number" class="text-input" id="sanJacintoTaxRate" placeholder="Rate" min="0" step="0.1" />
                                 </div>
                             </div>
                             <span class="rental-tax-op">=</span>
                             <div class="picker">
                                 <label>Taxes</label>
-                                <span id="sanJacintoTaxSum" class="tax-val" style="font-weight: 700;">$0.00/mo</span>
+                                <span id="sanJacintoTaxSum" class="tax-val">$0.00/mo</span>
                             </div>
                         </div>
 
@@ -422,7 +422,7 @@
                                 <tbody id="countyLineSpendGridBody"></tbody>
                             </table>
                         </div>
-                        <p id="countyLineSpendGridEmpty" class="empty-state" style="display:none;">No expenses yet &mdash; add your first one below.</p>
+                        <p id="countyLineSpendGridEmpty" class="empty-state" hidden>No expenses yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -436,7 +436,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="countyLineNewCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input" id="countyLineNewCategoryNotes" placeholder="Notes (optional)" style="font-size: 11.5px;" />
+                                <input type="text" class="text-input form-note" id="countyLineNewCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="countyLineAddCategoryBtn">Add expense</button>
                         </div>
@@ -455,28 +455,28 @@
                             <span class="rental-tax-op">&minus;</span>
                             <div class="picker">
                                 <label for="countyLineDepreciation">Depreciation (yr)</label>
-                                <div class="num-wrap money" style="width: 130px;">
+                                <div class="num-wrap money">
                                     <input type="number" class="text-input" id="countyLineDepreciation" placeholder="Annual" min="0" step="any" />
                                 </div>
                             </div>
                             <span class="rental-tax-op">&minus;</span>
                             <div class="picker">
                                 <label for="countyLineMortgageInterest">Mortgage Int (yr)</label>
-                                <div class="num-wrap money" style="width: 130px;">
+                                <div class="num-wrap money">
                                     <input type="number" class="text-input" id="countyLineMortgageInterest" placeholder="Annual" min="0" step="any" />
                                 </div>
                             </div>
                             <span class="rental-tax-op">&times;</span>
                             <div class="picker">
                                 <label for="countyLineTaxRate">Tax Rate</label>
-                                <div class="num-wrap pct" style="width: 95px;">
+                                <div class="num-wrap pct">
                                     <input type="number" class="text-input" id="countyLineTaxRate" placeholder="Rate" min="0" step="0.1" />
                                 </div>
                             </div>
                             <span class="rental-tax-op">=</span>
                             <div class="picker">
                                 <label>Taxes</label>
-                                <span id="countyLineTaxSum" class="tax-val" style="font-weight: 700;">$0.00/mo</span>
+                                <span id="countyLineTaxSum" class="tax-val">$0.00/mo</span>
                             </div>
                         </div>
 

@@ -1426,10 +1426,88 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
   align-items: center;
 }
 
+.rental-tax-row .num-wrap {
+  width: 130px;
+}
+
+.rental-tax-row .num-wrap.pct {
+  width: 95px;
+}
+
 .rental-tax-row .tax-val {
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
+}
+
+.rental-income-row {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.rental-prop-title {
+  font-weight: 600;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.loss-val {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.icon-locked {
+  font-size: 11px;
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+.note-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.note-editable {
+  outline: none;
+  min-height: 18px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  cursor: text;
+  border-radius: 4px;
+  padding: 2px 4px;
+  flex: 1;
+}
+
+.note-editable:focus {
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.note-editable:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-soft);
+  opacity: 0.5;
+  cursor: text;
+}
+
+.icon-edit-note {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.icon-edit-note:hover {
+  opacity: 1;
+  color: var(--primary);
 }
 
 .rental-tax-op {

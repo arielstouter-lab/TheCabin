@@ -164,7 +164,7 @@
         if (!body) return;
 
         body.innerHTML = '';
-        if (empty) empty.style.display = spendRows.length ? 'none' : 'block';
+        if (empty) empty.hidden = spendRows.length > 0;
 
         spendRows.forEach(row => {
             const tr = document.createElement('tr');
@@ -172,14 +172,14 @@
             const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
             const monthly = row.monthly_spend || 0;
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 130px;"></td>
-              <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
-              <td><textarea class="text-input" data-field="notes" rows="1" placeholder="Notes" style="width: 100%; min-width: 120px; font-size: 11.5px; line-height: 1.3; resize: vertical; word-break: break-word; white-space: pre-wrap; padding: 6px 8px;">${escapeHtml(row.notes || '')}</textarea></td>
-              <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
-              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete category">✕</button></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category"></td>
+              <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
+              <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes" data-placeholder="Add note…">${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
+              <td class="col-num">${fmt$(monthly)}</td>
+              <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete category">✕</button></td>
             `;
-            tr.querySelectorAll('input, select, textarea').forEach(input => {
+            tr.querySelectorAll('input, select').forEach(input => {
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
@@ -187,6 +187,28 @@
                     updateCategoryRow(row.id, { [field]: val });
                 });
             });
+            const noteSpan = tr.querySelector('.note-editable');
+            const noteEditBtn = tr.querySelector('.icon-edit-note');
+            if (noteEditBtn && noteSpan) {
+                noteEditBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    noteSpan.focus();
+                });
+            }
+            if (noteSpan) {
+                noteSpan.addEventListener('blur', () => {
+                    const val = (noteSpan.textContent || '').trim();
+                    if (val !== (row.notes || '')) {
+                        updateCategoryRow(row.id, { notes: val });
+                    }
+                });
+                noteSpan.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        noteSpan.blur();
+                    }
+                });
+            }
             const delBtn = tr.querySelector('.icon-delete');
             if (delBtn) delBtn.addEventListener('click', () => deleteCategoryRow(row.id));
             body.appendChild(tr);
@@ -202,7 +224,7 @@
         if (!body) return;
 
         body.innerHTML = '';
-        if (empty) empty.style.display = bankSpendRows.length ? 'none' : 'block';
+        if (empty) empty.hidden = bankSpendRows.length > 0;
 
         bankSpendRows.forEach(row => {
             const tr = document.createElement('tr');
@@ -210,14 +232,14 @@
             const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
             const monthly = row.monthly_spend || 0;
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 130px;"></td>
-              <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
-              <td><textarea class="text-input" data-field="notes" rows="1" placeholder="Notes" style="width: 100%; min-width: 120px; font-size: 11.5px; line-height: 1.3; resize: vertical; word-break: break-word; white-space: pre-wrap; padding: 6px 8px;">${escapeHtml(row.notes || '')}</textarea></td>
-              <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
-              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category"></td>
+              <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
+              <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes" data-placeholder="Add note…">${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
+              <td class="col-num">${fmt$(monthly)}</td>
+              <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
             `;
-            tr.querySelectorAll('input, select, textarea').forEach(input => {
+            tr.querySelectorAll('input, select').forEach(input => {
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
@@ -225,6 +247,28 @@
                     updateBankSpendRow(row.id, { [field]: val });
                 });
             });
+            const noteSpan = tr.querySelector('.note-editable');
+            const noteEditBtn = tr.querySelector('.icon-edit-note');
+            if (noteEditBtn && noteSpan) {
+                noteEditBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    noteSpan.focus();
+                });
+            }
+            if (noteSpan) {
+                noteSpan.addEventListener('blur', () => {
+                    const val = (noteSpan.textContent || '').trim();
+                    if (val !== (row.notes || '')) {
+                        updateBankSpendRow(row.id, { notes: val });
+                    }
+                });
+                noteSpan.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        noteSpan.blur();
+                    }
+                });
+            }
             const delBtn = tr.querySelector('.icon-delete');
             if (delBtn) delBtn.addEventListener('click', () => deleteBankSpendRow(row.id));
             body.appendChild(tr);
@@ -241,7 +285,7 @@
 
         body.innerHTML = '';
         const totalSources = incomeRows.length + RENTAL_PROPERTIES.length;
-        if (empty) empty.style.display = totalSources ? 'none' : 'block';
+        if (empty) empty.hidden = totalSources > 0;
 
         // 1. Regular household income rows (editable)
         incomeRows.forEach(row => {
@@ -250,14 +294,14 @@
             const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
             const monthly = row.monthly_spend || 0;
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category || '')}" data-field="category" style="width: 100%; min-width: 130px;"></td>
-              <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
-              <td><textarea class="text-input" data-field="notes" rows="1" placeholder="Notes" style="width: 100%; min-width: 120px; font-size: 11.5px; line-height: 1.3; resize: vertical; word-break: break-word; white-space: pre-wrap; padding: 6px 8px;">${escapeHtml(row.notes || '')}</textarea></td>
-              <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
-              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete income source">✕</button></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category || '')}" data-field="category"></td>
+              <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
+              <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes" data-placeholder="Add note…">${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
+              <td class="col-num">${fmt$(monthly)}</td>
+              <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete income source">✕</button></td>
             `;
-            tr.querySelectorAll('input, select, textarea').forEach(input => {
+            tr.querySelectorAll('input, select').forEach(input => {
                 input.addEventListener('change', () => {
                     const field = input.dataset.field;
                     let val = input.value;
@@ -265,6 +309,28 @@
                     updateIncomeRow(row.id, { [field]: val });
                 });
             });
+            const noteSpan = tr.querySelector('.note-editable');
+            const noteEditBtn = tr.querySelector('.icon-edit-note');
+            if (noteEditBtn && noteSpan) {
+                noteEditBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    noteSpan.focus();
+                });
+            }
+            if (noteSpan) {
+                noteSpan.addEventListener('blur', () => {
+                    const val = (noteSpan.textContent || '').trim();
+                    if (val !== (row.notes || '')) {
+                        updateIncomeRow(row.id, { notes: val });
+                    }
+                });
+                noteSpan.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        noteSpan.blur();
+                    }
+                });
+            }
             const delBtn = tr.querySelector('.icon-delete');
             if (delBtn) delBtn.addEventListener('click', () => deleteIncomeRow(row.id));
             body.appendChild(tr);
@@ -276,19 +342,18 @@
             const isProfit = profit >= 0;
             const tr = document.createElement('tr');
             tr.className = 'rental-income-row';
-            tr.style.background = 'rgba(0, 0, 0, 0.015)';
             tr.innerHTML = `
               <td>
-                <span style="font-weight: 600; color: var(--ink); display: inline-flex; align-items: center; gap: 6px;">
+                <span class="rental-prop-title">
                   ${escapeHtml(property)}
-                  <span style="font-size: 10.5px; font-weight: normal; color: var(--ink-soft); background: var(--paper); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px;">Rental ${isProfit ? 'Profit' : 'Loss'}</span>
+                  <span class="chip form-note">Rental ${isProfit ? 'Profit' : 'Loss'}</span>
                 </span>
               </td>
-              <td><span style="font-size: 13px; color: var(--ink-soft);">Monthly</span></td>
-              <td class="col-num"><span style="font-weight: 600; color: ${isProfit ? 'var(--ink)' : 'var(--danger, #c0392b)'};">${fmt$(profit)}</span></td>
-              <td><span style="font-size: 11.5px; color: var(--ink-soft); font-style: italic;">Rental Net</span></td>
-              <td class="col-num"><span style="font-weight: 600; color: ${isProfit ? 'var(--ink)' : 'var(--danger, #c0392b)'}; white-space: nowrap;">${fmt$(profit)}</span></td>
-              <td class="col-action"><span style="font-size: 11px; color: var(--ink-soft); cursor: default;" title="Calculated from Rentals tab — non-editable">🔒</span></td>
+              <td><span class="panel-sub">Monthly</span></td>
+              <td class="col-num ${isProfit ? '' : 'loss-val'}">${fmt$(profit)}</td>
+              <td><span class="form-note">Rental Net</span></td>
+              <td class="col-num ${isProfit ? '' : 'loss-val'}">${fmt$(profit)}</td>
+              <td class="col-action"><span class="icon-locked" title="Calculated from Rentals tab — non-editable">🔒</span></td>
             `;
             body.appendChild(tr);
         });
@@ -385,7 +450,7 @@
 
         if (body) {
             body.innerHTML = '';
-            if (empty) empty.style.display = expenses.length ? 'none' : 'block';
+            if (empty) empty.hidden = expenses.length > 0;
 
             expenses.forEach(row => {
                 const tr = document.createElement('tr');
@@ -393,14 +458,14 @@
                 const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
                 const monthly = row.monthly_spend || 0;
                 tr.innerHTML = `
-                  <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 130px;"></td>
-                  <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
-                  <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
-                  <td><textarea class="text-input" data-field="notes" rows="1" placeholder="Notes" style="width: 100%; min-width: 120px; font-size: 11.5px; line-height: 1.3; resize: vertical; word-break: break-word; white-space: pre-wrap; padding: 6px 8px;">${escapeHtml(row.notes || '')}</textarea></td>
-                  <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
-                  <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
+                  <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category"></td>
+                  <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
+                  <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
+                  <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes" data-placeholder="Add note…">${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
+                  <td class="col-num">${fmt$(monthly)}</td>
+                  <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
                 `;
-                tr.querySelectorAll('input, select, textarea').forEach(input => {
+                tr.querySelectorAll('input, select').forEach(input => {
                     input.addEventListener('change', () => {
                         const field = input.dataset.field;
                         let val = input.value;
@@ -408,6 +473,28 @@
                         updateRentalExpenseRow(row.id, { [field]: val });
                     });
                 });
+                const noteSpan = tr.querySelector('.note-editable');
+                const noteEditBtn = tr.querySelector('.icon-edit-note');
+                if (noteEditBtn && noteSpan) {
+                    noteEditBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        noteSpan.focus();
+                    });
+                }
+                if (noteSpan) {
+                    noteSpan.addEventListener('blur', () => {
+                        const val = (noteSpan.textContent || '').trim();
+                        if (val !== (row.notes || '')) {
+                            updateRentalExpenseRow(row.id, { notes: val });
+                        }
+                    });
+                    noteSpan.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            noteSpan.blur();
+                        }
+                    });
+                }
                 const delBtn = tr.querySelector('.icon-delete');
                 if (delBtn) delBtn.addEventListener('click', () => deleteRentalRow(row.id));
                 body.appendChild(tr);
@@ -483,15 +570,15 @@
         if (!body) return;
 
         body.innerHTML = '';
-        if (empty) empty.style.display = cardsRows.length ? 'none' : 'block';
+        if (empty) empty.hidden = cardsRows.length > 0;
 
         cardsRows.forEach(row => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.name)}" data-field="name" style="width: 100%; min-width: 140px;"></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.annual_fee ?? 0}" data-field="annual_fee" style="width: 100%; min-width: 80px;"></div></td>
-              <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.base_rate ?? 0}" data-field="base_rate" style="width: 100%; min-width: 70px;"></div></td>
-              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete card">✕</button></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.name)}" data-field="name"></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.annual_fee ?? 0}" data-field="annual_fee"></div></td>
+              <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.base_rate ?? 0}" data-field="base_rate"></div></td>
+              <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete card">✕</button></td>
             `;
             tr.querySelectorAll('input').forEach(input => {
                 input.addEventListener('change', () => {
@@ -522,16 +609,16 @@
         if (!body) return;
 
         body.innerHTML = '';
-        if (empty) empty.style.display = rewardRows.length ? 'none' : 'block';
+        if (empty) empty.hidden = rewardRows.length > 0;
 
         rewardRows.forEach(row => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-              <td><select class="text-input" data-field="card_id" style="width: 100%; min-width: 130px;">${cardOptionsHtml(row.card_id)}</select></td>
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category)}" data-field="category" style="width: 100%; min-width: 120px;"></td>
-              <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.rate ?? 0}" data-field="rate" style="width: 100%; min-width: 70px;"></div></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.special_refund ?? 0}" data-field="special_refund" style="width: 100%; min-width: 80px;"></div></td>
-              <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete row">✕</button></td>
+              <td><select class="text-input" data-field="card_id">${cardOptionsHtml(row.card_id)}</select></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category)}" data-field="category"></td>
+              <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" value="${row.rate ?? 0}" data-field="rate"></div></td>
+              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" value="${row.special_refund ?? 0}" data-field="special_refund"></div></td>
+              <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete row">✕</button></td>
             `;
             tr.querySelectorAll('input, select').forEach(input => {
                 input.addEventListener('change', () => {
@@ -635,18 +722,18 @@
 
         if (cardsRows.length < 2 || !spendRows.length) {
             container.innerHTML = '';
-            container.style.display = 'none';
+            container.hidden = true;
             return;
         }
 
         const combo = findBestTwoCardCombo();
         if (!combo) {
             container.innerHTML = '';
-            container.style.display = 'none';
+            container.hidden = true;
             return;
         }
 
-        container.style.display = 'block';
+        container.hidden = false;
         container.innerHTML = `
           <div class="best-combo-card">
             <div class="combo-info">
@@ -659,7 +746,7 @@
             <div class="combo-value-wrap">
               <div class="combo-value">${fmt$(combo.netMonthly)}<span class="combo-unit">/mo net</span></div>
               <div class="combo-value-sub">${fmt$(combo.netAnnual)}/yr net</div>
-              <button type="button" class="button-inline" id="loadBestComboBtn" style="margin-top: 6px; font-size: 12px; padding: 4px 10px;">Compare this pair</button>
+              <button type="button" class="button-inline" id="loadBestComboBtn">Compare this pair</button>
             </div>
           </div>
         `;
@@ -694,11 +781,11 @@
         const summaryGrid = document.getElementById('summaryGrid');
 
         if (!aId || !bId || aId === bId || !spendRows.length) {
-            if (compareTableWrap) compareTableWrap.style.display = 'none';
-            else if (compareTable) compareTable.style.display = 'none';
-            if (summaryGrid) summaryGrid.style.display = 'none';
+            if (compareTableWrap) compareTableWrap.hidden = true;
+            else if (compareTable) compareTable.hidden = true;
+            if (summaryGrid) summaryGrid.hidden = true;
             if (compareEmpty) {
-                compareEmpty.style.display = 'block';
+                compareEmpty.hidden = false;
                 compareEmpty.textContent = !spendRows.length
                     ? 'Add spending categories in the Budget tab and at least two cards to compare.'
                     : (!aId || !bId)
@@ -711,10 +798,10 @@
         const aName = (cardsRows.find(c => c.id === aId) || {}).name || '';
         const bName = (cardsRows.find(c => c.id === bId) || {}).name || '';
 
-        if (compareEmpty) compareEmpty.style.display = 'none';
-        if (compareTableWrap) compareTableWrap.style.display = 'block';
-        if (compareTable) compareTable.style.display = 'table';
-        if (summaryGrid) summaryGrid.style.display = 'grid';
+        if (compareEmpty) compareEmpty.hidden = true;
+        if (compareTableWrap) compareTableWrap.hidden = false;
+        if (compareTable) compareTable.hidden = false;
+        if (summaryGrid) summaryGrid.hidden = false;
 
         const headA = document.getElementById('headA');
         const headB = document.getElementById('headB');
@@ -773,17 +860,17 @@
             summaryGrid.innerHTML = `
             <div class="summary-card">
               <div class="label">${escapeHtml(aName)}</div>
-              <div class="value">${fmt$(aNet)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo net</span></div>
+              <div class="value">${fmt$(aNet)}<span class="combo-unit">/mo net</span></div>
               <div class="foot">Rewards ${fmt$(aTotal)}/mo &middot; Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) &middot; Net ${fmt$(aNet)}/mo</div>
             </div>
             <div class="summary-card">
               <div class="label">${escapeHtml(bName)}</div>
-              <div class="value">${fmt$(bNet)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo net</span></div>
+              <div class="value">${fmt$(bNet)}<span class="combo-unit">/mo net</span></div>
               <div class="foot">Rewards ${fmt$(bTotal)}/mo &middot; Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) &middot; Net ${fmt$(bNet)}/mo</div>
             </div>
             <div class="summary-card best">
               <div class="label">Best of Both (optimal routing)</div>
-              <div class="value">${fmt$(bestNet)}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;">/mo net</span></div>
+              <div class="value">${fmt$(bestNet)}<span class="combo-unit">/mo net</span></div>
               <div class="foot">Rewards ${fmt$(bestTotal)}/mo if you used whichever card wins each category &middot; minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestNet)}/mo</div>
             </div>
           `;
@@ -1684,9 +1771,9 @@
         const budgetPane = document.getElementById('tab-budget');
         const comparisonPane = document.getElementById('tab-comparison');
         const rentalPane = document.getElementById('tab-rental');
-        if (budgetPane) budgetPane.style.display = tabKey === 'budget' ? 'block' : 'none';
-        if (comparisonPane) comparisonPane.style.display = tabKey === 'comparison' ? 'block' : 'none';
-        if (rentalPane) rentalPane.style.display = tabKey === 'rental' ? 'block' : 'none';
+        if (budgetPane) budgetPane.hidden = tabKey !== 'budget';
+        if (comparisonPane) comparisonPane.hidden = tabKey !== 'comparison';
+        if (rentalPane) rentalPane.hidden = tabKey !== 'rental';
     }
 
     function setupTabs() {
