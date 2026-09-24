@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Calendar</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="head-loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js" defer></script>
+    <script src="app.js" defer></script>
+    <script src="calendar.js" defer></script>
+</head>
+
+<body class="app-page cal-page">
+<div class="app-shell">
+    <main class="main-content">
+        <a href="app.html" class="brand-link">
+            <div class="brand-mark"></div>
+        </a>
+
+        <header class="topbar">
+            <div class="text-center">
+                <h1>Calendar</h1>
+                <p>Shared household events — click a day to add or remove things.</p>
+            </div>
+        </header>
+
+        <section class="content">
+            <div class="cal-grid-layout">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Month</h2>
+                        <div class="cal-nav">
+                            <button class="cal-nav-btn" id="cal-prev">&lsaquo;</button>
+                            <span class="cal-month-label" id="cal-month-label"></span>
+                            <button class="cal-nav-btn" id="cal-next">&rsaquo;</button>
+                        </div>
+                    </div>
+                    <div class="cal-weekdays">
+                        <div class="cal-weekday">Su</div><div class="cal-weekday">Mo</div><div class="cal-weekday">Tu</div>
+                        <div class="cal-weekday">We</div><div class="cal-weekday">Th</div><div class="cal-weekday">Fr</div>
+                        <div class="cal-weekday">Sa</div>
+                    </div>
+                    <div class="cal-days" id="cal-days"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Events</h2>
+                        <span class="cal-selected-label" id="cal-selected-label"></span>
+                    </div>
+                    <div class="cal-events" id="cal-events"></div>
+                    <div class="add-row">
+                        <label for="cal-new-event" class="visually-hidden">New event</label>
+                        <input type="text" id="cal-new-event" class="text-input" placeholder="Add an event for this day" />
+                        <button class="button-inline" id="cal-add-event">Add</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>

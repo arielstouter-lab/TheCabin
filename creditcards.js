@@ -1,14 +1,15 @@
 (function () {
     const sb = window.supabaseClient;
-    const CATEGORIES_TABLE = 'household_spending_categories';
-    const BANK_SPENDING_TABLE = 'household_bank_spending';
-    const INCOME_TABLE = 'household_income';
+    const CATEGORIES_TABLE = 'spending_categories';
     const CARDS_TABLE = 'credit_cards';
     const REWARDS_TABLE = 'card_rewards';
 
-    let spendRows = [];       // {id, category, frequency, amount, monthly_spend} (Credit card spending)
-    let bankSpendRows = [];   // {id, category, frequency, amount, monthly_spend} (Bank account spending)
-    let incomeRows = [];      // {id, source, frequency, amount, monthly_amount} (Income)
+    const RENTAL_PROPERTIES = ['San Jacinto', 'County Line'];
+
+    let spendRows = [];       // {id, category, frequency, amount, monthly_spend, account_type: 'credit_cards', type: 'spending'}
+    let bankSpendRows = [];   // {id, category, frequency, amount, monthly_spend, account_type: 'bank', type: 'spending'}
+    let incomeRows = [];      // {id, source, category, frequency, amount, monthly_amount, account_type: 'income', type: 'income'}
+    let rentalRows = [];      // {id, property, category, frequency, amount, monthly_amount, monthly_spend, account_type: 'rental', type: 'income'|'spending'}
     let cardsRows = [];       // {id, name, annual_fee, base_rate}
     let rewardRows = [];      // {id, card_id, category, rate, special_refund}
 
@@ -60,6 +61,32 @@
         ).join('');
     }
 
+    // -------------------------------------------------------------------
+    // Rental Helpers
+    // -------------------------------------------------------------------
+    function getRentalRent(propertyName) {
+        const rentRow = rentalRows.find(r => r.property === propertyName && r.type === 'income');
+        if (!rentRow) return 0;
+        const amt = rentRow.amount !== undefined && rentRow.amount !== null ? rentRow.amount : (rentRow.monthly_amount || 0);
+        return calcMonthlyAmount(amt, rentRow.frequency);
+    }
+
+    function getRentalExpenses(propertyName) {
+        return rentalRows.filter(r => r.property === propertyName && r.type === 'spending');
+    }
+
+    function getRentalTotalExpenses(propertyName) {
+        const expenses = getRentalExpenses(propertyName);
+        return expenses.reduce((sum, r) => {
+            const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
+            return sum + calcMonthlyAmount(amt, r.frequency);
+        }, 0);
+    }
+
+    function getRentalProfit(propertyName) {
+        return getRentalRent(propertyName) - getRentalTotalExpenses(propertyName);
+    }
+
     function render() {
         renderSpendGrid();
         renderBankSpendGrid();
@@ -70,6 +97,7 @@
         renderCardOptions();
         renderBestCombo();
         renderComparison();
+        renderRentals();
     }
 
     // -------------------------------------------------------------------
@@ -147,7 +175,7 @@
     }
 
     // -------------------------------------------------------------------
-    // Grid 1c: Income
+    // Grid 1c: Income (with non-editable monthly rental profit lines)
     // -------------------------------------------------------------------
     function renderIncomeGrid() {
         const body = document.getElementById('incomeGridBody');
@@ -155,15 +183,17 @@
         if (!body) return;
 
         body.innerHTML = '';
-        if (empty) empty.style.display = incomeRows.length ? 'none' : 'block';
+        const totalSources = incomeRows.length + RENTAL_PROPERTIES.length;
+        if (empty) empty.style.display = totalSources ? 'none' : 'block';
 
+        // 1. Regular household income rows (editable)
         incomeRows.forEach(row => {
             const tr = document.createElement('tr');
             const freq = row.frequency || 'monthly';
             const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_amount ?? 0);
             const monthly = calcMonthlyAmount(amt, freq);
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.source || row.name || row.category || '')}" data-field="source" style="width: 100%; min-width: 130px;"></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.source || row.category || row.name || '')}" data-field="source" style="width: 100%; min-width: 130px;"></td>
               <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
               <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
               <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
@@ -179,6 +209,28 @@
             });
             const delBtn = tr.querySelector('.icon-delete');
             if (delBtn) delBtn.addEventListener('click', () => deleteIncomeRow(row.id));
+            body.appendChild(tr);
+        });
+
+        // 2. Non-editable rental property profit/loss lines
+        RENTAL_PROPERTIES.forEach(property => {
+            const profit = getRentalProfit(property);
+            const isProfit = profit >= 0;
+            const tr = document.createElement('tr');
+            tr.className = 'rental-income-row';
+            tr.style.background = 'rgba(0, 0, 0, 0.015)';
+            tr.innerHTML = `
+              <td>
+                <span style="font-weight: 600; color: var(--ink); display: inline-flex; align-items: center; gap: 6px;">
+                  ${escapeHtml(property)}
+                  <span style="font-size: 10.5px; font-weight: normal; color: var(--ink-soft); background: var(--paper); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px;">Rental ${isProfit ? 'Profit' : 'Loss'}</span>
+                </span>
+              </td>
+              <td><span style="font-size: 13px; color: var(--ink-soft);">Monthly</span></td>
+              <td class="col-num"><span style="font-weight: 600; color: ${isProfit ? 'var(--ink)' : 'var(--danger, #c0392b)'};">${fmt$(profit)}</span></td>
+              <td class="col-num"><span style="font-weight: 600; color: ${isProfit ? 'var(--ink)' : 'var(--danger, #c0392b)'}; white-space: nowrap;">${fmt$(profit)}</span></td>
+              <td class="col-action"><span style="font-size: 11px; color: var(--ink-soft); cursor: default;" title="Calculated from Rentals tab — non-editable">🔒</span></td>
+            `;
             body.appendChild(tr);
         });
     }
@@ -199,10 +251,14 @@
             return sum + calcMonthlyAmount(amt, r.frequency);
         }, 0);
         const totalSpending = totalCcSpend + totalBankSpend;
-        const totalIncome = incomeRows.reduce((sum, r) => {
+
+        const regularIncome = incomeRows.reduce((sum, r) => {
             const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_amount || 0);
             return sum + calcMonthlyAmount(amt, r.frequency);
         }, 0);
+        const rentalProfits = RENTAL_PROPERTIES.reduce((sum, prop) => sum + getRentalProfit(prop), 0);
+        const totalIncome = regularIncome + rentalProfits;
+
         const netBalance = totalIncome - totalSpending;
 
         const annualIncome = totalIncome * 12;
@@ -217,7 +273,7 @@
           <div class="summary-card">
             <div class="label">Total Income</div>
             <div class="value">${fmt$(totalIncome)}<span class="combo-unit">/mo</span></div>
-            <div class="foot">${fmt$(annualIncome)}/yr &middot; across ${incomeRows.length} source${incomeRows.length === 1 ? '' : 's'}</div>
+            <div class="foot">${fmt$(annualIncome)}/yr &middot; across ${incomeRows.length} source${incomeRows.length === 1 ? '' : 's'} + ${RENTAL_PROPERTIES.length} rental${RENTAL_PROPERTIES.length === 1 ? '' : 's'}</div>
           </div>
           <div class="summary-card">
             <div class="label">Total Spending</div>
@@ -230,6 +286,100 @@
             <div class="foot">Income (${fmt$(totalIncome)}) &minus; Spending (${fmt$(totalSpending)}) = ${fmt$(netBalance)}/mo (${fmt$(annualBalance)}/yr)</div>
           </div>
         `;
+    }
+
+    // -------------------------------------------------------------------
+    // Tab 3: Rentals (San Jacinto & County Line)
+    // -------------------------------------------------------------------
+    function renderRentals() {
+        renderPropertySection('San Jacinto', {
+            rentInputId: 'sanJacintoRentInput',
+            spendGridBodyId: 'sanJacintoSpendGridBody',
+            spendGridEmptyId: 'sanJacintoSpendGridEmpty',
+            profitSummaryId: 'sanJacintoProfitSummary'
+        });
+
+        renderPropertySection('County Line', {
+            rentInputId: 'countyLineRentInput',
+            spendGridBodyId: 'countyLineSpendGridBody',
+            spendGridEmptyId: 'countyLineSpendGridEmpty',
+            profitSummaryId: 'countyLineProfitSummary'
+        });
+    }
+
+    function renderPropertySection(propertyName, elements) {
+        // 1. Rent input at top
+        const rentInput = document.getElementById(elements.rentInputId);
+        const rentRow = rentalRows.find(r => r.property === propertyName && r.type === 'income');
+        const rentVal = rentRow ? (rentRow.amount !== undefined && rentRow.amount !== null ? rentRow.amount : rentRow.monthly_amount) : 0;
+        if (rentInput && document.activeElement !== rentInput) {
+            rentInput.value = rentVal ? rentVal : '';
+        }
+
+        // 2. Expenses Grid
+        const body = document.getElementById(elements.spendGridBodyId);
+        const empty = document.getElementById(elements.spendGridEmptyId);
+        const expenses = getRentalExpenses(propertyName);
+
+        if (body) {
+            body.innerHTML = '';
+            if (empty) empty.style.display = expenses.length ? 'none' : 'block';
+
+            expenses.forEach(row => {
+                const tr = document.createElement('tr');
+                const freq = row.frequency || 'monthly';
+                const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
+                const monthly = calcMonthlyAmount(amt, freq);
+                tr.innerHTML = `
+                  <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category" style="width: 100%; min-width: 130px;"></td>
+                  <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
+                  <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
+                  <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
+                  <td class="col-action"><button class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
+                `;
+                tr.querySelectorAll('input, select').forEach(input => {
+                    input.addEventListener('change', () => {
+                        const field = input.dataset.field;
+                        let val = input.value;
+                        if (field === 'amount') val = parseFloat(val) || 0;
+                        updateRentalExpenseRow(row.id, { [field]: val });
+                    });
+                });
+                const delBtn = tr.querySelector('.icon-delete');
+                if (delBtn) delBtn.addEventListener('click', () => deleteRentalRow(row.id));
+                body.appendChild(tr);
+            });
+        }
+
+        // 3. Profit Total at the bottom
+        const summary = document.getElementById(elements.profitSummaryId);
+        if (summary) {
+            const rent = getRentalRent(propertyName);
+            const totalExpenses = getRentalTotalExpenses(propertyName);
+            const profit = rent - totalExpenses;
+            const annualProfit = profit * 12;
+            const isProfit = profit >= 0;
+            const statusClass = isProfit ? 'surplus' : 'deficit';
+            const statusText = isProfit ? 'Net Profit' : 'Net Loss';
+
+            summary.innerHTML = `
+              <div class="summary-card">
+                <div class="label">Monthly Rent (Income)</div>
+                <div class="value">${fmt$(rent)}<span class="combo-unit">/mo</span></div>
+                <div class="foot">${fmt$(rent * 12)}/yr</div>
+              </div>
+              <div class="summary-card">
+                <div class="label">Total Expenses</div>
+                <div class="value">${fmt$(totalExpenses)}<span class="combo-unit">/mo</span></div>
+                <div class="foot">${fmt$(totalExpenses * 12)}/yr across ${expenses.length} expense${expenses.length === 1 ? '' : 's'}</div>
+              </div>
+              <div class="summary-card ${statusClass}">
+                <div class="label">${statusText}</div>
+                <div class="value">${fmt$(profit)}<span class="combo-unit">/mo</span></div>
+                <div class="foot">Rent (${fmt$(rent)}) &minus; Expenses (${fmt$(totalExpenses)}) = ${fmt$(profit)}/mo (${fmt$(annualProfit)}/yr)</div>
+              </div>
+            `;
+        }
     }
 
     // -------------------------------------------------------------------
@@ -306,7 +456,6 @@
     }
 
     function renderCardOptions() {
-        // Add-row dropdown for Card Rewards
         const newRewardCard = document.getElementById('newRewardCard');
         if (newRewardCard) {
             const current = newRewardCard.value;
@@ -315,9 +464,6 @@
             if (ids.includes(current)) newRewardCard.value = current;
         }
 
-        // Head-to-head pickers — driven by the Credit Cards list, so a card
-        // with just a base rate (no overrides yet) still shows up. Options
-        // are keyed by card id so a rename never breaks the selection.
         const sortedCards = [...cardsRows].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const aSel = document.getElementById('cardASelect');
         const bSel = document.getElementById('cardBSelect');
@@ -330,8 +476,6 @@
         });
     }
 
-    // Effective rate (+ any special refund) for a card in a given category:
-    // an exact category override first, else the card's base rate.
     function getEffectiveRate(cardId, category) {
         const exact = rewardRows.find(r => r.card_id === cardId && r.category && r.category.trim().toLowerCase() === category.trim().toLowerCase());
         if (exact) return { rate: exact.rate || 0, refund: exact.special_refund || 0, isDefault: false };
@@ -557,43 +701,122 @@
     }
 
     // -------------------------------------------------------------------
-    // Supabase CRUD — categories (credit card spending)
+    // Supabase CRUD — Consolidated Spending Categories
     // -------------------------------------------------------------------
-    async function loadCategories() {
+    async function loadSpendingCategories() {
         if (!sb) return;
         try {
             const { data, error } = await sb.from(CATEGORIES_TABLE).select('*').order('created_at', { ascending: true });
             if (error) throw error;
-            spendRows = (data || []).map(r => {
+
+            spendRows = [];
+            bankSpendRows = [];
+            incomeRows = [];
+            rentalRows = [];
+
+            (data || []).forEach(r => {
                 const freq = r.frequency || 'monthly';
-                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
-                return {
-                    ...r,
-                    frequency: freq,
-                    amount: amt,
-                    monthly_spend: calcMonthlyAmount(amt, freq)
-                };
+                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_amount ?? r.monthly_spend ?? 0);
+                const monthly = calcMonthlyAmount(amt, freq);
+
+                const acc = String(r.account_type || r.category_type || r.channel || '').toLowerCase();
+                const flow = String(r.type || r.spending_or_income || r.flow_type || '').toLowerCase();
+                const isRental = acc === 'rental' || acc === 'rentals' || Boolean(r.property) || Boolean(r.property_name);
+
+                if (isRental) {
+                    const prop = r.property || r.property_name || 'San Jacinto';
+                    const isIncome = flow === 'income' || r.is_income === true || (r.category && r.category.trim().toLowerCase() === 'rent');
+                    rentalRows.push({
+                        ...r,
+                        property: prop,
+                        property_name: prop,
+                        category: r.category || (isIncome ? 'Rent' : 'Expense'),
+                        frequency: freq,
+                        amount: amt,
+                        monthly_amount: isIncome ? monthly : undefined,
+                        monthly_spend: !isIncome ? monthly : undefined,
+                        account_type: 'rental',
+                        category_type: 'rental',
+                        type: isIncome ? 'income' : 'spending',
+                        spending_or_income: isIncome ? 'income' : 'spending'
+                    });
+                } else if (acc === 'income' || flow === 'income' || r.is_income === true) {
+                    incomeRows.push({
+                        ...r,
+                        source: r.source || r.category || r.name || '',
+                        category: r.category || r.source || r.name || '',
+                        frequency: freq,
+                        amount: amt,
+                        monthly_amount: monthly,
+                        account_type: 'income',
+                        category_type: 'income',
+                        type: 'income',
+                        spending_or_income: 'income'
+                    });
+                } else if (acc === 'bank' || acc === 'household_bank_spending') {
+                    bankSpendRows.push({
+                        ...r,
+                        category: r.category || r.name || '',
+                        frequency: freq,
+                        amount: amt,
+                        monthly_spend: monthly,
+                        account_type: 'bank',
+                        category_type: 'bank',
+                        type: 'spending',
+                        spending_or_income: 'spending'
+                    });
+                } else {
+                    // Default to credit card category
+                    spendRows.push({
+                        ...r,
+                        category: r.category || r.name || '',
+                        frequency: freq,
+                        amount: amt,
+                        monthly_spend: monthly,
+                        account_type: 'credit_cards',
+                        category_type: 'credit_cards',
+                        type: 'spending',
+                        spending_or_income: 'spending'
+                    });
+                }
             });
         } catch (err) {
-            console.error('Error loading categories:', err);
-            if (window.setStatus) window.setStatus('Could not load credit card spending categories.');
+            console.error('Error loading spending categories:', err);
+            if (window.setStatus) window.setStatus('Could not load spending categories.');
             spendRows = [];
+            bankSpendRows = [];
+            incomeRows = [];
+            rentalRows = [];
         }
     }
 
+    // --- Credit Card Spending ---
     async function addCategoryRow(data) {
         if (!sb) return;
         try {
-            const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([data]).select().single();
+            const freq = data.frequency || 'monthly';
+            const amt = data.amount || 0;
+            const monthly = calcMonthlyAmount(amt, freq);
+            const payload = {
+                category: data.category,
+                frequency: freq,
+                amount: amt,
+                monthly_spend: monthly,
+                account_type: 'credit_cards',
+                category_type: 'credit_cards',
+                type: 'spending',
+                spending_or_income: 'spending'
+            };
+            const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
             if (error) throw error;
             if (inserted) {
-                const freq = inserted.frequency || data.frequency || 'monthly';
-                const amt = inserted.amount !== undefined && inserted.amount !== null ? inserted.amount : (data.amount || 0);
                 spendRows.push({
                     ...inserted,
                     frequency: freq,
                     amount: amt,
-                    monthly_spend: calcMonthlyAmount(amt, freq)
+                    monthly_spend: monthly,
+                    account_type: 'credit_cards',
+                    type: 'spending'
                 });
                 render();
             }
@@ -641,43 +864,33 @@
         }
     }
 
-    // -------------------------------------------------------------------
-    // Supabase CRUD — bank spending
-    // -------------------------------------------------------------------
-    async function loadBankSpending() {
-        if (!sb) return;
-        try {
-            const { data, error } = await sb.from(BANK_SPENDING_TABLE).select('*').order('created_at', { ascending: true });
-            if (error) throw error;
-            bankSpendRows = (data || []).map(r => {
-                const freq = r.frequency || 'monthly';
-                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
-                return {
-                    ...r,
-                    frequency: freq,
-                    amount: amt,
-                    monthly_spend: calcMonthlyAmount(amt, freq)
-                };
-            });
-        } catch (err) {
-            console.error('Error loading bank spending:', err);
-            bankSpendRows = [];
-        }
-    }
-
+    // --- Bank Account Spending ---
     async function addBankSpendRow(data) {
         if (!sb) return;
         try {
-            const { data: inserted, error } = await sb.from(BANK_SPENDING_TABLE).insert([data]).select().single();
+            const freq = data.frequency || 'monthly';
+            const amt = data.amount || 0;
+            const monthly = calcMonthlyAmount(amt, freq);
+            const payload = {
+                category: data.category,
+                frequency: freq,
+                amount: amt,
+                monthly_spend: monthly,
+                account_type: 'bank',
+                category_type: 'bank',
+                type: 'spending',
+                spending_or_income: 'spending'
+            };
+            const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
             if (error) throw error;
             if (inserted) {
-                const freq = inserted.frequency || data.frequency || 'monthly';
-                const amt = inserted.amount !== undefined && inserted.amount !== null ? inserted.amount : (data.amount || 0);
                 bankSpendRows.push({
                     ...inserted,
                     frequency: freq,
                     amount: amt,
-                    monthly_spend: calcMonthlyAmount(amt, freq)
+                    monthly_spend: monthly,
+                    account_type: 'bank',
+                    type: 'spending'
                 });
                 render();
             }
@@ -703,7 +916,7 @@
                 payload.amount = row.amount;
                 payload.monthly_spend = row.monthly_spend;
             }
-            const { error } = await sb.from(BANK_SPENDING_TABLE).update(payload).eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq('id', id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update bank expense:', err);
@@ -714,7 +927,7 @@
     async function deleteBankSpendRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(BANK_SPENDING_TABLE).delete().eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq('id', id);
             if (error) throw error;
             bankSpendRows = bankSpendRows.filter(r => r.id !== id);
             render();
@@ -725,43 +938,37 @@
         }
     }
 
-    // -------------------------------------------------------------------
-    // Supabase CRUD — income
-    // -------------------------------------------------------------------
-    async function loadIncome() {
-        if (!sb) return;
-        try {
-            const { data, error } = await sb.from(INCOME_TABLE).select('*').order('created_at', { ascending: true });
-            if (error) throw error;
-            incomeRows = (data || []).map(r => {
-                const freq = r.frequency || 'monthly';
-                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_amount || 0);
-                return {
-                    ...r,
-                    frequency: freq,
-                    amount: amt,
-                    monthly_amount: calcMonthlyAmount(amt, freq)
-                };
-            });
-        } catch (err) {
-            console.error('Error loading income:', err);
-            incomeRows = [];
-        }
-    }
-
+    // --- Income ---
     async function addIncomeRow(data) {
         if (!sb) return;
         try {
-            const { data: inserted, error } = await sb.from(INCOME_TABLE).insert([data]).select().single();
+            const freq = data.frequency || 'monthly';
+            const amt = data.amount || 0;
+            const monthly = calcMonthlyAmount(amt, freq);
+            const src = data.source || data.category || '';
+            const payload = {
+                category: src,
+                source: src,
+                frequency: freq,
+                amount: amt,
+                monthly_amount: monthly,
+                account_type: 'income',
+                category_type: 'income',
+                type: 'income',
+                spending_or_income: 'income'
+            };
+            const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
             if (error) throw error;
             if (inserted) {
-                const freq = inserted.frequency || data.frequency || 'monthly';
-                const amt = inserted.amount !== undefined && inserted.amount !== null ? inserted.amount : (data.amount || 0);
                 incomeRows.push({
                     ...inserted,
+                    source: src,
+                    category: src,
                     frequency: freq,
                     amount: amt,
-                    monthly_amount: calcMonthlyAmount(amt, freq)
+                    monthly_amount: monthly,
+                    account_type: 'income',
+                    type: 'income'
                 });
                 render();
             }
@@ -778,6 +985,7 @@
             const row = incomeRows.find(r => r.id === id);
             if (row) {
                 Object.assign(row, patch);
+                if (patch.source !== undefined) row.category = patch.source;
                 row.monthly_amount = calcMonthlyAmount(row.amount, row.frequency);
             }
             render();
@@ -786,8 +994,9 @@
                 payload.frequency = row.frequency;
                 payload.amount = row.amount;
                 payload.monthly_amount = row.monthly_amount;
+                if (patch.source !== undefined) payload.category = patch.source;
             }
-            const { error } = await sb.from(INCOME_TABLE).update(payload).eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq('id', id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update income source:', err);
@@ -798,7 +1007,7 @@
     async function deleteIncomeRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(INCOME_TABLE).delete().eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq('id', id);
             if (error) throw error;
             incomeRows = incomeRows.filter(r => r.id !== id);
             render();
@@ -806,6 +1015,138 @@
         } catch (err) {
             console.error('Could not delete income source:', err);
             if (window.setStatus) window.setStatus('Could not delete income source.');
+        }
+    }
+
+    // --- Rentals ---
+    async function setRentalRent(propertyName, rentAmount) {
+        if (!sb) return;
+        const val = parseFloat(rentAmount) || 0;
+        let existing = rentalRows.find(r => r.property === propertyName && r.type === 'income');
+        try {
+            if (existing) {
+                existing.amount = val;
+                existing.monthly_amount = val;
+                render();
+                const { error } = await sb.from(CATEGORIES_TABLE).update({
+                    amount: val,
+                    monthly_amount: val,
+                    monthly_spend: val
+                }).eq('id', existing.id);
+                if (error) throw error;
+            } else {
+                const payload = {
+                    category: 'Rent',
+                    property: propertyName,
+                    property_name: propertyName,
+                    frequency: 'monthly',
+                    amount: val,
+                    monthly_amount: val,
+                    monthly_spend: val,
+                    account_type: 'rental',
+                    category_type: 'rental',
+                    type: 'income',
+                    spending_or_income: 'income'
+                };
+                const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
+                if (error) throw error;
+                if (inserted) {
+                    rentalRows.push({
+                        ...inserted,
+                        property: propertyName,
+                        property_name: propertyName,
+                        category: 'Rent',
+                        frequency: 'monthly',
+                        amount: val,
+                        monthly_amount: val,
+                        account_type: 'rental',
+                        type: 'income'
+                    });
+                    render();
+                }
+            }
+            if (window.setStatus) window.setStatus(`Updated rent for ${propertyName}.`);
+        } catch (err) {
+            console.error('Could not save rental income:', err);
+            if (window.setStatus) window.setStatus('Could not save rental income.');
+        }
+    }
+
+    async function addRentalExpenseRow(propertyName, data) {
+        if (!sb) return;
+        try {
+            const freq = data.frequency || 'monthly';
+            const amt = data.amount || 0;
+            const monthly = calcMonthlyAmount(amt, freq);
+            const payload = {
+                category: data.category,
+                property: propertyName,
+                property_name: propertyName,
+                frequency: freq,
+                amount: amt,
+                monthly_spend: monthly,
+                account_type: 'rental',
+                category_type: 'rental',
+                type: 'spending',
+                spending_or_income: 'spending'
+            };
+            const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
+            if (error) throw error;
+            if (inserted) {
+                rentalRows.push({
+                    ...inserted,
+                    property: propertyName,
+                    property_name: propertyName,
+                    category: data.category,
+                    frequency: freq,
+                    amount: amt,
+                    monthly_spend: monthly,
+                    account_type: 'rental',
+                    type: 'spending'
+                });
+                render();
+            }
+            if (window.setStatus) window.setStatus(`Added expense for ${propertyName}.`);
+        } catch (err) {
+            console.error('Could not add rental expense:', err);
+            if (window.setStatus) window.setStatus('Could not add rental expense: ' + (err.message || err));
+        }
+    }
+
+    async function updateRentalExpenseRow(id, patch) {
+        if (!sb) return;
+        try {
+            const row = rentalRows.find(r => r.id === id);
+            if (row) {
+                Object.assign(row, patch);
+                row.monthly_spend = calcMonthlyAmount(row.amount, row.frequency);
+            }
+            render();
+            const payload = { ...patch };
+            if (row) {
+                payload.frequency = row.frequency;
+                payload.amount = row.amount;
+                payload.monthly_spend = row.monthly_spend;
+            }
+            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Could not update rental expense:', err);
+            if (window.setStatus) window.setStatus('Could not update rental expense.');
+        }
+    }
+
+    async function deleteRentalRow(id) {
+        if (!sb) return;
+        try {
+            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq('id', id);
+            if (error) throw error;
+            rentalRows = rentalRows.filter(r => r.id !== id);
+            render();
+            if (window.setStatus) window.setStatus('Deleted rental entry.');
+        } catch (err) {
+            console.error('Could not delete rental entry:', err);
+            if (window.setStatus) window.setStatus('Could not delete rental entry.');
         }
     }
 
@@ -843,9 +1184,6 @@
         try {
             const row = cardsRows.find(r => r.id === id);
             if (row) Object.assign(row, patch);
-            // If the card's name changed, keep reward-row references in sync
-            // for display purposes only (the DB rows still store the old
-            // name until their own edit/save, since they're matched by id).
             render();
             const { error } = await sb.from(CARDS_TABLE).update(patch).eq('id', id);
             if (error) throw error;
@@ -927,14 +1265,12 @@
     }
 
     // -------------------------------------------------------------------
-    // Realtime sync (all tables)
+    // Realtime sync (Consolidated table + cards + rewards)
     // -------------------------------------------------------------------
     function setupRealtime() {
         if (realtimeChannel || !sb) return;
         realtimeChannel = sb.channel('credit_cards_changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: CATEGORIES_TABLE }, () => debounceReload())
-            .on('postgres_changes', { event: '*', schema: 'public', table: BANK_SPENDING_TABLE }, () => debounceReload())
-            .on('postgres_changes', { event: '*', schema: 'public', table: INCOME_TABLE }, () => debounceReload())
             .on('postgres_changes', { event: '*', schema: 'public', table: CARDS_TABLE }, () => debounceReload())
             .on('postgres_changes', { event: '*', schema: 'public', table: REWARDS_TABLE }, () => debounceReload())
             .subscribe();
@@ -947,7 +1283,7 @@
             if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
                 return;
             }
-            await Promise.all([loadCategories(), loadBankSpending(), loadIncome(), loadCards(), loadRewards()]);
+            await Promise.all([loadSpendingCategories(), loadCards(), loadRewards()]);
             render();
         }, 400);
     }
@@ -957,7 +1293,7 @@
     });
 
     async function loadAll() {
-        await Promise.all([loadCategories(), loadBankSpending(), loadIncome(), loadCards(), loadRewards()]);
+        await Promise.all([loadSpendingCategories(), loadCards(), loadRewards()]);
         render();
         setupRealtime();
     }
@@ -965,6 +1301,7 @@
     // -------------------------------------------------------------------
     // Wire up UI
     // -------------------------------------------------------------------
+    // 1. Credit Card Spending
     const addCategoryBtn = document.getElementById('addCategoryBtn');
     if (addCategoryBtn) {
         addCategoryBtn.addEventListener('click', () => {
@@ -974,12 +1311,11 @@
             const category = catInput.value.trim();
             const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
             const amount = parseFloat(amountInput.value) || 0;
-            const monthly_spend = calcMonthlyAmount(amount, frequency);
             if (!category) {
                 if (window.setStatus) window.setStatus('Category name is required.');
                 return;
             }
-            addCategoryRow({ category, frequency, amount, monthly_spend });
+            addCategoryRow({ category, frequency, amount });
             catInput.value = '';
             amountInput.value = '';
             if (freqSelect) freqSelect.value = 'monthly';
@@ -987,6 +1323,7 @@
         });
     }
 
+    // 2. Bank Account Spending
     const addBankCategoryBtn = document.getElementById('addBankCategoryBtn');
     if (addBankCategoryBtn) {
         addBankCategoryBtn.addEventListener('click', () => {
@@ -996,12 +1333,11 @@
             const category = catInput.value.trim();
             const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
             const amount = parseFloat(amountInput.value) || 0;
-            const monthly_spend = calcMonthlyAmount(amount, frequency);
             if (!category) {
                 if (window.setStatus) window.setStatus('Expense name is required.');
                 return;
             }
-            addBankSpendRow({ category, frequency, amount, monthly_spend });
+            addBankSpendRow({ category, frequency, amount });
             catInput.value = '';
             amountInput.value = '';
             if (freqSelect) freqSelect.value = 'monthly';
@@ -1009,6 +1345,7 @@
         });
     }
 
+    // 3. Household Income
     const addIncomeBtn = document.getElementById('addIncomeBtn');
     if (addIncomeBtn) {
         addIncomeBtn.addEventListener('click', () => {
@@ -1018,12 +1355,11 @@
             const source = sourceInput.value.trim();
             const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
             const amount = parseFloat(amountInput.value) || 0;
-            const monthly_amount = calcMonthlyAmount(amount, frequency);
             if (!source) {
                 if (window.setStatus) window.setStatus('Income source is required.');
                 return;
             }
-            addIncomeRow({ source, frequency, amount, monthly_amount });
+            addIncomeRow({ source, frequency, amount });
             sourceInput.value = '';
             amountInput.value = '';
             if (freqSelect) freqSelect.value = 'monthly';
@@ -1031,6 +1367,65 @@
         });
     }
 
+    // 4. San Jacinto Rental UI
+    const sanJacintoRentInput = document.getElementById('sanJacintoRentInput');
+    if (sanJacintoRentInput) {
+        sanJacintoRentInput.addEventListener('change', () => {
+            setRentalRent('San Jacinto', sanJacintoRentInput.value);
+        });
+    }
+
+    const sanJacintoAddCategoryBtn = document.getElementById('sanJacintoAddCategoryBtn');
+    if (sanJacintoAddCategoryBtn) {
+        sanJacintoAddCategoryBtn.addEventListener('click', () => {
+            const catInput = document.getElementById('sanJacintoNewCategory');
+            const freqSelect = document.getElementById('sanJacintoNewCategoryFrequency');
+            const amountInput = document.getElementById('sanJacintoNewCategoryAmount');
+            const category = catInput.value.trim();
+            const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
+            const amount = parseFloat(amountInput.value) || 0;
+            if (!category) {
+                if (window.setStatus) window.setStatus('Expense category is required.');
+                return;
+            }
+            addRentalExpenseRow('San Jacinto', { category, frequency, amount });
+            catInput.value = '';
+            amountInput.value = '';
+            if (freqSelect) freqSelect.value = 'monthly';
+            catInput.focus();
+        });
+    }
+
+    // 5. County Line Rental UI
+    const countyLineRentInput = document.getElementById('countyLineRentInput');
+    if (countyLineRentInput) {
+        countyLineRentInput.addEventListener('change', () => {
+            setRentalRent('County Line', countyLineRentInput.value);
+        });
+    }
+
+    const countyLineAddCategoryBtn = document.getElementById('countyLineAddCategoryBtn');
+    if (countyLineAddCategoryBtn) {
+        countyLineAddCategoryBtn.addEventListener('click', () => {
+            const catInput = document.getElementById('countyLineNewCategory');
+            const freqSelect = document.getElementById('countyLineNewCategoryFrequency');
+            const amountInput = document.getElementById('countyLineNewCategoryAmount');
+            const category = catInput.value.trim();
+            const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
+            const amount = parseFloat(amountInput.value) || 0;
+            if (!category) {
+                if (window.setStatus) window.setStatus('Expense category is required.');
+                return;
+            }
+            addRentalExpenseRow('County Line', { category, frequency, amount });
+            catInput.value = '';
+            amountInput.value = '';
+            if (freqSelect) freqSelect.value = 'monthly';
+            catInput.focus();
+        });
+    }
+
+    // 6. Credit Cards & Rewards
     const addCardBtn = document.getElementById('addCardBtn');
     if (addCardBtn) {
         addCardBtn.addEventListener('click', () => {
@@ -1063,7 +1458,7 @@
             const rateInput = document.getElementById('newRate');
             const refundInput = document.getElementById('newSpecialRefund');
 
-            const card = cardSelect.value; // this is now a card id
+            const card = cardSelect.value;
             const category = catInput.value.trim();
             const rate = parseFloat(rateInput.value) || 0;
             const special_refund = parseFloat(refundInput.value) || 0;
@@ -1109,8 +1504,10 @@
 
         const budgetPane = document.getElementById('tab-budget');
         const comparisonPane = document.getElementById('tab-comparison');
+        const rentalPane = document.getElementById('tab-rental');
         if (budgetPane) budgetPane.style.display = tabKey === 'budget' ? 'block' : 'none';
         if (comparisonPane) comparisonPane.style.display = tabKey === 'comparison' ? 'block' : 'none';
+        if (rentalPane) rentalPane.style.display = tabKey === 'rental' ? 'block' : 'none';
     }
 
     function setupTabs() {
@@ -1129,12 +1526,20 @@
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const targetId = e.target.id;
-            if (['newCategory', 'newCategoryAmount', 'newCategorySpend'].includes(targetId)) {
+            if (['newCategory', 'newCategoryAmount'].includes(targetId)) {
                 if (addCategoryBtn) addCategoryBtn.click();
-            } else if (['newBankCategory', 'newBankCategoryAmount', 'newBankCategorySpend'].includes(targetId)) {
+            } else if (['newBankCategory', 'newBankCategoryAmount'].includes(targetId)) {
                 if (addBankCategoryBtn) addBankCategoryBtn.click();
             } else if (['newIncomeSource', 'newIncomeAmount'].includes(targetId)) {
                 if (addIncomeBtn) addIncomeBtn.click();
+            } else if (['sanJacintoRentInput'].includes(targetId)) {
+                if (sanJacintoRentInput) sanJacintoRentInput.blur();
+            } else if (['sanJacintoNewCategory', 'sanJacintoNewCategoryAmount'].includes(targetId)) {
+                if (sanJacintoAddCategoryBtn) sanJacintoAddCategoryBtn.click();
+            } else if (['countyLineRentInput'].includes(targetId)) {
+                if (countyLineRentInput) countyLineRentInput.blur();
+            } else if (['countyLineNewCategory', 'countyLineNewCategoryAmount'].includes(targetId)) {
+                if (countyLineAddCategoryBtn) countyLineAddCategoryBtn.click();
             } else if (['newCardName', 'newCardFee', 'newCardBaseRate'].includes(targetId)) {
                 if (addCardBtn) addCardBtn.click();
             } else if (['newRewardCategory', 'newRate', 'newSpecialRefund'].includes(targetId)) {
