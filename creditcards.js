@@ -1,6 +1,6 @@
 (function () {
     const sb = window.supabaseClient;
-    const CATEGORIES_TABLE = 'spending_categories';
+    const CATEGORIES_TABLE = 'income_expense_categories';
     const CARDS_TABLE = 'credit_cards';
     const REWARDS_TABLE = 'card_rewards';
 
