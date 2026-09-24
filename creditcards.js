@@ -92,6 +92,96 @@
     }
 
     // -------------------------------------------------------------------
+    // HTML Template & Element Builders
+    // -------------------------------------------------------------------
+    function summaryCardHtml({ label, value, unit = '/mo', foot = '', statusClass = '' }) {
+        const cls = statusClass ? `summary-card ${statusClass}` : 'summary-card';
+        return `
+          <div class="${cls}">
+            <div class="label">${escapeHtml(label)}</div>
+            <div class="value">${value}<span class="combo-unit">${escapeHtml(unit)}</span></div>
+            ${foot ? `<div class="foot">${foot}</div>` : ''}
+          </div>
+        `;
+    }
+
+    function categoryRowHtml(row, options = {}) {
+        const freq = row.frequency || 'monthly';
+        const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
+        const monthly = row.monthly_spend || 0;
+        const deleteTitle = options.deleteTitle || 'Delete';
+        const placeholder = options.notePlaceholder ? ` data-placeholder="${escapeHtml(options.notePlaceholder)}"` : '';
+
+        return `
+          <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category"></td>
+          <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
+          <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
+          <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes"${placeholder}>${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
+          <td class="col-num">${fmt$(monthly)}</td>
+          <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="${escapeHtml(deleteTitle)}">✕</button></td>
+        `;
+    }
+
+    function createCategoryRowElement(row, onUpdate, onDelete, options = {}) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = categoryRowHtml(row, options);
+
+        tr.querySelectorAll('input, select').forEach(input => {
+            input.addEventListener('change', () => {
+                const field = input.dataset.field;
+                let val = input.value;
+                if (field === 'amount') val = parseFloat(val) || 0;
+                onUpdate(row.id, { [field]: val });
+            });
+        });
+
+        const noteSpan = tr.querySelector('.note-editable');
+        const noteEditBtn = tr.querySelector('.icon-edit-note');
+        if (noteEditBtn && noteSpan) {
+            noteEditBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                noteSpan.focus();
+            });
+        }
+        if (noteSpan) {
+            noteSpan.addEventListener('blur', () => {
+                const val = (noteSpan.textContent || '').trim();
+                if (val !== (row.notes || '')) {
+                    onUpdate(row.id, { notes: val });
+                }
+            });
+            noteSpan.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    noteSpan.blur();
+                }
+            });
+        }
+
+        const delBtn = tr.querySelector('.icon-delete');
+        if (delBtn) delBtn.addEventListener('click', () => onDelete(row.id));
+
+        return tr;
+    }
+
+    function rentalIncomeRowHtml(property, profit) {
+        const isProfit = profit >= 0;
+        return `
+          <td>
+            <span class="rental-prop-title">
+              ${escapeHtml(property)}
+              <span class="chip form-note">Rental ${isProfit ? 'Profit' : 'Loss'}</span>
+            </span>
+          </td>
+          <td><span class="panel-sub">Monthly</span></td>
+          <td class="col-num ${isProfit ? '' : 'loss-val'}">${fmt$(profit)}</td>
+          <td><span class="form-note">Rental Net</span></td>
+          <td class="col-num ${isProfit ? '' : 'loss-val'}">${fmt$(profit)}</td>
+          <td class="col-action"><span class="icon-locked" title="Calculated from Rentals tab — non-editable">🔒</span></td>
+        `;
+    }
+
+    // -------------------------------------------------------------------
     // Rental Helpers
     // -------------------------------------------------------------------
     function getRentalRent(propertyName) {
@@ -155,6 +245,7 @@
         renderRentals();
     }
 
+
     // -------------------------------------------------------------------
     // Grid 1: Credit Card Spending
     // -------------------------------------------------------------------
@@ -167,51 +258,9 @@
         if (empty) empty.hidden = spendRows.length > 0;
 
         spendRows.forEach(row => {
-            const tr = document.createElement('tr');
-            const freq = row.frequency || 'monthly';
-            const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
-            const monthly = row.monthly_spend || 0;
-            tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category"></td>
-              <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
-              <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes" data-placeholder="Add note…">${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
-              <td class="col-num">${fmt$(monthly)}</td>
-              <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete category">✕</button></td>
-            `;
-            tr.querySelectorAll('input, select').forEach(input => {
-                input.addEventListener('change', () => {
-                    const field = input.dataset.field;
-                    let val = input.value;
-                    if (field === 'amount') val = parseFloat(val) || 0;
-                    updateCategoryRow(row.id, { [field]: val });
-                });
-            });
-            const noteSpan = tr.querySelector('.note-editable');
-            const noteEditBtn = tr.querySelector('.icon-edit-note');
-            if (noteEditBtn && noteSpan) {
-                noteEditBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    noteSpan.focus();
-                });
-            }
-            if (noteSpan) {
-                noteSpan.addEventListener('blur', () => {
-                    const val = (noteSpan.textContent || '').trim();
-                    if (val !== (row.notes || '')) {
-                        updateCategoryRow(row.id, { notes: val });
-                    }
-                });
-                noteSpan.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        noteSpan.blur();
-                    }
-                });
-            }
-            const delBtn = tr.querySelector('.icon-delete');
-            if (delBtn) delBtn.addEventListener('click', () => deleteCategoryRow(row.id));
-            body.appendChild(tr);
+            body.appendChild(createCategoryRowElement(row, updateCategoryRow, deleteCategoryRow, {
+                deleteTitle: 'Delete category'
+            }));
         });
     }
 
@@ -227,51 +276,9 @@
         if (empty) empty.hidden = bankSpendRows.length > 0;
 
         bankSpendRows.forEach(row => {
-            const tr = document.createElement('tr');
-            const freq = row.frequency || 'monthly';
-            const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
-            const monthly = row.monthly_spend || 0;
-            tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category"></td>
-              <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
-              <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes" data-placeholder="Add note…">${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
-              <td class="col-num">${fmt$(monthly)}</td>
-              <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
-            `;
-            tr.querySelectorAll('input, select').forEach(input => {
-                input.addEventListener('change', () => {
-                    const field = input.dataset.field;
-                    let val = input.value;
-                    if (field === 'amount') val = parseFloat(val) || 0;
-                    updateBankSpendRow(row.id, { [field]: val });
-                });
-            });
-            const noteSpan = tr.querySelector('.note-editable');
-            const noteEditBtn = tr.querySelector('.icon-edit-note');
-            if (noteEditBtn && noteSpan) {
-                noteEditBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    noteSpan.focus();
-                });
-            }
-            if (noteSpan) {
-                noteSpan.addEventListener('blur', () => {
-                    const val = (noteSpan.textContent || '').trim();
-                    if (val !== (row.notes || '')) {
-                        updateBankSpendRow(row.id, { notes: val });
-                    }
-                });
-                noteSpan.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        noteSpan.blur();
-                    }
-                });
-            }
-            const delBtn = tr.querySelector('.icon-delete');
-            if (delBtn) delBtn.addEventListener('click', () => deleteBankSpendRow(row.id));
-            body.appendChild(tr);
+            body.appendChild(createCategoryRowElement(row, updateBankSpendRow, deleteBankSpendRow, {
+                deleteTitle: 'Delete expense'
+            }));
         });
     }
 
@@ -289,72 +296,17 @@
 
         // 1. Regular household income rows (editable)
         incomeRows.forEach(row => {
-            const tr = document.createElement('tr');
-            const freq = row.frequency || 'monthly';
-            const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
-            const monthly = row.monthly_spend || 0;
-            tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.category || '')}" data-field="category"></td>
-              <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
-              <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
-              <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes" data-placeholder="Add note…">${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
-              <td class="col-num">${fmt$(monthly)}</td>
-              <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete income source">✕</button></td>
-            `;
-            tr.querySelectorAll('input, select').forEach(input => {
-                input.addEventListener('change', () => {
-                    const field = input.dataset.field;
-                    let val = input.value;
-                    if (field === 'amount') val = parseFloat(val) || 0;
-                    updateIncomeRow(row.id, { [field]: val });
-                });
-            });
-            const noteSpan = tr.querySelector('.note-editable');
-            const noteEditBtn = tr.querySelector('.icon-edit-note');
-            if (noteEditBtn && noteSpan) {
-                noteEditBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    noteSpan.focus();
-                });
-            }
-            if (noteSpan) {
-                noteSpan.addEventListener('blur', () => {
-                    const val = (noteSpan.textContent || '').trim();
-                    if (val !== (row.notes || '')) {
-                        updateIncomeRow(row.id, { notes: val });
-                    }
-                });
-                noteSpan.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        noteSpan.blur();
-                    }
-                });
-            }
-            const delBtn = tr.querySelector('.icon-delete');
-            if (delBtn) delBtn.addEventListener('click', () => deleteIncomeRow(row.id));
-            body.appendChild(tr);
+            body.appendChild(createCategoryRowElement(row, updateIncomeRow, deleteIncomeRow, {
+                deleteTitle: 'Delete income source'
+            }));
         });
 
         // 2. Non-editable rental property profit/loss lines
         RENTAL_PROPERTIES.forEach(property => {
             const profit = getRentalProfit(property);
-            const isProfit = profit >= 0;
             const tr = document.createElement('tr');
             tr.className = 'rental-income-row';
-            tr.innerHTML = `
-              <td>
-                <span class="rental-prop-title">
-                  ${escapeHtml(property)}
-                  <span class="chip form-note">Rental ${isProfit ? 'Profit' : 'Loss'}</span>
-                </span>
-              </td>
-              <td><span class="panel-sub">Monthly</span></td>
-              <td class="col-num ${isProfit ? '' : 'loss-val'}">${fmt$(profit)}</td>
-              <td><span class="form-note">Rental Net</span></td>
-              <td class="col-num ${isProfit ? '' : 'loss-val'}">${fmt$(profit)}</td>
-              <td class="col-action"><span class="icon-locked" title="Calculated from Rentals tab — non-editable">🔒</span></td>
-            `;
+            tr.innerHTML = rentalIncomeRowHtml(property, profit);
             body.appendChild(tr);
         });
     }
@@ -384,23 +336,24 @@
         const statusClass = isSurplus ? 'surplus' : 'deficit';
         const statusText = isSurplus ? 'Surplus' : 'Deficit';
 
-        container.innerHTML = `
-          <div class="summary-card">
-            <div class="label">Total Income</div>
-            <div class="value">${fmt$(totalIncome)}<span class="combo-unit">/mo</span></div>
-            <div class="foot">${fmt$(annualIncome)}/yr &middot; across ${incomeRows.length} source${incomeRows.length === 1 ? '' : 's'} + ${RENTAL_PROPERTIES.length} rental${RENTAL_PROPERTIES.length === 1 ? '' : 's'}</div>
-          </div>
-          <div class="summary-card">
-            <div class="label">Total Spending</div>
-            <div class="value">${fmt$(totalSpending)}<span class="combo-unit">/mo</span></div>
-            <div class="foot">CC: ${fmt$(totalCcSpend)}/mo &middot; Bank: ${fmt$(totalBankSpend)}/mo &middot; ${fmt$(annualSpending)}/yr</div>
-          </div>
-          <div class="summary-card ${statusClass}">
-            <div class="label">Net Balance (${statusText})</div>
-            <div class="value">${fmt$(netBalance)}<span class="combo-unit">/mo</span></div>
-            <div class="foot">Income (${fmt$(totalIncome)}) &minus; Spending (${fmt$(totalSpending)}) = ${fmt$(netBalance)}/mo (${fmt$(annualBalance)}/yr)</div>
-          </div>
-        `;
+        container.innerHTML = [
+            summaryCardHtml({
+                label: 'Total Income',
+                value: fmt$(totalIncome),
+                foot: `${fmt$(annualIncome)}/yr &middot; across ${incomeRows.length} source${incomeRows.length === 1 ? '' : 's'} + ${RENTAL_PROPERTIES.length} rental${RENTAL_PROPERTIES.length === 1 ? '' : 's'}`
+            }),
+            summaryCardHtml({
+                label: 'Total Spending',
+                value: fmt$(totalSpending),
+                foot: `CC: ${fmt$(totalCcSpend)}/mo &middot; Bank: ${fmt$(totalBankSpend)}/mo &middot; ${fmt$(annualSpending)}/yr`
+            }),
+            summaryCardHtml({
+                label: `Net Balance (${statusText})`,
+                value: fmt$(netBalance),
+                statusClass: statusClass,
+                foot: `Income (${fmt$(totalIncome)}) &minus; Spending (${fmt$(totalSpending)}) = ${fmt$(netBalance)}/mo (${fmt$(annualBalance)}/yr)`
+            })
+        ].join('');
     }
 
     // -------------------------------------------------------------------
@@ -453,51 +406,9 @@
             if (empty) empty.hidden = expenses.length > 0;
 
             expenses.forEach(row => {
-                const tr = document.createElement('tr');
-                const freq = row.frequency || 'monthly';
-                const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
-                const monthly = row.monthly_spend || 0;
-                tr.innerHTML = `
-                  <td><input type="text" class="text-input" value="${escapeHtml(row.category || row.name || '')}" data-field="category"></td>
-                  <td><select class="text-input" data-field="frequency">${frequencyOptionsHtml(freq)}</select></td>
-                  <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount"></div></td>
-                  <td><div class="note-cell"><span class="form-note note-editable" contenteditable="true" data-field="notes" data-placeholder="Add note…">${escapeHtml(row.notes || '')}</span><button type="button" class="icon-edit-note" title="Edit note">📝</button></div></td>
-                  <td class="col-num">${fmt$(monthly)}</td>
-                  <td class="col-action"><button type="button" class="icon-delete" data-del-id="${row.id}" title="Delete expense">✕</button></td>
-                `;
-                tr.querySelectorAll('input, select').forEach(input => {
-                    input.addEventListener('change', () => {
-                        const field = input.dataset.field;
-                        let val = input.value;
-                        if (field === 'amount') val = parseFloat(val) || 0;
-                        updateRentalExpenseRow(row.id, { [field]: val });
-                    });
-                });
-                const noteSpan = tr.querySelector('.note-editable');
-                const noteEditBtn = tr.querySelector('.icon-edit-note');
-                if (noteEditBtn && noteSpan) {
-                    noteEditBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        noteSpan.focus();
-                    });
-                }
-                if (noteSpan) {
-                    noteSpan.addEventListener('blur', () => {
-                        const val = (noteSpan.textContent || '').trim();
-                        if (val !== (row.notes || '')) {
-                            updateRentalExpenseRow(row.id, { notes: val });
-                        }
-                    });
-                    noteSpan.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            noteSpan.blur();
-                        }
-                    });
-                }
-                const delBtn = tr.querySelector('.icon-delete');
-                if (delBtn) delBtn.addEventListener('click', () => deleteRentalRow(row.id));
-                body.appendChild(tr);
+                body.appendChild(createCategoryRowElement(row, updateRentalExpenseRow, deleteRentalRow, {
+                    deleteTitle: 'Delete expense'
+                }));
             });
         }
 
@@ -541,23 +452,24 @@
             const statusClass = isProfit ? 'surplus' : 'deficit';
             const statusText = isProfit ? 'Net Profit' : 'Net Loss';
 
-            summary.innerHTML = `
-              <div class="summary-card">
-                <div class="label">Monthly Rent (Income)</div>
-                <div class="value">${fmt$(rent)}<span class="combo-unit">/mo</span></div>
-                <div class="foot">${fmt$(rent * 12)}/yr</div>
-              </div>
-              <div class="summary-card">
-                <div class="label">Total Expenses</div>
-                <div class="value">${fmt$(totalExpenses)}<span class="combo-unit">/mo</span></div>
-                <div class="foot">${fmt$(operatingExpenses)}/mo expenses + ${fmt$(monthlyTax)}/mo tax &middot; ${fmt$(totalExpenses * 12)}/yr</div>
-              </div>
-              <div class="summary-card ${statusClass}">
-                <div class="label">${statusText}</div>
-                <div class="value">${fmt$(profit)}<span class="combo-unit">/mo</span></div>
-                <div class="foot">Rent (${fmt$(rent)}) &minus; Expenses (${fmt$(totalExpenses)}) = ${fmt$(profit)}/mo (${fmt$(annualProfit)}/yr)</div>
-              </div>
-            `;
+            summary.innerHTML = [
+                summaryCardHtml({
+                    label: 'Monthly Rent (Income)',
+                    value: fmt$(rent),
+                    foot: `${fmt$(rent * 12)}/yr`
+                }),
+                summaryCardHtml({
+                    label: 'Total Expenses',
+                    value: fmt$(totalExpenses),
+                    foot: `${fmt$(operatingExpenses)}/mo expenses + ${fmt$(monthlyTax)}/mo tax &middot; ${fmt$(totalExpenses * 12)}/yr`
+                }),
+                summaryCardHtml({
+                    label: statusText,
+                    value: fmt$(profit),
+                    statusClass: statusClass,
+                    foot: `Rent (${fmt$(rent)}) &minus; Expenses (${fmt$(totalExpenses)}) = ${fmt$(profit)}/mo (${fmt$(annualProfit)}/yr)`
+                })
+            ].join('');
         }
     }
 
@@ -857,23 +769,27 @@
             const aNet = aTotal - aFee / 12;
             const bNet = bTotal - bFee / 12;
             const bestNet = bestTotal - (aFee + bFee) / 12;
-            summaryGrid.innerHTML = `
-            <div class="summary-card">
-              <div class="label">${escapeHtml(aName)}</div>
-              <div class="value">${fmt$(aNet)}<span class="combo-unit">/mo net</span></div>
-              <div class="foot">Rewards ${fmt$(aTotal)}/mo &middot; Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) &middot; Net ${fmt$(aNet)}/mo</div>
-            </div>
-            <div class="summary-card">
-              <div class="label">${escapeHtml(bName)}</div>
-              <div class="value">${fmt$(bNet)}<span class="combo-unit">/mo net</span></div>
-              <div class="foot">Rewards ${fmt$(bTotal)}/mo &middot; Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) &middot; Net ${fmt$(bNet)}/mo</div>
-            </div>
-            <div class="summary-card best">
-              <div class="label">Best of Both (optimal routing)</div>
-              <div class="value">${fmt$(bestNet)}<span class="combo-unit">/mo net</span></div>
-              <div class="foot">Rewards ${fmt$(bestTotal)}/mo if you used whichever card wins each category &middot; minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestNet)}/mo</div>
-            </div>
-          `;
+            summaryGrid.innerHTML = [
+                summaryCardHtml({
+                    label: aName,
+                    value: `${fmt$(aNet)}`,
+                    unit: '/mo net',
+                    foot: `Rewards ${fmt$(aTotal)}/mo &middot; Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) &middot; Net ${fmt$(aNet)}/mo`
+                }),
+                summaryCardHtml({
+                    label: bName,
+                    value: `${fmt$(bNet)}`,
+                    unit: '/mo net',
+                    foot: `Rewards ${fmt$(bTotal)}/mo &middot; Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) &middot; Net ${fmt$(bNet)}/mo`
+                }),
+                summaryCardHtml({
+                    label: 'Best of Both (optimal routing)',
+                    value: `${fmt$(bestNet)}`,
+                    unit: '/mo net',
+                    statusClass: 'best',
+                    foot: `Rewards ${fmt$(bestTotal)}/mo if you used whichever card wins each category &middot; minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestNet)}/mo`
+                })
+            ].join('');
         }
     }
 
