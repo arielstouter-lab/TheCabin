@@ -4,12 +4,31 @@
     const CARDS_TABLE = 'credit_cards';
     const REWARDS_TABLE = 'card_rewards';
 
+    // Categories Table Columns
+    const COL_CAT_ID = 'id';
+    const COL_CAT_CATEGORY = 'category';
+    const COL_CAT_FREQUENCY = 'frequency';
+    const COL_CAT_AMOUNT = 'amount';
+    const COL_CAT_MONTHLY_SPEND = 'monthly_spend';
+    const COL_CAT_ACCOUNT_TYPE = 'account_type';
+    const COL_CAT_TYPE = 'type';
+    const COL_CAT_PROPERTY = 'property';
+    const COL_CAT_CREATED_AT = 'created_at';
+
+    // Credit Cards Table Columns
+    const COL_CARD_ID = 'id';
+    const COL_CARD_CREATED_AT = 'created_at';
+
+    // Card Rewards Table Columns
+    const COL_REWARD_ID = 'id';
+    const COL_REWARD_CREATED_AT = 'created_at';
+
     const RENTAL_PROPERTIES = ['San Jacinto', 'County Line'];
 
     let spendRows = [];       // {id, category, frequency, amount, monthly_spend, account_type: 'credit_cards', type: 'spending'}
     let bankSpendRows = [];   // {id, category, frequency, amount, monthly_spend, account_type: 'bank', type: 'spending'}
-    let incomeRows = [];      // {id, source, category, frequency, amount, monthly_amount, account_type: 'income', type: 'income'}
-    let rentalRows = [];      // {id, property, category, frequency, amount, monthly_amount, monthly_spend, account_type: 'rental', type: 'income'|'spending'}
+    let incomeRows = [];      // {id, category, frequency, amount, monthly_spend, account_type: 'income', type: 'income'}
+    let rentalRows = [];      // {id, property, category, frequency, amount, monthly_spend, account_type: 'rental', type: 'income'|'spending'}
     let cardsRows = [];       // {id, name, annual_fee, base_rate}
     let rewardRows = [];      // {id, card_id, category, rate, special_refund}
 
@@ -67,7 +86,7 @@
     function getRentalRent(propertyName) {
         const rentRow = rentalRows.find(r => r.property === propertyName && r.type === 'income');
         if (!rentRow) return 0;
-        const amt = rentRow.amount !== undefined && rentRow.amount !== null ? rentRow.amount : (rentRow.monthly_amount || 0);
+        const amt = rentRow.amount !== undefined && rentRow.amount !== null ? rentRow.amount : (rentRow.monthly_spend || 0);
         return calcMonthlyAmount(amt, rentRow.frequency);
     }
 
@@ -190,10 +209,10 @@
         incomeRows.forEach(row => {
             const tr = document.createElement('tr');
             const freq = row.frequency || 'monthly';
-            const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_amount ?? 0);
+            const amt = row.amount !== undefined && row.amount !== null ? row.amount : (row.monthly_spend ?? 0);
             const monthly = calcMonthlyAmount(amt, freq);
             tr.innerHTML = `
-              <td><input type="text" class="text-input" value="${escapeHtml(row.source || row.category || row.name || '')}" data-field="source" style="width: 100%; min-width: 130px;"></td>
+              <td><input type="text" class="text-input" value="${escapeHtml(row.category || '')}" data-field="category" style="width: 100%; min-width: 130px;"></td>
               <td><select class="text-input" data-field="frequency" style="width: 100%; min-width: 140px;">${frequencyOptionsHtml(freq)}</select></td>
               <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" value="${amt}" data-field="amount" style="width: 100%; min-width: 90px;"></div></td>
               <td class="col-num"><span style="font-weight: 600; color: var(--ink); white-space: nowrap;">${fmt$(monthly)}</span></td>
@@ -253,7 +272,7 @@
         const totalSpending = totalCcSpend + totalBankSpend;
 
         const regularIncome = incomeRows.reduce((sum, r) => {
-            const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_amount || 0);
+            const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_spend || 0);
             return sum + calcMonthlyAmount(amt, r.frequency);
         }, 0);
         const rentalProfits = RENTAL_PROPERTIES.reduce((sum, prop) => sum + getRentalProfit(prop), 0);
@@ -311,7 +330,7 @@
         // 1. Rent input at top
         const rentInput = document.getElementById(elements.rentInputId);
         const rentRow = rentalRows.find(r => r.property === propertyName && r.type === 'income');
-        const rentVal = rentRow ? (rentRow.amount !== undefined && rentRow.amount !== null ? rentRow.amount : rentRow.monthly_amount) : 0;
+        const rentVal = rentRow ? (rentRow.amount !== undefined && rentRow.amount !== null ? rentRow.amount : (rentRow.monthly_spend || 0)) : 0;
         if (rentInput && document.activeElement !== rentInput) {
             rentInput.value = rentVal ? rentVal : '';
         }
@@ -706,7 +725,7 @@
     async function loadSpendingCategories() {
         if (!sb) return;
         try {
-            const { data, error } = await sb.from(CATEGORIES_TABLE).select('*').order('created_at', { ascending: true });
+            const { data, error } = await sb.from(CATEGORIES_TABLE).select('*').order(COL_CAT_CREATED_AT, { ascending: true });
             if (error) throw error;
 
             spendRows = [];
@@ -715,68 +734,57 @@
             rentalRows = [];
 
             (data || []).forEach(r => {
-                const freq = r.frequency || 'monthly';
-                const amt = r.amount !== undefined && r.amount !== null ? r.amount : (r.monthly_amount ?? r.monthly_spend ?? 0);
+                const freq = r[COL_CAT_FREQUENCY] || 'monthly';
+                const amt = r[COL_CAT_AMOUNT] !== undefined && r[COL_CAT_AMOUNT] !== null ? r[COL_CAT_AMOUNT] : (r[COL_CAT_MONTHLY_SPEND] ?? 0);
                 const monthly = calcMonthlyAmount(amt, freq);
 
-                const acc = String(r.account_type || r.category_type || r.channel || '').toLowerCase();
-                const flow = String(r.type || r.spending_or_income || r.flow_type || '').toLowerCase();
-                const isRental = acc === 'rental' || acc === 'rentals' || Boolean(r.property) || Boolean(r.property_name);
+                const acc = String(r[COL_CAT_ACCOUNT_TYPE] || '').toLowerCase();
+                const flow = String(r[COL_CAT_TYPE] || '').toLowerCase();
+                const isRental = acc === 'rental' || acc === 'rentals' || Boolean(r[COL_CAT_PROPERTY]);
 
                 if (isRental) {
-                    const prop = r.property || r.property_name || 'San Jacinto';
-                    const isIncome = flow === 'income' || r.is_income === true || (r.category && r.category.trim().toLowerCase() === 'rent');
+                    const prop = r[COL_CAT_PROPERTY] || 'San Jacinto';
+                    const isIncome = flow === 'income' || (r[COL_CAT_CATEGORY] && r[COL_CAT_CATEGORY].trim().toLowerCase() === 'rent');
                     rentalRows.push({
                         ...r,
                         property: prop,
-                        property_name: prop,
-                        category: r.category || (isIncome ? 'Rent' : 'Expense'),
+                        category: r[COL_CAT_CATEGORY] || (isIncome ? 'Rent' : 'Expense'),
                         frequency: freq,
                         amount: amt,
-                        monthly_amount: isIncome ? monthly : undefined,
-                        monthly_spend: !isIncome ? monthly : undefined,
+                        monthly_spend: monthly,
                         account_type: 'rental',
-                        category_type: 'rental',
-                        type: isIncome ? 'income' : 'spending',
-                        spending_or_income: isIncome ? 'income' : 'spending'
+                        type: isIncome ? 'income' : 'spending'
                     });
-                } else if (acc === 'income' || flow === 'income' || r.is_income === true) {
+                } else if (acc === 'income' || flow === 'income') {
                     incomeRows.push({
                         ...r,
-                        source: r.source || r.category || r.name || '',
-                        category: r.category || r.source || r.name || '',
+                        category: r[COL_CAT_CATEGORY] || '',
                         frequency: freq,
                         amount: amt,
-                        monthly_amount: monthly,
+                        monthly_spend: monthly,
                         account_type: 'income',
-                        category_type: 'income',
-                        type: 'income',
-                        spending_or_income: 'income'
+                        type: 'income'
                     });
-                } else if (acc === 'bank' || acc === 'household_bank_spending') {
+                } else if (acc === 'bank') {
                     bankSpendRows.push({
                         ...r,
-                        category: r.category || r.name || '',
+                        category: r[COL_CAT_CATEGORY] || '',
                         frequency: freq,
                         amount: amt,
                         monthly_spend: monthly,
                         account_type: 'bank',
-                        category_type: 'bank',
-                        type: 'spending',
-                        spending_or_income: 'spending'
+                        type: 'spending'
                     });
                 } else {
                     // Default to credit card category
                     spendRows.push({
                         ...r,
-                        category: r.category || r.name || '',
+                        category: r[COL_CAT_CATEGORY] || '',
                         frequency: freq,
                         amount: amt,
                         monthly_spend: monthly,
                         account_type: 'credit_cards',
-                        category_type: 'credit_cards',
-                        type: 'spending',
-                        spending_or_income: 'spending'
+                        type: 'spending'
                     });
                 }
             });
@@ -798,14 +806,12 @@
             const amt = data.amount || 0;
             const monthly = calcMonthlyAmount(amt, freq);
             const payload = {
-                category: data.category,
-                frequency: freq,
-                amount: amt,
-                monthly_spend: monthly,
-                account_type: 'credit_cards',
-                category_type: 'credit_cards',
-                type: 'spending',
-                spending_or_income: 'spending'
+                [COL_CAT_CATEGORY]: data.category,
+                [COL_CAT_FREQUENCY]: freq,
+                [COL_CAT_AMOUNT]: amt,
+                [COL_CAT_MONTHLY_SPEND]: monthly,
+                [COL_CAT_ACCOUNT_TYPE]: 'credit_cards',
+                [COL_CAT_TYPE]: 'spending'
             };
             const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
             if (error) throw error;
@@ -838,11 +844,11 @@
             render();
             const payload = { ...patch };
             if (row) {
-                payload.frequency = row.frequency;
-                payload.amount = row.amount;
-                payload.monthly_spend = row.monthly_spend;
+                payload[COL_CAT_FREQUENCY] = row.frequency;
+                payload[COL_CAT_AMOUNT] = row.amount;
+                payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
             }
-            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update category:', err);
@@ -853,7 +859,7 @@
     async function deleteCategoryRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
             if (error) throw error;
             spendRows = spendRows.filter(r => r.id !== id);
             render();
@@ -872,14 +878,12 @@
             const amt = data.amount || 0;
             const monthly = calcMonthlyAmount(amt, freq);
             const payload = {
-                category: data.category,
-                frequency: freq,
-                amount: amt,
-                monthly_spend: monthly,
-                account_type: 'bank',
-                category_type: 'bank',
-                type: 'spending',
-                spending_or_income: 'spending'
+                [COL_CAT_CATEGORY]: data.category,
+                [COL_CAT_FREQUENCY]: freq,
+                [COL_CAT_AMOUNT]: amt,
+                [COL_CAT_MONTHLY_SPEND]: monthly,
+                [COL_CAT_ACCOUNT_TYPE]: 'bank',
+                [COL_CAT_TYPE]: 'spending'
             };
             const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
             if (error) throw error;
@@ -912,11 +916,11 @@
             render();
             const payload = { ...patch };
             if (row) {
-                payload.frequency = row.frequency;
-                payload.amount = row.amount;
-                payload.monthly_spend = row.monthly_spend;
+                payload[COL_CAT_FREQUENCY] = row.frequency;
+                payload[COL_CAT_AMOUNT] = row.amount;
+                payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
             }
-            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update bank expense:', err);
@@ -927,7 +931,7 @@
     async function deleteBankSpendRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
             if (error) throw error;
             bankSpendRows = bankSpendRows.filter(r => r.id !== id);
             render();
@@ -945,28 +949,24 @@
             const freq = data.frequency || 'monthly';
             const amt = data.amount || 0;
             const monthly = calcMonthlyAmount(amt, freq);
-            const src = data.source || data.category || '';
+            const cat = data.category || data.source || '';
             const payload = {
-                category: src,
-                source: src,
-                frequency: freq,
-                amount: amt,
-                monthly_amount: monthly,
-                account_type: 'income',
-                category_type: 'income',
-                type: 'income',
-                spending_or_income: 'income'
+                [COL_CAT_CATEGORY]: cat,
+                [COL_CAT_FREQUENCY]: freq,
+                [COL_CAT_AMOUNT]: amt,
+                [COL_CAT_MONTHLY_SPEND]: monthly,
+                [COL_CAT_ACCOUNT_TYPE]: 'income',
+                [COL_CAT_TYPE]: 'income'
             };
             const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
             if (error) throw error;
             if (inserted) {
                 incomeRows.push({
                     ...inserted,
-                    source: src,
-                    category: src,
+                    category: cat,
                     frequency: freq,
                     amount: amt,
-                    monthly_amount: monthly,
+                    monthly_spend: monthly,
                     account_type: 'income',
                     type: 'income'
                 });
@@ -985,18 +985,16 @@
             const row = incomeRows.find(r => r.id === id);
             if (row) {
                 Object.assign(row, patch);
-                if (patch.source !== undefined) row.category = patch.source;
-                row.monthly_amount = calcMonthlyAmount(row.amount, row.frequency);
+                row.monthly_spend = calcMonthlyAmount(row.amount, row.frequency);
             }
             render();
             const payload = { ...patch };
             if (row) {
-                payload.frequency = row.frequency;
-                payload.amount = row.amount;
-                payload.monthly_amount = row.monthly_amount;
-                if (patch.source !== undefined) payload.category = patch.source;
+                payload[COL_CAT_FREQUENCY] = row.frequency;
+                payload[COL_CAT_AMOUNT] = row.amount;
+                payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
             }
-            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update income source:', err);
@@ -1007,7 +1005,7 @@
     async function deleteIncomeRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
             if (error) throw error;
             incomeRows = incomeRows.filter(r => r.id !== id);
             render();
@@ -1026,27 +1024,22 @@
         try {
             if (existing) {
                 existing.amount = val;
-                existing.monthly_amount = val;
+                existing.monthly_spend = val;
                 render();
                 const { error } = await sb.from(CATEGORIES_TABLE).update({
-                    amount: val,
-                    monthly_amount: val,
-                    monthly_spend: val
-                }).eq('id', existing.id);
+                    [COL_CAT_AMOUNT]: val,
+                    [COL_CAT_MONTHLY_SPEND]: val
+                }).eq(COL_CAT_ID, existing.id);
                 if (error) throw error;
             } else {
                 const payload = {
-                    category: 'Rent',
-                    property: propertyName,
-                    property_name: propertyName,
-                    frequency: 'monthly',
-                    amount: val,
-                    monthly_amount: val,
-                    monthly_spend: val,
-                    account_type: 'rental',
-                    category_type: 'rental',
-                    type: 'income',
-                    spending_or_income: 'income'
+                    [COL_CAT_CATEGORY]: 'Rent',
+                    [COL_CAT_PROPERTY]: propertyName,
+                    [COL_CAT_FREQUENCY]: 'monthly',
+                    [COL_CAT_AMOUNT]: val,
+                    [COL_CAT_MONTHLY_SPEND]: val,
+                    [COL_CAT_ACCOUNT_TYPE]: 'rental',
+                    [COL_CAT_TYPE]: 'income'
                 };
                 const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
                 if (error) throw error;
@@ -1054,11 +1047,10 @@
                     rentalRows.push({
                         ...inserted,
                         property: propertyName,
-                        property_name: propertyName,
                         category: 'Rent',
                         frequency: 'monthly',
                         amount: val,
-                        monthly_amount: val,
+                        monthly_spend: val,
                         account_type: 'rental',
                         type: 'income'
                     });
@@ -1079,16 +1071,13 @@
             const amt = data.amount || 0;
             const monthly = calcMonthlyAmount(amt, freq);
             const payload = {
-                category: data.category,
-                property: propertyName,
-                property_name: propertyName,
-                frequency: freq,
-                amount: amt,
-                monthly_spend: monthly,
-                account_type: 'rental',
-                category_type: 'rental',
-                type: 'spending',
-                spending_or_income: 'spending'
+                [COL_CAT_CATEGORY]: data.category,
+                [COL_CAT_PROPERTY]: propertyName,
+                [COL_CAT_FREQUENCY]: freq,
+                [COL_CAT_AMOUNT]: amt,
+                [COL_CAT_MONTHLY_SPEND]: monthly,
+                [COL_CAT_ACCOUNT_TYPE]: 'rental',
+                [COL_CAT_TYPE]: 'spending'
             };
             const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
             if (error) throw error;
@@ -1096,7 +1085,6 @@
                 rentalRows.push({
                     ...inserted,
                     property: propertyName,
-                    property_name: propertyName,
                     category: data.category,
                     frequency: freq,
                     amount: amt,
@@ -1124,11 +1112,11 @@
             render();
             const payload = { ...patch };
             if (row) {
-                payload.frequency = row.frequency;
-                payload.amount = row.amount;
-                payload.monthly_spend = row.monthly_spend;
+                payload[COL_CAT_FREQUENCY] = row.frequency;
+                payload[COL_CAT_AMOUNT] = row.amount;
+                payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
             }
-            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update rental expense:', err);
@@ -1139,7 +1127,7 @@
     async function deleteRentalRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq('id', id);
+            const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
             if (error) throw error;
             rentalRows = rentalRows.filter(r => r.id !== id);
             render();
@@ -1156,7 +1144,7 @@
     async function loadCards() {
         if (!sb) return;
         try {
-            const { data, error } = await sb.from(CARDS_TABLE).select('*').order('created_at', { ascending: true });
+            const { data, error } = await sb.from(CARDS_TABLE).select('*').order(COL_CARD_CREATED_AT, { ascending: true });
             if (error) throw error;
             cardsRows = data || [];
         } catch (err) {
@@ -1185,7 +1173,7 @@
             const row = cardsRows.find(r => r.id === id);
             if (row) Object.assign(row, patch);
             render();
-            const { error } = await sb.from(CARDS_TABLE).update(patch).eq('id', id);
+            const { error } = await sb.from(CARDS_TABLE).update(patch).eq(COL_CARD_ID, id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update card:', err);
@@ -1196,7 +1184,7 @@
     async function deleteCardRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(CARDS_TABLE).delete().eq('id', id);
+            const { error } = await sb.from(CARDS_TABLE).delete().eq(COL_CARD_ID, id);
             if (error) throw error;
             cardsRows = cardsRows.filter(r => r.id !== id);
             render();
@@ -1213,7 +1201,7 @@
     async function loadRewards() {
         if (!sb) return;
         try {
-            const { data, error } = await sb.from(REWARDS_TABLE).select('*').order('created_at', { ascending: true });
+            const { data, error } = await sb.from(REWARDS_TABLE).select('*').order(COL_REWARD_CREATED_AT, { ascending: true });
             if (error) throw error;
             rewardRows = data || [];
         } catch (err) {
@@ -1242,7 +1230,7 @@
             const row = rewardRows.find(r => r.id === id);
             if (row) Object.assign(row, patch);
             render();
-            const { error } = await sb.from(REWARDS_TABLE).update(patch).eq('id', id);
+            const { error } = await sb.from(REWARDS_TABLE).update(patch).eq(COL_REWARD_ID, id);
             if (error) throw error;
         } catch (err) {
             console.error('Could not update row:', err);
@@ -1253,7 +1241,7 @@
     async function deleteRewardRow(id) {
         if (!sb) return;
         try {
-            const { error } = await sb.from(REWARDS_TABLE).delete().eq('id', id);
+            const { error } = await sb.from(REWARDS_TABLE).delete().eq(COL_REWARD_ID, id);
             if (error) throw error;
             rewardRows = rewardRows.filter(r => r.id !== id);
             render();
@@ -1359,7 +1347,7 @@
                 if (window.setStatus) window.setStatus('Income source is required.');
                 return;
             }
-            addIncomeRow({ source, frequency, amount });
+            addIncomeRow({ category: source, frequency, amount });
             sourceInput.value = '';
             amountInput.value = '';
             if (freqSelect) freqSelect.value = 'monthly';

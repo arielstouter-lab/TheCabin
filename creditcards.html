@@ -296,21 +296,16 @@
                     </div>
                     <div class="panel-body">
                         <!-- Top: One editable monthly income (rent) -->
-                        <div class="rental-rent-section" style="margin-bottom: 14px;">
-                            <label for="sanJacintoRentInput" style="font-weight: 600; font-size: 13px; color: var(--ink); display: block; margin-bottom: 6px;">Monthly Income (Rent)</label>
-                            <div style="display: flex; align-items: center; gap: 10px; max-width: 320px;">
-                                <div class="num-wrap money" style="flex: 1;">
+                        <div class="compare-pickers">
+                            <div class="picker">
+                                <label for="sanJacintoRentInput">Monthly Income (Rent)</label>
+                                <div class="num-wrap money">
                                     <input type="number" class="text-input" id="sanJacintoRentInput" placeholder="Monthly rent amount" min="0" step="any" />
                                 </div>
-                                <span style="font-size: 12px; color: var(--ink-soft);">/month</span>
                             </div>
                         </div>
 
-                        <!-- Line -->
-                        <hr class="cc-divider" style="border: 0; border-top: 1px solid var(--line); margin: 16px 0;" />
-
                         <!-- Entries for expenses that can be added or removed -->
-                        <div style="margin-bottom: 8px; font-weight: 600; font-size: 13px; color: var(--ink);">Rental Expenses</div>
                         <div class="table-wrap">
                             <table class="cc-table">
                                 <thead>
@@ -327,7 +322,7 @@
                         </div>
                         <p id="sanJacintoSpendGridEmpty" class="empty-state" style="display:none;">No expenses yet &mdash; add your first one below.</p>
 
-                        <div class="cc-add-form" style="margin-top: 12px;">
+                        <div class="cc-add-form">
                             <div class="cc-add-fields">
                                 <input type="text" class="text-input" id="sanJacintoNewCategory" placeholder="Expense (e.g. Mortgage, Insurance)" />
                                 <select class="text-input" id="sanJacintoNewCategoryFrequency">
@@ -343,9 +338,6 @@
                             <button class="button-inline" id="sanJacintoAddCategoryBtn">Add expense</button>
                         </div>
 
-                        <!-- Line -->
-                        <hr class="cc-divider" style="border: 0; border-top: 1px solid var(--line); margin: 20px 0 16px 0;" />
-
                         <!-- Profit totaled at the bottom -->
                         <div id="sanJacintoProfitSummary" class="summary-grid"></div>
                     </div>
@@ -358,21 +350,16 @@
                     </div>
                     <div class="panel-body">
                         <!-- Top: One editable monthly income (rent) -->
-                        <div class="rental-rent-section" style="margin-bottom: 14px;">
-                            <label for="countyLineRentInput" style="font-weight: 600; font-size: 13px; color: var(--ink); display: block; margin-bottom: 6px;">Monthly Income (Rent)</label>
-                            <div style="display: flex; align-items: center; gap: 10px; max-width: 320px;">
-                                <div class="num-wrap money" style="flex: 1;">
+                        <div class="compare-pickers">
+                            <div class="picker">
+                                <label for="countyLineRentInput">Monthly Income (Rent)</label>
+                                <div class="num-wrap money">
                                     <input type="number" class="text-input" id="countyLineRentInput" placeholder="Monthly rent amount" min="0" step="any" />
                                 </div>
-                                <span style="font-size: 12px; color: var(--ink-soft);">/month</span>
                             </div>
                         </div>
 
-                        <!-- Line -->
-                        <hr class="cc-divider" style="border: 0; border-top: 1px solid var(--line); margin: 16px 0;" />
-
                         <!-- Entries for expenses that can be added or removed -->
-                        <div style="margin-bottom: 8px; font-weight: 600; font-size: 13px; color: var(--ink);">Rental Expenses</div>
                         <div class="table-wrap">
                             <table class="cc-table">
                                 <thead>
@@ -389,7 +376,7 @@
                         </div>
                         <p id="countyLineSpendGridEmpty" class="empty-state" style="display:none;">No expenses yet &mdash; add your first one below.</p>
 
-                        <div class="cc-add-form" style="margin-top: 12px;">
+                        <div class="cc-add-form">
                             <div class="cc-add-fields">
                                 <input type="text" class="text-input" id="countyLineNewCategory" placeholder="Expense (e.g. Mortgage, Insurance)" />
                                 <select class="text-input" id="countyLineNewCategoryFrequency">
@@ -404,9 +391,6 @@
                             </div>
                             <button class="button-inline" id="countyLineAddCategoryBtn">Add expense</button>
                         </div>
-
-                        <!-- Line -->
-                        <hr class="cc-divider" style="border: 0; border-top: 1px solid var(--line); margin: 20px 0 16px 0;" />
 
                         <!-- Profit totaled at the bottom -->
                         <div id="countyLineProfitSummary" class="summary-grid"></div>
