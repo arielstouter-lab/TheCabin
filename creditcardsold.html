@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Credit Cards</title>
+    <link rel="stylesheet" href="styles.old.css">
+    <script src="head-loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js" defer></script>
+    <script src="app.js" defer></script>
+    <script src="creditcards.js" defer></script>
+</head>
+<body class="app-page">
+<div class="app-shell">
+    <main class="main-content">
+        <a href="app.html" class="brand-link">
+            <div class="brand-mark"></div>
+        </a>
+
+        <header class="topbar">
+            <div class="text-center">
+                <h1>Financial Tools</h1>
+                <p>Log your household spending by category, set up each card's reward rates, then compare any two head-to-head.</p>
+            </div>
+        </header>
+
+        <section class="content">
+            <div class="tabs-container" id="cc-tabs">
+                <button type="button" class="tab active" data-tab="budget">
+                    <span>Budget</span>
+                </button>
+                <button type="button" class="tab" data-tab="comparison">
+                    <span>Credit Card Comparison</span>
+                </button>
+                <button type="button" class="tab" data-tab="rental">
+                    <span>Rentals</span>
+                </button>
+            </div>
+
+            <!-- Tab 1: Budget -->
+            <div id="tab-budget" class="tab-pane">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Credit Card Spending</h2>
+                        <span class="panel-sub">Monthly credit card spend per category, used by credit card comparison</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="spendGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="spendGridEmpty" class="empty-state" hidden>No credit card categories yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newCategory" placeholder="Category (e.g. Dining, Gas)" />
+                                <select class="text-input" id="newCategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newCategoryAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input form-note" id="newCategoryNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="addCategoryBtn">Add category</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Bank Account Spending</h2>
+                        <span class="panel-sub">Non-card monthly expenses</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="bankSpendGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="bankSpendGridEmpty" class="empty-state" hidden>No bank account expenses yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newBankCategory" placeholder="Expense (e.g. Rent, Utilities)" />
+                                <select class="text-input" id="newBankCategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newBankCategoryAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input form-note" id="newBankCategoryNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="addBankCategoryBtn">Add expense</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Income</h2>
+                        <span class="panel-sub">Monthly income sources (e.g. primary salary, side income)</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Income Source</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Amount</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="incomeGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="incomeGridEmpty" class="empty-state" hidden>No income sources yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newIncomeSource" placeholder="Income source (e.g. Salary, Consulting)" />
+                                <select class="text-input" id="newIncomeFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newIncomeAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input form-note" id="newIncomeNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="addIncomeBtn">Add income</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Monthly Budget Balance</h2>
+                        <span class="panel-sub">Total Income &minus; Total Spending = Net Balance</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="balanceSummaryGrid" class="summary-grid"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Credit Card Comparison -->
+            <div id="tab-comparison" class="tab-pane" hidden>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Head-to-Head Comparison</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div id="bestComboContainer" hidden></div>
+
+                        <div class="compare-pickers">
+                            <div class="picker">
+                                <label for="cardASelect">Card A</label>
+                                <select id="cardASelect"><option value="">Choose a card…</option></select>
+                            </div>
+                            <div class="picker">
+                                <label for="cardBSelect">Card B</label>
+                                <select id="cardBSelect"><option value="">Choose a card…</option></select>
+                            </div>
+                        </div>
+
+                        <p id="compareEmpty" class="empty-state">Add spending categories in the Budget tab and at least two cards, then pick them here.</p>
+
+                        <div class="table-wrap" id="compareTableWrap" hidden>
+                            <table class="cc-table" id="compareTable">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-num" id="headA">Card A</th>
+                                    <th class="col-num" id="headB">Card B</th>
+                                    <th>Best</th>
+                                </tr>
+                                </thead>
+                                <tbody id="compareBody"></tbody>
+                            </table>
+                        </div>
+
+                        <div id="summaryGrid" class="summary-grid" hidden></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Credit Cards</h2>
+                        <span class="panel-sub">Annual fee &amp; base rate ("everything else") for each card</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Card</th>
+                                    <th class="col-num">Annual Fee</th>
+                                    <th class="col-num">Base Rate</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="cardsGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="cardsGridEmpty" class="empty-state" hidden>No cards yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newCardName" placeholder="Card name (e.g. Amex Gold)" />
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newCardFee" placeholder="Fee / yr" min="0" step="1" />
+                                </div>
+                                <div class="num-wrap pct">
+                                    <input type="number" class="text-input" id="newCardBaseRate" placeholder="Base rate %" min="0" step="0.1" />
+                                </div>
+                            </div>
+                            <button class="button-inline" id="addCardBtn">Add card</button>
+                        </div>
+                        <p class="form-note">Base rate applies to any category that doesn't have its own rate set below.</p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">Card Rewards</h2>
+                        <span class="panel-sub">Category-specific rates that override a card's base rate</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Card</th>
+                                    <th>Category</th>
+                                    <th class="col-num">Reward Rate</th>
+                                    <th class="col-num">Special Refund</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="rewardsGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="rewardsGridEmpty" class="empty-state" hidden>No overrides yet &mdash; add one below, or add a card above and rely on its base rate.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <select class="text-input" id="newRewardCard"><option value="">Choose a card…</option></select>
+                                <input type="text" class="text-input" id="newRewardCategory" placeholder="Category (e.g. Dining, Gas)" />
+                                <div class="num-wrap pct">
+                                    <input type="number" class="text-input" id="newRate" placeholder="Rate %" min="0" step="0.1" />
+                                </div>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newSpecialRefund" placeholder="Special refund" min="0" step="1" />
+                                </div>
+                            </div>
+                            <button class="button-inline" id="addRewardBtn">Add rate</button>
+                        </div>
+                        <p class="form-note">Special refund is a flat $/mo add-on for that specific card + category (e.g. a fixed statement credit), on top of the percentage reward.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Rental Income/Loss -->
+            <div id="tab-rental" class="tab-pane" hidden>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">San Jacinto</h2>
+                        <span class="panel-sub">Rental Property</span>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Top: One editable monthly income (rent) -->
+                        <div class="compare-pickers">
+                            <div class="picker">
+                                <label for="sanJacintoRentInput">Monthly Income (Rent)</label>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="sanJacintoRentInput" placeholder="Monthly rent amount" min="0" step="any" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Entries for expenses that can be added or removed -->
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="sanJacintoSpendGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="sanJacintoSpendGridEmpty" class="empty-state" hidden>No expenses yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="sanJacintoNewCategory" placeholder="Expense (e.g. Mortgage, Insurance)" />
+                                <select class="text-input" id="sanJacintoNewCategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="sanJacintoNewCategoryAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input form-note" id="sanJacintoNewCategoryNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="sanJacintoAddCategoryBtn">Add expense</button>
+                        </div>
+
+                        <!-- Taxes line right above summary -->
+                        <div class="compare-pickers rental-tax-row" id="sanJacintoTaxRow">
+                            <div class="picker">
+                                <label>Rent</label>
+                                <span id="sanJacintoTaxRent" class="tax-val">$0.00</span>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label>Expenses</label>
+                                <span id="sanJacintoTaxExpenses" class="tax-val">$0.00</span>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label for="sanJacintoDepreciation">Depreciation (yr)</label>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="sanJacintoDepreciation" placeholder="Annual" min="0" step="any" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label for="sanJacintoMortgageInterest">Mortgage Int (yr)</label>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="sanJacintoMortgageInterest" placeholder="Annual" min="0" step="any" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">&times;</span>
+                            <div class="picker">
+                                <label for="sanJacintoTaxRate">Tax Rate</label>
+                                <div class="num-wrap pct">
+                                    <input type="number" class="text-input" id="sanJacintoTaxRate" placeholder="Rate" min="0" step="0.1" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">=</span>
+                            <div class="picker">
+                                <label>Taxes</label>
+                                <span id="sanJacintoTaxSum" class="tax-val">$0.00/mo</span>
+                            </div>
+                        </div>
+
+                        <!-- Profit totaled at the bottom -->
+                        <div id="sanJacintoProfitSummary" class="summary-grid"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 class="panel-title">County Line</h2>
+                        <span class="panel-sub">Rental Property</span>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Top: One editable monthly income (rent) -->
+                        <div class="compare-pickers">
+                            <div class="picker">
+                                <label for="countyLineRentInput">Monthly Income (Rent)</label>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="countyLineRentInput" placeholder="Monthly rent amount" min="0" step="any" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Entries for expenses that can be added or removed -->
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="countyLineSpendGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="countyLineSpendGridEmpty" class="empty-state" hidden>No expenses yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="countyLineNewCategory" placeholder="Expense (e.g. Mortgage, Insurance)" />
+                                <select class="text-input" id="countyLineNewCategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="countyLineNewCategoryAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input form-note" id="countyLineNewCategoryNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="countyLineAddCategoryBtn">Add expense</button>
+                        </div>
+
+                        <!-- Taxes line right above summary -->
+                        <div class="compare-pickers rental-tax-row" id="countyLineTaxRow">
+                            <div class="picker">
+                                <label>Rent</label>
+                                <span id="countyLineTaxRent" class="tax-val">$0.00</span>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label>Expenses</label>
+                                <span id="countyLineTaxExpenses" class="tax-val">$0.00</span>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label for="countyLineDepreciation">Depreciation (yr)</label>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="countyLineDepreciation" placeholder="Annual" min="0" step="any" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">&minus;</span>
+                            <div class="picker">
+                                <label for="countyLineMortgageInterest">Mortgage Int (yr)</label>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="countyLineMortgageInterest" placeholder="Annual" min="0" step="any" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">&times;</span>
+                            <div class="picker">
+                                <label for="countyLineTaxRate">Tax Rate</label>
+                                <div class="num-wrap pct">
+                                    <input type="number" class="text-input" id="countyLineTaxRate" placeholder="Rate" min="0" step="0.1" />
+                                </div>
+                            </div>
+                            <span class="rental-tax-op">=</span>
+                            <div class="picker">
+                                <label>Taxes</label>
+                                <span id="countyLineTaxSum" class="tax-val">$0.00/mo</span>
+                            </div>
+                        </div>
+
+                        <!-- Profit totaled at the bottom -->
+                        <div id="countyLineProfitSummary" class="summary-grid"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>
