@@ -72,10 +72,9 @@
             if(c.dateStr === today) classes.push('today');
             if(c.dateStr === selectedDate) classes.push('selected');
             const dots = count ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(count,4))}</div>` : '';
-            const countLabel = count ? `<span class="cal-day-count">${count} event${count>1?'s':''}</span>` : '';
             return `<div class="${classes.join(' ')}" data-date="${c.dateStr}">
         <span class="cal-day-num">${c.label}</span>
-        ${dots}${countLabel}
+        ${dots}
       </div>`;
         }).join('');
     }

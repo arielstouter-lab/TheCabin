@@ -505,8 +505,6 @@ select { cursor: pointer; }
 
 .cal-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary-hover); }
 
-.cal-day-count { font-size: var(--text-2xs); color: var(--ink-soft); }
-
 .cal-selected-label { font-size: var(--text-xs); color: var(--ink-soft); }
 
 .cal-events { padding: 6px 16px 6px; }
@@ -967,6 +965,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .card { padding: 20px 10px; }
   .cal-grid-layout,
   .cl-grid { grid-template-columns: minmax(0, 1fr); width: 100%; }
+  .cal-day { min-height: 40px; }
   .card-head { flex-wrap: wrap; gap: 6px; }
   .card-sub { text-align: left; }
   .cl-panel-actions .button { flex: 1 1 auto; font-size: var(--text-base); padding: 0 12px; }
