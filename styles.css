@@ -204,7 +204,7 @@ select { cursor: pointer; }
   &:hover { color: var(--ink); }
 }
 
-.add-item { display: flex; margin-bottom: 20px; }
+.add-item { display: flex; margin-bottom: 20px; gap: 6px; }
 
 .stepper { display: inline-flex; align-items: center; background: var(--card); overflow: hidden; }
 
@@ -326,8 +326,6 @@ select { cursor: pointer; }
 .card-title { font-family: var(--font-serif), serif; font-weight: 600; font-size: var(--text-xl); margin: 0; }
 
 .card-sub { font-size: var(--text-xs); color: var(--ink-soft); text-align: right; line-height: 1.4; }
-
-.card-body { padding: 16px; }
 
 .card-search { padding: 10px 14px 4px; }
 
@@ -974,4 +972,9 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .best-combo-card { flex-direction: column; align-items: flex-start; gap: 12px; }
   .best-combo-card .combo-value-wrap { text-align: left; width: 100%; display: flex; flex-direction: column; align-items: flex-start; }
   .toast-container { bottom: 16px; right: 16px; left: 16px; width: auto; max-width: none; }
+  /* Minimum column width for tables */
+  .min-col {
+    min-width: 150px;
+  }
+
 }
