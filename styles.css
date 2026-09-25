@@ -878,7 +878,6 @@ body.cal-page {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  .combo-info { flex: 1; min-width: 220px; }
   .combo-tag { display: inline-block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary); margin-bottom: 4px; }
   .combo-title { font-family: var(--font-serif); font-size: var(--text-xl); font-weight: 700; color: var(--ink); margin-bottom: 4px; }
   .combo-sub { font-size: var(--text-sm); color: var(--ink-soft); line-height: 1.4; }
