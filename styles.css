@@ -326,14 +326,6 @@ select { cursor: pointer; }
 
 .action-footer { margin-top: 16px; text-align: center; }
 
-/*.welcome-card {*/
-/*  padding: 30px;*/
-/*  margin-bottom: 20px;*/
-/*  box-shadow: var(--shadow);*/
-/*  h2 { margin: 0 0 10px; font-size: var(--text-3xl); }*/
-/*  p { max-width: 600px; margin: 0; color: var(--ink-soft); line-height: 1.6; font-size: var(--text-md); }*/
-/*}*/
-
 .card-row {
   display: flex;
   flex-direction: column;
