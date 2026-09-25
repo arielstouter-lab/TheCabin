@@ -450,7 +450,7 @@ select {
 .panel,
 .welcome-card,
 .card-row,
-.rental-tax-row,
+.card,
 .summary-card {
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -458,7 +458,7 @@ select {
 
 .panel,
 .card-row,
-.rental-tax-row {
+.card {
     background: var(--card);
 }
 
@@ -857,7 +857,7 @@ select {
     max-width: 420px;
 }
 
-.auth-card {
+.card {
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: 16px;
@@ -1418,7 +1418,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     color: var(--ink-soft);
 }
 
-.rental-tax-row {
+.card {
     margin-top: 14px;
     padding: 12px 14px;
     background: var(--card);
@@ -1426,15 +1426,15 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     align-items: center;
 }
 
-.rental-tax-row .num-wrap {
+.card .num-wrap {
     width: 130px;
 }
 
-.rental-tax-row .num-wrap.pct {
+.card .num-wrap.pct {
     width: 95px;
 }
 
-.rental-tax-row .tax-val {
+.card .tax-val {
     font-weight: 600;
     color: var(--ink);
     white-space: nowrap;
@@ -1843,7 +1843,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
         grid-template-columns: 1fr;
     }
 
-    .auth-card {
+    .card {
         padding: 28px 22px;
     }
 

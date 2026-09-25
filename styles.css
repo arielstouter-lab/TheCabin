@@ -298,8 +298,6 @@ select { cursor: pointer; }
 .card-row,
 .summary-card,
 .best-combo-card,
-.auth-card,
-.rental-tax-row,
 .toast { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); }
 
 .cl-ticket,
@@ -436,7 +434,7 @@ select { cursor: pointer; }
 
 .auth-container { width: 100%; max-width: 420px; }
 
-.auth-card { padding: 40px; box-shadow: var(--shadow); }
+.card { padding: 40px; box-shadow: var(--shadow); }
 
 .brand {
   display: flex;
@@ -840,7 +838,7 @@ body.cal-page {
   label { font-family: var(--font-serif); font-weight: 600; font-size: var(--text-base); color: var(--ink-soft); }
 }
 
-.rental-tax-row {
+.card {
   margin-top: 14px;
   padding: 12px 14px;
   gap: 12px;
@@ -970,7 +968,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .content { padding: 16px 12px; }
   .card { padding: 18px 14px; }
   .dashboard-grid { grid-template-columns: 1fr; }
-  .auth-card { padding: 28px 22px; }
+  .card { padding: 28px 22px; }
   .cal-grid-layout,
   .cl-grid { grid-template-columns: minmax(0, 1fr); width: 100%; }
   .card-head { flex-wrap: wrap; gap: 6px; }
