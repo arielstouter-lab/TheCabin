@@ -350,8 +350,8 @@
             </div>
           </div>`).join('') : '<p class="empty-state">Nothing in the pantry yet.</p>';
         return `
-        <div class="panel-head">
-          <h2 class="panel-title">${escapeHtml(sec.name)}</h2>
+        <div class="card-head">
+          <h2 class="card-title">${escapeHtml(sec.name)}</h2>
         </div>
         <div class="lst-items">${itemsHtml}</div>
         <div class="lst-add-item">
@@ -438,8 +438,8 @@
         }).join('') : `<p class="empty-state">${recipeSearchQuery ? 'No recipes match your search.' : 'No recipes found.'}</p>`;
 
         return `
-            <div class="panel-head">
-              <h2 class="panel-title">${escapeHtml(sec.name)}</h2>
+            <div class="card-head">
+              <h2 class="card-title">${escapeHtml(sec.name)}</h2>
             </div>
             <div style="padding: 10px 14px 4px;">
               <input type="text" class="text-input" placeholder="Search recipes or ingredients..." id="lst-recipe-search" value="${escapeHtml(recipeSearchQuery)}" style="width: 100%;" />
@@ -479,8 +479,8 @@
         }).join('') : '<p class="empty-state">Nothing here yet.</p>';
 
         return `
-    <div class="panel-head">
-      <h2 class="panel-title">${escapeHtml(sec.name)}</h2>
+    <div class="card-head">
+      <h2 class="card-title">${escapeHtml(sec.name)}</h2>
       <a href="managegroceries.html" class="button-inline">Manage groceries</a>
     </div>
     <div class="lst-items">${itemsHtml}</div>
@@ -526,8 +526,8 @@
         }).join('') : '<p class="empty-state">Nothing here yet.</p>';
 
         return `
-    <div class="panel-head">
-      <h2 class="panel-title">${escapeHtml(sec.name)}</h2>
+    <div class="card-head">
+      <h2 class="card-title">${escapeHtml(sec.name)}</h2>
       ${panelDeleteSectionButton(sec)}
     </div>
     <div class="lst-items">${itemsHtml}</div>

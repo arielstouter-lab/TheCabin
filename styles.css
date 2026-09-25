@@ -314,15 +314,15 @@ select { cursor: pointer; }
   margin-bottom: 20px;
 }
 
-.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); gap: 10px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); gap: 10px; }
 
-.panel-title { font-family: var(--font-serif), serif; font-weight: 600; font-size: var(--text-xl); margin: 0; }
+.card-title { font-family: var(--font-serif), serif; font-weight: 600; font-size: var(--text-xl); margin: 0; }
 
-.panel-sub { font-size: var(--text-xs); color: var(--ink-soft); text-align: right; line-height: 1.4; }
+.card-sub { font-size: var(--text-xs); color: var(--ink-soft); text-align: right; line-height: 1.4; }
 
-.panel-body { padding: 16px; }
+.card-body { padding: 16px; }
 
-.panel-search { padding: 10px 14px 4px; }
+.card-search { padding: 10px 14px 4px; }
 
 .action-footer { margin-top: 16px; text-align: center; }
 
@@ -981,8 +981,8 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .auth-card { padding: 28px 22px; }
   .cal-grid-layout,
   .cl-grid { grid-template-columns: minmax(0, 1fr); width: 100%; }
-  .panel-head { flex-wrap: wrap; gap: 6px; }
-  .panel-sub { text-align: left; }
+  .card-head { flex-wrap: wrap; gap: 6px; }
+  .card-sub { text-align: left; }
   .cl-panel-actions .button { flex: 1 1 auto; font-size: var(--text-base); padding: 0 12px; }
   .cc-add-form { flex-direction: column; align-items: stretch; }
   .cc-add-form .button-inline { width: 100%; text-align: center; }

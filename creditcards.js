@@ -173,7 +173,7 @@
               <span class="chip form-note">Rental ${isProfit ? 'Profit' : 'Loss'}</span>
             </span>
           </td>
-          <td><span class="panel-sub">Monthly</span></td>
+          <td><span class="card-sub">Monthly</span></td>
           <td class="col-num ${isProfit ? '' : 'loss-val'}">${fmt$(profit)}</td>
           <td><span class="form-note">Rental Net</span></td>
           <td class="col-num ${isProfit ? '' : 'loss-val'}">${fmt$(profit)}</td>
