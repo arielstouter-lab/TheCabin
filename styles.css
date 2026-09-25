@@ -537,7 +537,7 @@ body.cal-page {
 
 .cl-person:last-child { margin-bottom: 0; }
 
-.cl-beam-name { width: 110px; flex: 0 0 auto; font-size: var(--text-md); font-weight: 600; }
+.cl-beam-name { flex: 0 0 auto; font-size: var(--text-md); font-weight: 600; }
 
 .cl-beam-track { position: relative; flex: 1; height: 20px; background: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 40px); border-bottom: 1px solid var(--line); }
 
@@ -553,7 +553,7 @@ body.cal-page {
 
 .cl-beam-target { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ochre); }
 
-.cl-beam-pts { width: 64px; flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--primary); font-size: var(--text-md); }
+.cl-beam-pts { flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--primary); font-size: var(--text-md); }
 
 .cl-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 22px; min-width: 0; }
 
