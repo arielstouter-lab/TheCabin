@@ -507,8 +507,6 @@ select { cursor: pointer; }
 
 .cal-selected-label { font-size: var(--text-xs); color: var(--ink-soft); }
 
-.cal-events { padding: 6px 16px 6px; }
-
 .cal-event { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: var(--text-base); }
 
 .cal-event-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -962,7 +960,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .topbar { padding: 16px; }
   .content { padding: 16px 12px; }
   .dashboard-grid { grid-template-columns: 1fr; }
-  .card { padding: 35px 25px; }
+  .card { padding: 25px 25px; }
   .cal-grid-layout,
   .cl-grid { grid-template-columns: minmax(0, 1fr); width: 100%; }
   .cal-day { min-height: 40px; }
