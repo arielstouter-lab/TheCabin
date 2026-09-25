@@ -958,7 +958,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .topbar { padding: 16px; }
   .content { padding: 16px 12px; }
   .dashboard-grid { grid-template-columns: 1fr; }
-  .card { padding: 20px 16px; }
+  .card { padding: 20px 10px; }
   .cal-grid-layout,
   .cl-grid { grid-template-columns: minmax(0, 1fr); width: 100%; }
   .card-head { flex-wrap: wrap; gap: 6px; }
