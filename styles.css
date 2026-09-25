@@ -298,7 +298,10 @@ select { cursor: pointer; }
 .card-row,
 .summary-card,
 .best-combo-card,
-.toast { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); }
+.toast {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card); }
 
 .cl-ticket,
 .lst-item,
@@ -318,7 +321,7 @@ select { cursor: pointer; }
 
 .card-sub { font-size: var(--text-xs); color: var(--ink-soft); text-align: right; line-height: 1.4; }
 
-.card-body { padding: 16px; }
+.card-body { padding: 16px; display: flex }
 
 .card-search { padding: 10px 14px 4px; }
 
@@ -846,7 +849,7 @@ body.cal-page {
   .tax-val { font-weight: 600; color: var(--ink); white-space: nowrap; }
 }
 
-.rental-tax-op { font-size: var(--text-md); font-weight: 700; color: var(--ink-soft); user-select: none; }
+/*.rental-tax-op { font-size: var(--text-md); font-weight: 700; color: var(--ink-soft); user-select: none; }*/
 
 .win-a { font-weight: 600; color: var(--primary); }
 
