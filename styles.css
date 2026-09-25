@@ -294,8 +294,7 @@ select { cursor: pointer; }
 }
 
 /* 4. CARD FAMILY — 9 blocks collapsed into 2 shared shapes (elevated / inset) */
-.panel,
-.welcome-card,
+.card,
 .card-row,
 .summary-card,
 .best-combo-card,
@@ -307,7 +306,13 @@ select { cursor: pointer; }
 .lst-item,
 .cal-event { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); }
 
-.panel { display: flex; flex-direction: column; min-width: 0; max-width: 100%; margin-bottom: 20px; }
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  margin-bottom: 20px;
+}
 
 .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); gap: 10px; }
 
@@ -321,13 +326,13 @@ select { cursor: pointer; }
 
 .action-footer { margin-top: 16px; text-align: center; }
 
-.welcome-card {
-  padding: 30px;
-  margin-bottom: 20px;
-  box-shadow: var(--shadow);
-  h2 { margin: 0 0 10px; font-size: var(--text-3xl); }
-  p { max-width: 600px; margin: 0; color: var(--ink-soft); line-height: 1.6; font-size: var(--text-md); }
-}
+/*.welcome-card {*/
+/*  padding: 30px;*/
+/*  margin-bottom: 20px;*/
+/*  box-shadow: var(--shadow);*/
+/*  h2 { margin: 0 0 10px; font-size: var(--text-3xl); }*/
+/*  p { max-width: 600px; margin: 0; color: var(--ink-soft); line-height: 1.6; font-size: var(--text-md); }*/
+/*}*/
 
 .card-row {
   display: flex;
@@ -971,7 +976,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .user-card { flex-direction: column; gap: 8px; padding: 8px 0; }
   .topbar { padding: 16px; }
   .content { padding: 16px 12px; }
-  .welcome-card { padding: 18px 14px; }
+  .card { padding: 18px 14px; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .auth-card { padding: 28px 22px; }
   .cal-grid-layout,
