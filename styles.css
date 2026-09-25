@@ -812,7 +812,7 @@ body.cal-page {
   .col-action { width: 36px; text-align: center; }
 }
 
-.cc-add-form { display: flex; gap: 10px; align-items: flex-end; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.cc-add-form { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; padding-top: 14px; border-top: 1px solid var(--line); flex-wrap: nowrap; }
 
 .cc-add-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; flex: 1; }
 
@@ -829,16 +829,6 @@ body.cal-page {
     &::after { content: '%'; position: absolute; right: 9px; font-size: var(--text-sm); color: var(--ink-soft); pointer-events: none; }
     input { padding-right: 22px; }
   }
-}
-
-.compare-pickers {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-  .picker { display: flex; align-items: center; gap: 8px; }
-  label { font-family: var(--font-serif); font-weight: 600; font-size: var(--text-base); color: var(--ink-soft); }
 }
 
 .card {
