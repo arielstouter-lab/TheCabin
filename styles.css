@@ -957,9 +957,8 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .user-card { flex-direction: column; gap: 8px; padding: 8px 0; }
   .topbar { padding: 16px; }
   .content { padding: 16px 12px; }
-  .card { padding: 18px 14px; }
   .dashboard-grid { grid-template-columns: 1fr; }
-  .card { padding: 28px 22px; }
+  .card { padding: 20px 16px; }
   .cal-grid-layout,
   .cl-grid { grid-template-columns: minmax(0, 1fr); width: 100%; }
   .card-head { flex-wrap: wrap; gap: 6px; }
