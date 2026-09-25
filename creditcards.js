@@ -647,7 +647,7 @@
 
         container.hidden = false;
         container.innerHTML = `
-          <div class="best-combo-card">
+          <div class="card">
             <div class="combo-info">
               <span class="combo-tag">Top 2-Card Combination</span>
               <div class="combo-title">${escapeHtml(combo.cardA.name)} + ${escapeHtml(combo.cardB.name)}</div>
