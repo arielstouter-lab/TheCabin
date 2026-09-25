@@ -321,7 +321,7 @@ select { cursor: pointer; }
 
 .card-sub { font-size: var(--text-xs); color: var(--ink-soft); text-align: right; line-height: 1.4; }
 
-.card-body { padding: 16px; display: flex }
+.card-body { padding: 16px; }
 
 .card-search { padding: 10px 14px 4px; }
 
