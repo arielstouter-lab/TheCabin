@@ -470,7 +470,7 @@ select {
     margin-bottom: 20px;
 }
 
-.card-head {
+.panel-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -479,25 +479,25 @@ select {
     gap: 10px;
 }
 
-.card-title {
+.panel-title {
     font-family: var(--font-serif), serif;
     font-weight: 600;
     font-size: 18px;
     margin: 0;
 }
 
-.card-sub {
+.panel-sub {
     font-size: 11.5px;
     color: var(--ink-soft);
     text-align: right;
     line-height: 1.4;
 }
 
-.card-body {
+.panel-body {
     padding: 16px;
 }
 
-.card-search {
+.panel-search {
     padding: 10px 14px 4px;
 }
 
@@ -1853,12 +1853,12 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
         width: 100%;
     }
 
-    .card-head {
+    .panel-head {
         flex-wrap: wrap;
         gap: 6px;
     }
 
-    .card-sub {
+    .panel-sub {
         text-align: left;
     }
 
