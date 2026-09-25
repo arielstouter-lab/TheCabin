@@ -295,8 +295,11 @@ select { cursor: pointer; }
 
 /* 4. CARD FAMILY — 9 blocks collapsed into 2 shared shapes (elevated / inset) */
 .card,
-/*.card-row,*/
-/*.summary-card,*/
+.card-row,
+.summary-card,
+.best-combo-card,
+.auth-card,
+.rental-tax-row,
 .toast { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); }
 
 .cl-ticket,
@@ -441,7 +444,7 @@ select { cursor: pointer; }
 
 .auth-container { width: 100%; max-width: 420px; }
 
-.card { padding: 40px; box-shadow: var(--shadow); }
+.auth-card { padding: 40px; box-shadow: var(--shadow); }
 
 .brand {
   display: flex;
@@ -845,7 +848,7 @@ body.cal-page {
   label { font-family: var(--font-serif); font-weight: 600; font-size: var(--text-base); color: var(--ink-soft); }
 }
 
-.card {
+.rental-tax-row {
   margin-top: 14px;
   padding: 12px 14px;
   gap: 12px;
@@ -863,28 +866,28 @@ body.cal-page {
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 18px; }
 
-/*.summary-card {*/
-/*  padding: 14px 16px;*/
-/*  display: flex;*/
-/*  flex-direction: column;*/
-/*  &.best,*/
-/*  &.surplus { background: var(--success-card); border-color: var(--primary); }*/
-/*  &.surplus .value { color: var(--primary); }*/
-/*  &.deficit {*/
-/*    background: var(--danger-bg);*/
-/*    border-color: var(--danger);*/
-/*    .value { color: var(--danger); }*/
-/*  }*/
-/*  .label { font-size: var(--text-sm); font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; }*/
-/*  .value { font-family: var(--font-serif); font-size: var(--text-2xl); font-weight: 700; color: var(--ink); margin: 6px 0; }*/
-/*  .foot { font-size: var(--text-xs); color: var(--ink-soft); line-height: 1.4; margin-top: auto; }*/
-/*}*/
+.summary-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  &.best,
+  &.surplus { background: var(--success-card); border-color: var(--primary); }
+  &.surplus .value { color: var(--primary); }
+  &.deficit {
+    background: var(--danger-bg);
+    border-color: var(--danger);
+    .value { color: var(--danger); }
+  }
+  .label { font-size: var(--text-sm); font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; }
+  .value { font-family: var(--font-serif); font-size: var(--text-2xl); font-weight: 700; color: var(--ink); margin: 6px 0; }
+  .foot { font-size: var(--text-xs); color: var(--ink-soft); line-height: 1.4; margin-top: auto; }
+}
 
 #bestComboContainer { margin-bottom: 16px; }
 
 #compareTableWrap { margin-top: 16px; }
 
-.card {
+.best-combo-card {
   border-color: var(--primary);
   background: var(--success-card);
   padding: 14px 18px;
@@ -975,7 +978,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .content { padding: 16px 12px; }
   .card { padding: 18px 14px; }
   .dashboard-grid { grid-template-columns: 1fr; }
-  .card { padding: 28px 22px; }
+  .auth-card { padding: 28px 22px; }
   .cal-grid-layout,
   .cl-grid { grid-template-columns: minmax(0, 1fr); width: 100%; }
   .card-head { flex-wrap: wrap; gap: 6px; }
@@ -983,7 +986,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm
   .cl-panel-actions .button { flex: 1 1 auto; font-size: var(--text-base); padding: 0 12px; }
   .cc-add-form { flex-direction: column; align-items: stretch; }
   .cc-add-form .button-inline { width: 100%; text-align: center; }
-  .card { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .card .combo-value-wrap { text-align: left; width: 100%; display: flex; flex-direction: column; align-items: flex-start; }
+  .best-combo-card { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .best-combo-card .combo-value-wrap { text-align: left; width: 100%; display: flex; flex-direction: column; align-items: flex-start; }
   .toast-container { bottom: 16px; right: 16px; left: 16px; width: auto; max-width: none; }
 }

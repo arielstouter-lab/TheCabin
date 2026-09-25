@@ -450,7 +450,7 @@ select {
 .panel,
 .welcome-card,
 .card-row,
-.card,
+.rental-tax-row,
 .summary-card {
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -458,7 +458,7 @@ select {
 
 .panel,
 .card-row,
-.card {
+.rental-tax-row {
     background: var(--card);
 }
 
@@ -857,7 +857,7 @@ select {
     max-width: 420px;
 }
 
-.card {
+.auth-card {
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: 16px;
@@ -1418,7 +1418,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     color: var(--ink-soft);
 }
 
-.card {
+.rental-tax-row {
     margin-top: 14px;
     padding: 12px 14px;
     background: var(--card);
@@ -1426,15 +1426,15 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     align-items: center;
 }
 
-.card .num-wrap {
+.rental-tax-row .num-wrap {
     width: 130px;
 }
 
-.card .num-wrap.pct {
+.rental-tax-row .num-wrap.pct {
     width: 95px;
 }
 
-.card .tax-val {
+.rental-tax-row .tax-val {
     font-weight: 600;
     color: var(--ink);
     white-space: nowrap;
@@ -1577,7 +1577,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     margin-top: 16px;
 }
 
-.card {
+.best-combo-card {
     background: var(--success-card);
     border: 1px solid var(--primary);
     border-radius: var(--radius);
@@ -1589,12 +1589,12 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     flex-wrap: wrap;
 }
 
-.card .combo-info {
+.best-combo-card .combo-info {
     flex: 1;
     min-width: 220px;
 }
 
-.card .combo-tag {
+.best-combo-card .combo-tag {
     display: inline-block;
     font-size: 11px;
     font-weight: 700;
@@ -1604,7 +1604,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     margin-bottom: 4px;
 }
 
-.card .combo-title {
+.best-combo-card .combo-title {
     font-family: var(--font-serif);
     font-size: 18px;
     font-weight: 700;
@@ -1612,17 +1612,17 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     margin-bottom: 4px;
 }
 
-.card .combo-sub {
+.best-combo-card .combo-sub {
     font-size: 12px;
     color: var(--ink-soft);
     line-height: 1.4;
 }
 
-.card .combo-value-wrap {
+.best-combo-card .combo-value-wrap {
     text-align: right;
 }
 
-.card .combo-value {
+.best-combo-card .combo-value {
     font-family: var(--font-serif);
     font-size: 24px;
     font-weight: 700;
@@ -1630,13 +1630,13 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
     line-height: 1.1;
 }
 
-.card .combo-unit {
+.best-combo-card .combo-unit {
     font-size: 13px;
     color: var(--ink-soft);
     font-weight: 500;
 }
 
-.card .combo-value-sub {
+.best-combo-card .combo-value-sub {
     font-size: 12px;
     color: var(--ink-soft);
     font-weight: 500;
@@ -1843,7 +1843,7 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
         grid-template-columns: 1fr;
     }
 
-    .card {
+    .auth-card {
         padding: 28px 22px;
     }
 
@@ -1878,13 +1878,13 @@ body.cal-page[data-season="winter"] { background-color: var(--card); }
         text-align: center;
     }
 
-    .card {
+    .best-combo-card {
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
     }
 
-    .card .combo-value-wrap {
+    .best-combo-card .combo-value-wrap {
         text-align: left;
         width: 100%;
         display: flex;
