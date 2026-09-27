@@ -432,8 +432,10 @@
                   <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
                 </div>
                 <div class="note-cell">
-                  <span class="form-note note-editable" contenteditable="true" data-field="notes" placeholder="Notes" value="${escapeHtml(recipe.notes || '')}" data-recipe-notes="${recipe.id}" />
-                  <span class="form-note note-editable" contenteditable="true" data-field="notes" placeholder="URL" value="${escapeHtml(recipe.url || '')}" data-recipe-url="${recipe.id}" />
+                  <span class="form-note note-editable" contenteditable="true" data-field="notes" placeholder="Notes" value="${escapeHtml(recipe.notes || '')}" data-recipe-notes="${recipe.id}" </span>
+                  <button type="button" class="icon-edit-note" title="Edit note">📝</button>
+                  <span class="form-note note-editable" contenteditable="true" data-field="notes" placeholder="URL" value="${escapeHtml(recipe.url || '')}" data-recipe-url="${recipe.id}" </span>
+                  <button type="button" class="icon-edit-note" title="Edit note">📝</button>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                   ${ingredientsHtml}
