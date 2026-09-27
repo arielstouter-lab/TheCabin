@@ -430,10 +430,11 @@
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
                   <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--primary); font-family: 'Fraunces', serif;">${escapeHtml(recipe.name)}</h3>
                   <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
+                </div>
                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
                   <input type="text" class="text-input form-note" placeholder="Notes" value="${escapeHtml(recipe.notes || '')}" data-recipe-notes="${recipe.id}" />
                   <input type="text" class="text-input form-note" placeholder="URL" value="${escapeHtml(recipe.url || '')}" data-recipe-url="${recipe.id}" />
-                </div>` : ''}
+                </div>
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                   ${ingredientsHtml}
                 </div>
