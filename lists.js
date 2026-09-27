@@ -430,7 +430,10 @@
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
                   <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--primary); font-family: 'Fraunces', serif;">${escapeHtml(recipe.name)}</h3>
                   <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
-                </div>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                  <input type="text" class="text-input form-note" placeholder="Notes" value="${escapeHtml(recipe.notes || '')}" data-recipe-notes="${recipe.id}" />
+                  <input type="text" class="text-input form-note" placeholder="URL" value="${escapeHtml(recipe.url || '')}" data-recipe-url="${recipe.id}" />
+                </div>` : ''}
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                   ${ingredientsHtml}
                 </div>
@@ -813,7 +816,7 @@
         }
     });
 
-    document.getElementById('lst-panel').addEventListener('change', async (e) => {
+document.getElementById('lst-panel').addEventListener('change', async (e) => {
         if(e.target.matches('[data-toggle-check]')){
             const id = e.target.getAttribute('data-toggle-check');
             const checked = e.target.checked;
@@ -824,6 +827,28 @@
                     await sb.from('household_list_items').update({checked}).eq('id', id);
                 } catch(err){ setStatus('Could not update item.'); }
             }
+        }
+
+        if(e.target.matches('[data-recipe-notes]')){
+            const id = e.target.getAttribute('data-recipe-notes');
+            const notes = e.target.value.trim();
+            const recipe = recipes.find(r => String(r.id) === String(id));
+            if(recipe) recipe.notes = notes;
+            try{
+                await sb.from('household_recipes').update({notes}).eq('id', id);
+            } catch(err){ setStatus('Could not update notes.'); }
+            return;
+        }
+
+        if(e.target.matches('[data-recipe-url]')){
+            const id = e.target.getAttribute('data-recipe-url');
+            const url = e.target.value.trim();
+            const recipe = recipes.find(r => String(r.id) === String(id));
+            if(recipe) recipe.url = url;
+            try{
+                await sb.from('household_recipes').update({url}).eq('id', id);
+            } catch(err){ setStatus('Could not update URL.'); }
+            return;
         }
     });
 
