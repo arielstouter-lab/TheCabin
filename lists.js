@@ -431,9 +431,9 @@
                   <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--primary); font-family: 'Fraunces', serif;">${escapeHtml(recipe.name)}</h3>
                   <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                  <input type="text" class="text-input form-note" placeholder="Notes" value="${escapeHtml(recipe.notes || '')}" data-recipe-notes="${recipe.id}" />
-                  <input type="text" class="text-input form-note" placeholder="URL" value="${escapeHtml(recipe.url || '')}" data-recipe-url="${recipe.id}" />
+                <div class="note-cell">
+                  <span class="form-note note-editable" contenteditable="true" data-field="notes" placeholder="Notes" value="${escapeHtml(recipe.notes || '')}" data-recipe-notes="${recipe.id}" />
+                  <span class="form-note note-editable" contenteditable="true" data-field="notes" placeholder="URL" value="${escapeHtml(recipe.url || '')}" data-recipe-url="${recipe.id}" />
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                   ${ingredientsHtml}
