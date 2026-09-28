@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thecabin-v1';
+const CACHE_NAME = 'thecabin-v2';
 const STATIC_ASSETS = [
   './',
   'index.html',
@@ -13,7 +13,12 @@ const STATIC_ASSETS = [
   'app.js',
   'calendar.js',
   'chores.js',
-  'lists.js',
+  'lists/lists.js',
+    'lists/lists-dom.js',
+    'lists/lists-panel.js',
+    'lists/lists-pantry.js',
+    'lists/lists-recipes.js',
+    'lists/lists-state.js',
   'managegroceries.js',
   'weather.js',
   'config.js',

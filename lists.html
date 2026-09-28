@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
-    <script src="lists.js" defer></script>
+    <script type="module" src="Lists/lists.js" defer></script>
 </head>
 
 <body class="app-page">
@@ -36,6 +36,134 @@
             </div>
             <div class="card" id="lst-panel"></div>
         </section>
+
+            <!-- ============ Tabs ============ -->
+            <template id="tpl-tab">
+                <button type="button" class="tab">
+                    <span data-ref="label"></span>
+                </button>
+            </template>
+
+            <!-- ============ Shared small pieces ============ -->
+            <template id="tpl-empty">
+                <p class="empty-state"></p>
+            </template>
+
+            <template id="tpl-chip">
+                <span class="lst-chip"></span>
+            </template>
+
+            <template id="tpl-manage-link">
+                <a href="managegroceries.html" class="button-inline">Manage groceries</a>
+            </template>
+
+            <template id="tpl-delete-tab">
+                <button type="button" class="icon-delete" title="Remove tab">✕</button>
+            </template>
+
+            <!-- ============ Groceries / custom tabs (lists-panel.js) ============ -->
+            <template id="tpl-list-panel">
+                <div class="card-head" data-ref="head">
+                    <h2 class="card-title" data-ref="title"></h2>
+                </div>
+                <div class="lst-items" data-ref="items"></div>
+                <div class="lst-add-item">
+                    <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
+                    <div class="lst-add-row2">
+                        <select data-ref="newPerson">
+                            <option value="">Unassigned</option>
+                        </select>
+                        <input type="date" placeholder="Date" data-ref="newDue" />
+                        <label class="lst-priority-toggle">
+                            <input type="checkbox" data-ref="newPriority" /> High priority
+                        </label>
+                        <button class="button-inline" data-ref="addBtn">Add</button>
+                    </div>
+                </div>
+            </template>
+
+            <template id="tpl-list-item">
+                <div class="lst-item draggable-item" draggable="true">
+                    <div class="lst-item-top">
+                        <span class="drag-handle" title="Drag to reorder" data-ref="handle">⋮⋮</span>
+                        <label class="lst-check-label">
+                            <input type="checkbox" data-ref="checkbox" />
+                            <span class="lst-item-text" data-ref="text"></span>
+                        </label>
+                        <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+                    </div>
+                    <div class="lst-item-meta" data-ref="meta"></div>
+                </div>
+            </template>
+
+            <!-- ============ Pantry (lists-pantry.js) ============ -->
+            <template id="tpl-pantry-panel">
+                <div class="card-head">
+                    <h2 class="card-title" data-ref="title"></h2>
+                </div>
+                <div class="lst-items" data-ref="items"></div>
+                <div class="lst-add-item">
+                    <input type="text" class="text-input" placeholder="Add a pantry item" data-ref="newText" />
+                    <div class="lst-add-row2">
+                        <div class="stepper">
+                            <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="newQtyDown">−</button>
+                            <span class="stepper-val" data-ref="newQtyVal">1</span>
+                            <button type="button" class="stepper-btn" title="Increase quantity" data-ref="newQtyUp">+</button>
+                        </div>
+                        <button class="button-inline" data-ref="addBtn">Add</button>
+                    </div>
+                </div>
+            </template>
+
+            <template id="tpl-pantry-item">
+                <div class="lst-item lst-item-row">
+                    <span class="lst-item-text" data-ref="text"></span>
+                    <div class="lst-actions">
+                        <div class="stepper">
+                            <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="qtyDown">−</button>
+                            <span class="stepper-val" data-ref="qtyVal"></span>
+                            <button type="button" class="stepper-btn" title="Increase quantity" data-ref="qtyUp">+</button>
+                        </div>
+                        <button type="button" class="button-inline" data-ref="addToGroceries">Add to groceries</button>
+                        <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+                    </div>
+                </div>
+            </template>
+
+            <!-- ============ Recipes (lists-recipes.js) ============ -->
+            <template id="tpl-recipes-panel">
+                <div class="card-head">
+                    <h2 class="card-title" data-ref="title"></h2>
+                </div>
+                <div class="recipe-search-row">
+                    <input type="text" class="text-input" placeholder="Search recipes or ingredients..." data-ref="search" />
+                </div>
+                <div class="lst-items" data-ref="list"></div>
+            </template>
+
+            <template id="tpl-recipe-card">
+                <div class="lst-panel">
+                    <div class="card-head">
+                        <div class="card-title" data-ref="name"></div>
+                        <div class="note-cell" style="white-space: wrap">
+                            <span class="form-note note-editable" contenteditable="true" data-placeholder="Notes" data-ref="notes"></span>
+                            <button type="button" class="icon-edit-note" title="Edit notes" data-ref="editNotes">📝</button>
+                            <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-ref="url"></span>
+                            <button type="button" class="icon-edit-note" title="Edit URL" data-ref="editUrl">📝</button>
+                            <a class="recipe-url-link" target="_blank" rel="noopener noreferrer" title="Open link" hidden data-ref="urlLink">↗</a>
+                        </div>
+                        <button type="button" class="button-inline" data-ref="addAll">Add full recipe</button>
+                    </div>
+                    <div class="recipe-ingredients" data-ref="ingredients"></div>
+                </div>
+            </template>
+
+            <template id="tpl-recipe-ingredient">
+                <div class="lst-item lst-item-row">
+                    <span class="lst-item-text" data-ref="text"></span>
+                    <button type="button" class="button-inline" data-ref="addBtn">Add to groceries</button>
+                </div>
+            </template>
     </main>
 </div>
 </body>
