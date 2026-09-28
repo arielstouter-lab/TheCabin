@@ -49,8 +49,25 @@ export const isGroceries = sec => !!sec && sec.name === 'Groceries';
 
 // Hash slug for a tab: "groceries", "pantry", "recipes", or the section id
 // for user-created tabs (their names can be renamed/duplicated).
+function slugify(text){
+    return String(text || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'tab';
+}
+
 export function sectionSlug(sec){
-    return isPermanent(sec) ? sec.name.toLowerCase() : sec.id;
+    if(isPermanent(sec)) return sec.name.toLowerCase();
+
+    const base = slugify(sec.name);
+    const dupes = state.sections.filter(s => !isPermanent(s) && slugify(s.name) === base);
+    if(dupes.length <= 1) return base;
+
+    // Two custom tabs share a name — keep the slug stable per tab by
+    // only disambiguating the later ones (creation order via created_at).
+    const idx = dupes.findIndex(s => s.id === sec.id);
+    return idx === 0 ? base : `${base}-${sec.id.slice(0, 6)}`;
 }
 
 export function findSectionBySlug(slug){

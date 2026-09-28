@@ -74,7 +74,7 @@ document.getElementById('lst-add-section').addEventListener('click', async () =>
         state.sections.push(data);
         state.itemsBySection[data.id] = [];
         input.value = '';
-        location.hash = data.id; // custom tabs are keyed by id, not name
+        location.hash = sectionSlug(data); // custom tabs are keyed by id, not name
     } catch(e){
         setStatus('Could not add tab.');
     }
