@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Lists</title>
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../head-loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../config.js" defer></script>
+    <script src="../app.js" defer></script>
+    <script src="lists.js" defer></script>
+</head>
+
+<body class="app-page">
+<div class="app-shell">
+    <main class="main-content">
+        <a href="../app.html" class="brand-link">
+            <div class="brand-mark"></div>
+        </a>
+
+        <header class="topbar">
+            <div class="text-center">
+                <h1>Lists</h1>
+                <p>Groceries, pantry, errands, etc.</p>
+            </div>
+        </header>
+
+        <section class="content">
+            <div class="add-item">
+                <label for="lst-new-section-name" class="visually-hidden">New tab</label>
+                <input type="text" id="lst-new-section-name" class="text-input" placeholder="New tab, e.g. Errands" />
+                <button class="button-inline" id="lst-add-section">Add tab</button>
+            </div>
+
+            <!-- ============ Tabs ============ -->
+            <template id="tpl-tab">
+                <button type="button" class="tab">
+                    <span data-ref="label"></span>
+                </button>
+            </template>
+
+            <!-- ============ Shared small pieces ============ -->
+            <template id="tpl-empty">
+                <p class="empty-state"></p>
+            </template>
+
+            <template id="tpl-chip">
+                <span class="lst-chip"></span>
+            </template>
+
+            <template id="tpl-manage-link">
+                <a href="../managegroceries.html" class="button-inline">Manage groceries</a>
+            </template>
+
+            <template id="tpl-delete-tab">
+                <button type="button" class="icon-delete" title="Remove tab">✕</button>
+            </template>
+
+            <!-- ============ Groceries / custom tabs (lists-panel.js) ============ -->
+            <template id="tpl-list-panel">
+                <div class="card-head" data-ref="head">
+                    <h2 class="card-title" data-ref="title"></h2>
+                </div>
+                <div class="lst-items" data-ref="items"></div>
+                <div class="lst-add-item">
+                    <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
+                    <div class="lst-add-row2">
+                        <select data-ref="newPerson">
+                            <option value="">Unassigned</option>
+                        </select>
+                        <input type="date" placeholder="Date" data-ref="newDue" />
+                        <label class="lst-priority-toggle">
+                            <input type="checkbox" data-ref="newPriority" /> High priority
+                        </label>
+                        <button class="button-inline" data-ref="addBtn">Add</button>
+                    </div>
+                </div>
+            </template>
+
+            <template id="tpl-list-item">
+                <div class="lst-item draggable-item" draggable="true">
+                    <div class="lst-item-top">
+                        <span class="drag-handle" title="Drag to reorder" data-ref="handle">⋮⋮</span>
+                        <label class="lst-check-label">
+                            <input type="checkbox" data-ref="checkbox" />
+                            <span class="lst-item-text" data-ref="text"></span>
+                        </label>
+                        <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+                    </div>
+                    <div class="lst-item-meta" data-ref="meta"></div>
+                </div>
+            </template>
+
+            <!-- ============ Pantry (lists-pantry.js) ============ -->
+            <template id="tpl-pantry-panel">
+                <div class="card-head">
+                    <h2 class="card-title" data-ref="title"></h2>
+                </div>
+                <div class="lst-items" data-ref="items"></div>
+                <div class="lst-add-item">
+                    <input type="text" class="text-input" placeholder="Add a pantry item" data-ref="newText" />
+                    <div class="lst-add-row2">
+                        <div class="stepper">
+                            <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="newQtyDown">−</button>
+                            <span class="stepper-val" data-ref="newQtyVal">1</span>
+                            <button type="button" class="stepper-btn" title="Increase quantity" data-ref="newQtyUp">+</button>
+                        </div>
+                        <button class="button-inline" data-ref="addBtn">Add</button>
+                    </div>
+                </div>
+            </template>
+
+            <template id="tpl-pantry-item">
+                <div class="lst-item lst-item-row">
+                    <span class="lst-item-text" data-ref="text"></span>
+                    <div class="lst-actions">
+                        <div class="stepper">
+                            <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="qtyDown">−</button>
+                            <span class="stepper-val" data-ref="qtyVal"></span>
+                            <button type="button" class="stepper-btn" title="Increase quantity" data-ref="qtyUp">+</button>
+                        </div>
+                        <button type="button" class="button-inline" data-ref="addToGroceries">Add to groceries</button>
+                        <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+                    </div>
+                </div>
+            </template>
+
+            <!-- ============ Recipes (lists-recipes.js) ============ -->
+            <template id="tpl-recipes-panel">
+                <div class="card-head">
+                    <h2 class="card-title" data-ref="title"></h2>
+                </div>
+                <div class="recipe-search-row">
+                    <input type="text" class="text-input" placeholder="Search recipes or ingredients..." data-ref="search" />
+                </div>
+                <div class="lst-items" data-ref="list"></div>
+            </template>
+
+            <template id="tpl-recipe-card">
+                <div class="lst-item recipe-card">
+                    <div class="recipe-card-head">
+                        <h3 class="recipe-name" data-ref="name"></h3>
+                        <button type="button" class="button-inline" data-ref="addAll">Add full recipe</button>
+                    </div>
+                    <div class="note-cell">
+                        <span class="form-note note-editable" contenteditable="true" data-placeholder="Notes" data-ref="notes"></span>
+                        <button type="button" class="icon-edit-note" title="Edit notes" data-ref="editNotes">📝</button>
+                    </div>
+                    <div class="note-cell">
+                        <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-ref="url"></span>
+                        <button type="button" class="icon-edit-note" title="Edit URL" data-ref="editUrl">📝</button>
+                        <a class="recipe-url-link" target="_blank" rel="noopener noreferrer" title="Open link" hidden data-ref="urlLink">↗</a>
+                    </div>
+                    <div class="recipe-ingredients" data-ref="ingredients"></div>
+                </div>
+            </template>
+
+            <template id="tpl-recipe-ingredient">
+                <div class="lst-item-row recipe-ingredient-row">
+                    <span class="lst-item-text" data-ref="text"></span>
+                    <button type="button" class="button-inline" data-ref="addBtn">Add to groceries</button>
+                </div>
+            </template>
+        </section>
+    </main>
+</div>
+</body>
+</html>
+
+<!--
+  Paste the <template> blocks below wherever you want inside <body>
+  (they render nothing themselves). Keep your existing #lst-tabs,
+  #lst-panel, #lst-add-section and #lst-new-section-name elements —
+  main.js still looks them up by those ids.
+
+  Load the modules as a module script, after those elements exist and
+  after supabaseClient / todayStr / groceryKey / groceryKeysMatch /
+  initDragAndDrop / initAppPage / setStatus are defined on window:
+
+    <script type="module" src="lists/main.js"></script>
+
+  main.js, state.js, dom.js, lists-panel.js, lists-pantry.js and
+  lists-recipes.js all need to sit together in the same folder (they
+  import each other by relative path).
+-->
+<!--
+  ============ CSS ============
+  Replaces the inline styles that used to be built in JS. Add to your
+  stylesheet (or a <style> tag) — adjust colors/fonts to match the rest
+  of the page; var(--primary) and var(--line) are assumed to already
+  exist since the old inline styles used them too.
+-->
+<style>
+    .recipe-card{ padding: 12px; margin-bottom: 12px; }
+
+    .recipe-card-head{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .recipe-name{
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--primary);
+        font-family: 'Fraunces', serif;
+    }
+
+    .recipe-search-row{ padding: 10px 14px 4px; }
+    .recipe-search-row .text-input{ width: 100%; }
+
+    .recipe-ingredient-row{
+        padding: 4px 0;
+        border-top: 1px solid var(--line);
+    }
+
+    .recipe-ingredients .empty-state{
+        padding: 4px 0;
+        font-size: 12px;
+    }
+
+    #lst-panel .note-cell{
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    #lst-panel .note-cell .form-note{
+        flex: 1 1 0;
+        min-width: 0;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+    }
+
+    #lst-panel .note-cell .icon-edit-note,
+    #lst-panel .note-cell .recipe-url-link{
+        flex: 0 0 auto;
+    }
+
+    .recipe-url-link{ color: var(--primary); text-decoration: underline; }
+    .recipe-url-link[hidden]{ display: none; }
+</style>
