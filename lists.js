@@ -419,26 +419,26 @@
         const recipesHtml = filtered.length ? filtered.map(recipe => {
             const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
             const ingredientsHtml = ingredients.length ? ingredients.map(ingredients => `
-              <div class="lst-item-row" style="padding: 4px 0; border-top: 1px solid var(--line);">
+              <div class="lst-item-row">
                 <span class="lst-item-text">${escapeHtml(ingredients)}</span>
                 <button type="button" class="button-inline" data-add-recipe-ingredient="${escapeHtml(ingredients)}">Add to groceries</button>
               </div>
-    `).join('') : '<p class="empty-state" style="padding: 4px 0; font-size: 12px;">No ingredients listed.</p>';
+    `).join('') : '<p class="empty-state">No ingredients listed.</p>';
 
             return `
-              <div class="lst-item" style="padding: 12px; margin-bottom: 12px;">
+              <div class="lst-item">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
                   <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--primary); font-family: 'Fraunces', serif;">${escapeHtml(recipe.name)}</h3>
                   <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
                 </div>
-                <div class="note-cell">
+                <div class="note-cell" style="white-space: wrap">
                   <span class="form-note note-editable" contenteditable="true" data-placeholder="Notes" data-recipe-notes="${recipe.id}">${escapeHtml(recipe.notes || '')}</span>
                   <button type="button" class="icon-edit-note" data-edit-note title="Edit notes">📝</button>
                   <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-recipe-url="${recipe.id}">${escapeHtml(recipe.url || '')}</span>
                   <button type="button" class="icon-edit-note" data-edit-note title="Edit URL">📝</button>
                   <a class="recipe-url-link" data-url-link="${recipe.id}" href="${escapeHtml(recipe.url)}" target="_blank" rel="noopener noreferrer" title="Open link" ${recipe.url ? '' : 'hidden'}>↗</a>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div>
                   ${ingredientsHtml}
                 </div>
               </div>`;
@@ -448,7 +448,7 @@
             <div class="card-head">
               <h2 class="card-title">${escapeHtml(sec.name)}</h2>
             </div>
-            <div style="padding: 10px 14px 4px;">
+            <div>
               <input type="text" class="text-input" placeholder="Search recipes or ingredients..." id="lst-recipe-search" value="${escapeHtml(recipeSearchQuery)}" style="width: 100%;" />
             </div>
             <div class="lst-items" id="lst-recipe-list">${recipesHtml}</div>`;
