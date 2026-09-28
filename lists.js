@@ -428,14 +428,16 @@
             return `
               <div class="lst-panel">
                 <div>
-                  <h3>${escapeHtml(recipe.name)}</h3>
+                  <div class="card-title">${escapeHtml(recipe.name)}</div>
                   <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
                 </div>
-                <div class="note-cell" style="white-space: wrap">
-                  <span class="form-note note-editable" contenteditable="true" data-placeholder="Notes" data-recipe-notes="${recipe.id}">${escapeHtml(recipe.notes || '')}</span>
-                  <button type="button" class="icon-edit-note" data-edit-note title="Edit notes">📝</button>
-                  <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-recipe-url="${recipe.id}">${escapeHtml(recipe.url || '')}</span>
-                  <button type="button" class="icon-edit-note" data-edit-note title="Edit URL">📝</button>
+                <div class="lst-item-row">
+                  <div class="note-cell" style="white-space: wrap">
+                    <span class="form-note note-editable" contenteditable="true" data-placeholder="Notes" data-recipe-notes="${recipe.id}">${escapeHtml(recipe.notes || '')}</span>
+                    <button type="button" class="icon-edit-note" data-edit-note title="Edit notes">📝</button>
+                    <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-recipe-url="${recipe.id}">${escapeHtml(recipe.url || '')}</span>
+                    <button type="button" class="icon-edit-note" data-edit-note title="Edit URL">📝</button>
+                  </div>
                   <a class="recipe-url-link" data-url-link="${recipe.id}" href="${escapeHtml(recipe.url)}" target="_blank" rel="noopener noreferrer" title="Open link" ${recipe.url ? '' : 'hidden'}>↗</a>
                 </div>
                 <div class="lst-items">
