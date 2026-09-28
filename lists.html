@@ -31,9 +31,11 @@
                 <button class="button-inline" id="lst-add-section">Add tab</button>
             </div>
 
-            <div class="lst-tabs" id="lst-tabs"></div>
+            <div class="tabs-container" id="lst-tabs">
 
-            <div class="lst-panel-card" id="lst-panel"></div>
+            </div>
+            <div class="card" id="lst-panel"></div>
+        </section>
 
             <!-- ============ Tabs ============ -->
             <template id="tpl-tab">
@@ -140,112 +142,29 @@
             </template>
 
             <template id="tpl-recipe-card">
-                <div class="lst-item recipe-card">
-                    <div class="recipe-card-head">
-                        <h3 class="recipe-name" data-ref="name"></h3>
+                <div class="lst-panel">
+                    <div class="card-head">
+                        <div class="card-title" data-ref="name"></div>
+                        <div class="note-cell" style="white-space: wrap">
+                            <span class="form-note note-editable" contenteditable="true" data-placeholder="Notes" data-ref="notes"></span>
+                            <button type="button" class="icon-edit-note" title="Edit notes" data-ref="editNotes">📝</button>
+                            <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-ref="url"></span>
+                            <button type="button" class="icon-edit-note" title="Edit URL" data-ref="editUrl">📝</button>
+                            <a class="recipe-url-link" target="_blank" rel="noopener noreferrer" title="Open link" hidden data-ref="urlLink">↗</a>
+                        </div>
                         <button type="button" class="button-inline" data-ref="addAll">Add full recipe</button>
-                    </div>
-                    <div class="note-cell">
-                        <span class="form-note note-editable" contenteditable="true" data-placeholder="Notes" data-ref="notes"></span>
-                        <button type="button" class="icon-edit-note" title="Edit notes" data-ref="editNotes">📝</button>
-                    </div>
-                    <div class="note-cell">
-                        <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-ref="url"></span>
-                        <button type="button" class="icon-edit-note" title="Edit URL" data-ref="editUrl">📝</button>
-                        <a class="recipe-url-link" target="_blank" rel="noopener noreferrer" title="Open link" hidden data-ref="urlLink">↗</a>
                     </div>
                     <div class="recipe-ingredients" data-ref="ingredients"></div>
                 </div>
             </template>
 
             <template id="tpl-recipe-ingredient">
-                <div class="lst-item-row recipe-ingredient-row">
+                <div class="lst-item lst-item-row">
                     <span class="lst-item-text" data-ref="text"></span>
                     <button type="button" class="button-inline" data-ref="addBtn">Add to groceries</button>
                 </div>
             </template>
-        </section>
     </main>
 </div>
 </body>
 </html>
-
-<!--
-  Paste the <template> blocks below wherever you want inside <body>
-  (they render nothing themselves). Keep your existing #lst-tabs,
-  #lst-panel, #lst-add-section and #lst-new-section-name elements —
-  main.js still looks them up by those ids.
-
-  Load the modules as a module script, after those elements exist and
-  after supabaseClient / todayStr / groceryKey / groceryKeysMatch /
-  initDragAndDrop / initAppPage / setStatus are defined on window:
-
-    <script type="module" src="lists/main.js"></script>
-
-  main.js, state.js, dom.js, lists-panel.js, lists-pantry.js and
-  lists-recipes.js all need to sit together in the same folder (they
-  import each other by relative path).
--->
-<!--
-  ============ CSS ============
-  Replaces the inline styles that used to be built in JS. Add to your
-  stylesheet (or a <style> tag) — adjust colors/fonts to match the rest
-  of the page; var(--primary) and var(--line) are assumed to already
-  exist since the old inline styles used them too.
--->
-<style>
-    .recipe-card{ padding: 12px; margin-bottom: 12px; }
-
-    .recipe-card-head{
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 8px;
-    }
-
-    .recipe-name{
-        margin: 0;
-        font-size: 15px;
-        font-weight: 600;
-        color: var(--primary);
-        font-family: 'Fraunces', serif;
-    }
-
-    .recipe-search-row{ padding: 10px 14px 4px; }
-    .recipe-search-row .text-input{ width: 100%; }
-
-    .recipe-ingredient-row{
-        padding: 4px 0;
-        border-top: 1px solid var(--line);
-    }
-
-    .recipe-ingredients .empty-state{
-        padding: 4px 0;
-        font-size: 12px;
-    }
-
-    #lst-panel .note-cell{
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        margin-bottom: 8px;
-    }
-
-    #lst-panel .note-cell .form-note{
-        flex: 1 1 0;
-        min-width: 0;
-        white-space: normal;
-        overflow: visible;
-        text-overflow: clip;
-        overflow-wrap: anywhere;
-    }
-
-    #lst-panel .note-cell .icon-edit-note,
-    #lst-panel .note-cell .recipe-url-link{
-        flex: 0 0 auto;
-    }
-
-    .recipe-url-link{ color: var(--primary); text-decoration: underline; }
-    .recipe-url-link[hidden]{ display: none; }
-</style>
