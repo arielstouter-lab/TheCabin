@@ -5,7 +5,7 @@ const STATIC_ASSETS = [
   'app.html',
   'calendar.html',
   'chores.html',
-  'lists/lists.html',
+  'lists.html',
   'managegroceries.html',
   'weather.html',
   'styles.css',
