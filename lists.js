@@ -432,10 +432,10 @@
                   <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
                 </div>
                 <div class="note-cell">
-                  <span class="form-note note-editable" contenteditable="true" data-field="notes" placeholder="Notes" value="${escapeHtml(recipe.notes || '')}" data-recipe-notes="${recipe.id}" </span>
-                  <button type="button" class="icon-edit-note" title="Edit note">📝</button>
-                  <span class="form-note note-editable" contenteditable="true" data-field="notes" placeholder="URL" value="${escapeHtml(recipe.url || '')}" data-recipe-url="${recipe.id}" </span>
-                  <button type="button" class="icon-edit-note" title="Edit note">📝</button>
+                  <span class="form-note note-editable" contenteditable="true" data-placeholder="Notes" data-recipe-notes="${recipe.id}">${escapeHtml(recipe.notes || '')}</span>
+                  <button type="button" class="icon-edit-note" data-edit-note title="Edit notes">📝</button>
+                  <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-recipe-url="${recipe.id}">${escapeHtml(recipe.url || '')}</span>
+                  <button type="button" class="icon-edit-note" data-edit-note title="Edit URL">📝</button>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                   ${ingredientsHtml}
@@ -662,6 +662,12 @@
             return;
         }
 
+        if(t.matches('[data-edit-note]')){
+            const field = t.previousElementSibling;
+            if(field) field.focus();
+            return;
+        }
+
         if(t.matches('[data-add-recipe-all]')){
             const recipeId = t.getAttribute('data-add-recipe-all');
             const recipe = recipes.find(r => String(r.id) === String(recipeId));
@@ -831,28 +837,26 @@ document.getElementById('lst-panel').addEventListener('change', async (e) => {
                 } catch(err){ setStatus('Could not update item.'); }
             }
         }
+    });
 
-        if(e.target.matches('[data-recipe-notes]')){
-            const id = e.target.getAttribute('data-recipe-notes');
-            const notes = e.target.value.trim();
-            const recipe = recipes.find(r => String(r.id) === String(id));
-            if(recipe) recipe.notes = notes;
-            try{
-                await sb.from('household_recipes').update({notes}).eq('id', id);
-            } catch(err){ setStatus('Could not update notes.'); }
-            return;
-        }
+    document.getElementById('lst-panel').addEventListener('focusout', async (e) => {
+        const t = e.target;
+        if(!t.matches || !(t.matches('[data-recipe-notes]') || t.matches('[data-recipe-url]'))) return;
 
-        if(e.target.matches('[data-recipe-url]')){
-            const id = e.target.getAttribute('data-recipe-url');
-            const url = e.target.value.trim();
-            const recipe = recipes.find(r => String(r.id) === String(id));
-            if(recipe) recipe.url = url;
-            try{
-                await sb.from('household_recipes').update({url}).eq('id', id);
-            } catch(err){ setStatus('Could not update URL.'); }
-            return;
-        }
+        const isNotes = t.matches('[data-recipe-notes]');
+        const field = isNotes ? 'notes' : 'url';
+        const id = t.getAttribute(isNotes ? 'data-recipe-notes' : 'data-recipe-url');
+        const value = t.textContent.trim();
+
+        const recipe = recipes.find(r => String(r.id) === String(id));
+        if(!recipe || (recipe[field] || '') === value) return;
+
+        recipe[field] = value;
+        saveToLocalCache();
+        try{
+            const { error } = await sb.from('household_recipes').update({ [field]: value }).eq('id', id);
+            if(error) throw error;
+        } catch(err){ setStatus(`Could not update ${field}.`); }
     });
 
     document.getElementById('lst-panel').addEventListener('keydown', (e) => {
@@ -867,6 +871,9 @@ document.getElementById('lst-panel').addEventListener('change', async (e) => {
             const btn = document.querySelector('[data-add-pantry-item]');
             if(btn) btn.click();
         }
+        if(e.key === 'Enter' && e.target.matches('[data-recipe-notes], [data-recipe-url]')){
+            e.preventDefault();
+            e.target.blur(); }
     });
 
     const panelEl = document.getElementById('lst-panel');
