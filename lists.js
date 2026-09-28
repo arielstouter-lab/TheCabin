@@ -419,16 +419,16 @@
         const recipesHtml = filtered.length ? filtered.map(recipe => {
             const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
             const ingredientsHtml = ingredients.length ? ingredients.map(ingredients => `
-              <div class="lst-item">
+              <div class="lst-item lst-item-row">
                 <span class="lst-item-text">${escapeHtml(ingredients)}</span>
                 <button type="button" class="button-inline" data-add-recipe-ingredient="${escapeHtml(ingredients)}">Add to groceries</button>
               </div>
     `).join('') : '<p class="empty-state">No ingredients listed.</p>';
 
             return `
-              <div class="lst-item">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
-                  <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--primary); font-family: 'Fraunces', serif;">${escapeHtml(recipe.name)}</h3>
+              <div class="lst-panel">
+                <div>
+                  <h3>${escapeHtml(recipe.name)}</h3>
                   <button type="button" class="button-inline" data-add-recipe-all="${recipe.id}">Add full recipe</button>
                 </div>
                 <div class="note-cell" style="white-space: wrap">
@@ -438,7 +438,7 @@
                   <button type="button" class="icon-edit-note" data-edit-note title="Edit URL">📝</button>
                   <a class="recipe-url-link" data-url-link="${recipe.id}" href="${escapeHtml(recipe.url)}" target="_blank" rel="noopener noreferrer" title="Open link" ${recipe.url ? '' : 'hidden'}>↗</a>
                 </div>
-                <div class="lst-item-row">
+                <div class="lst-items">
                   ${ingredientsHtml}
                 </div>
               </div>`;
