@@ -1,8 +1,8 @@
 // Recipes panel: searchable card list. Each card has an editable notes field
 // and an editable URL field with a small "open link" anchor kept in sync.
 
-import { state, sb, saveToLocalCache, requestRender, addIngredientsToGroceries } from './state.js';
-import { cloneFragment, cloneEl, refs, emptyState, focusAtEnd } from './dom.js';
+import { state, sb, saveToLocalCache, requestRender, addIngredientsToGroceries } from './lists-state.js';
+import { cloneFragment, cloneEl, refs, emptyState, focusAtEnd } from './lists-dom.js';
 
 let recipeSearchQuery = '';
 
