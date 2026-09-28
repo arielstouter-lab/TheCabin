@@ -436,6 +436,7 @@
                   <button type="button" class="icon-edit-note" data-edit-note title="Edit notes">📝</button>
                   <span class="form-note note-editable" contenteditable="true" data-placeholder="URL" data-recipe-url="${recipe.id}">${escapeHtml(recipe.url || '')}</span>
                   <button type="button" class="icon-edit-note" data-edit-note title="Edit URL">📝</button>
+                  <a class="recipe-url-link" data-url-link="${recipe.id}" href="${escapeHtml(recipe.url)}" target="_blank" rel="noopener noreferrer" title="Open link" ${recipe.url ? '' : 'hidden'}>↗</a>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                   ${ingredientsHtml}
@@ -857,6 +858,13 @@ document.getElementById('lst-panel').addEventListener('change', async (e) => {
             const { error } = await sb.from('household_recipes').update({ [field]: value }).eq('id', id);
             if(error) throw error;
         } catch(err){ setStatus(`Could not update ${field}.`); }
+        if(!isNotes){
+            const link = document.querySelector(`[data-url-link="${id}"]`);
+            if(link){
+                link.href = normalizeUrl(value);
+                link.hidden = !value;
+            }
+        }
     });
 
     document.getElementById('lst-panel').addEventListener('keydown', (e) => {
