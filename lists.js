@@ -438,7 +438,7 @@
                   <button type="button" class="icon-edit-note" data-edit-note title="Edit URL">📝</button>
                   <a class="recipe-url-link" data-url-link="${recipe.id}" href="${escapeHtml(recipe.url)}" target="_blank" rel="noopener noreferrer" title="Open link" ${recipe.url ? '' : 'hidden'}>↗</a>
                 </div>
-                <div>
+                <div class="cc-add-form">
                   ${ingredientsHtml}
                 </div>
               </div>`;
