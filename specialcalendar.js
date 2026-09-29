@@ -59,6 +59,8 @@
 
             oHistory = data || [];
 
+            console.log('O data:', data);
+
             updateOPanel();
 
         } catch (err) {
@@ -184,10 +186,10 @@
         }
 
         document.getElementById('o-days-since').textContent =
-            daysSince;
+            String(daysSince);
 
         document.getElementById('o-longest-gap').textContent =
-            longestGap;
+            String(longestGap);
     }
 
     document.getElementById('cal-prev').addEventListener('click', () => {
