@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
-    <script src="creditcards.js" defer></script>
+    <script type="module" src="creditcards.js"></script>
 </head>
 <body class="app-page">
 <div class="app-shell">
@@ -25,7 +25,7 @@
 
         <section class="content">
             <div class="tabs-container" id="cc-tabs">
-                <button type="button" class="tab active" data-tab="budget">
+                <button type="button" class="tab" data-tab="budget">
                     <span>Budget</span>
                 </button>
                 <button type="button" class="tab" data-tab="comparison">
@@ -226,7 +226,7 @@
                             <table class="cc-table">
                                 <thead>
                                 <tr>
-                                    <th class ="min-col">Card</th>
+                                    <th class="min-col">Card</th>
                                     <th class="col-num min-col">Annual Fee</th>
                                     <th class="col-num min-col">Base Rate</th>
                                     <th class="col-action min-col"></th>
@@ -263,8 +263,8 @@
                             <table class="cc-table">
                                 <thead>
                                 <tr>
-                                    <th class ="min-col">Card</th>
-                                    <th class ="min-col">Category</th>
+                                    <th class="min-col">Card</th>
+                                    <th class="min-col">Category</th>
                                     <th class="col-num min-col">Reward Rate</th>
                                     <th class="col-num min-col">Special Refund</th>
                                     <th class="col-action min-col"></th>
@@ -301,7 +301,6 @@
                         <span class="card-sub">Rental Property</span>
                     </div>
                     <div class="card-body">
-                        <!-- Top: One editable monthly income (rent) -->
                         <div class="cc-add-form">
                             <div class="picker">
                                 <label for="sanJacintoRentInput">Monthly Income (Rent)</label>
@@ -311,12 +310,11 @@
                             </div>
                         </div>
 
-                        <!-- Entries for expenses that can be added or removed -->
                         <div class="table-wrap">
                             <table class="cc-table">
                                 <thead>
                                 <tr>
-                                    <th class ="min-col">Category</th>
+                                    <th class="min-col">Category</th>
                                     <th class="min-col">Frequency</th>
                                     <th class="col-num min-col">Amount</th>
                                     <th class="min-col">Notes</th>
@@ -346,7 +344,6 @@
                             <button class="button-inline" id="sanJacintoAddCategoryBtn">Add expense</button>
                         </div>
 
-                        <!-- Taxes line right above summary -->
                         <div class="cc-add-form" id="sanJacintoTaxRow">
                             <div class="picker">
                                 <label>Rent</label>
@@ -385,7 +382,6 @@
                             </div>
                         </div>
 
-                        <!-- Profit totaled at the bottom -->
                         <div id="sanJacintoProfitSummary" class="summary-grid"></div>
                     </div>
                 </div>
@@ -396,7 +392,6 @@
                         <span class="card-sub">Rental Property</span>
                     </div>
                     <div class="card-body">
-                        <!-- Top: One editable monthly income (rent) -->
                         <div class="cc-add-form">
                             <div class="picker">
                                 <label for="countyLineRentInput">Monthly Income (Rent)</label>
@@ -406,7 +401,6 @@
                             </div>
                         </div>
 
-                        <!-- Entries for expenses that can be added or removed -->
                         <div class="table-wrap">
                             <table class="cc-table">
                                 <thead>
@@ -441,7 +435,6 @@
                             <button class="button-inline" id="countyLineAddCategoryBtn">Add expense</button>
                         </div>
 
-                        <!-- Taxes line right above summary -->
                         <div class="cc-add-form" id="countyLineTaxRow">
                             <div class="picker">
                                 <label>Rent</label>
@@ -480,11 +473,122 @@
                             </div>
                         </div>
 
-                        <!-- Profit totaled at the bottom -->
                         <div id="countyLineProfitSummary" class="summary-grid"></div>
                     </div>
                 </div>
             </div>
+
+            <!-- ============ Templates ============ -->
+            <!-- Shared components (also used by other pages that import
+                 category-row.js / summary-card.js) -->
+            <template id="tpl-category-row">
+                <tr>
+                    <td><input type="text" class="text-input" data-ref="name" /></td>
+                    <td><select class="text-input" data-ref="frequency"></select></td>
+                    <td class="col-num">
+                        <div class="num-wrap money">
+                            <input type="number" class="text-input" min="0" step="any" data-ref="amount" />
+                        </div>
+                    </td>
+                    <td>
+                        <div class="note-cell">
+                            <span class="form-note note-editable" contenteditable="true" data-ref="notes"></span>
+                            <button type="button" class="icon-edit-note" title="Edit note" data-ref="editNote">📝</button>
+                        </div>
+                    </td>
+                    <td class="col-num" data-ref="monthly"></td>
+                    <td class="col-action">
+                        <button type="button" class="icon-delete" title="Delete" data-ref="delBtn">✕</button>
+                    </td>
+                </tr>
+            </template>
+
+            <template id="tpl-summary-card">
+                <div class="summary-card">
+                    <div class="label" data-ref="label"></div>
+                    <div class="value">
+                        <span data-ref="value"></span><span class="combo-unit" data-ref="unit"></span>
+                    </div>
+                    <div class="foot" data-ref="foot"></div>
+                </div>
+            </template>
+
+            <!-- Page-specific: cards, rewards, rental income, comparison -->
+            <template id="tpl-card-row">
+                <tr>
+                    <td><input type="text" class="text-input" data-ref="name" /></td>
+                    <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" data-ref="fee" /></div></td>
+                    <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" data-ref="rate" /></div></td>
+                    <td class="col-action"><button type="button" class="icon-delete" title="Delete card" data-ref="delBtn">✕</button></td>
+                </tr>
+            </template>
+
+            <template id="tpl-reward-row">
+                <tr>
+                    <td><select class="text-input" data-ref="card"></select></td>
+                    <td><input type="text" class="text-input" data-ref="category" /></td>
+                    <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" data-ref="rate" /></div></td>
+                    <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" data-ref="refund" /></div></td>
+                    <td class="col-action"><button type="button" class="icon-delete" title="Delete row" data-ref="delBtn">✕</button></td>
+                </tr>
+            </template>
+
+            <template id="tpl-rental-income-row">
+                <tr class="rental-income-row">
+                    <td>
+                        <span class="rental-prop-title" data-ref="propName"></span>
+                        <span class="chip form-note" data-ref="chip"></span>
+                    </td>
+                    <td><span class="card-sub">Monthly</span></td>
+                    <td class="col-num" data-ref="profit1"></td>
+                    <td><span class="form-note">Rental Net</span></td>
+                    <td class="col-num" data-ref="profit2"></td>
+                    <td class="col-action"><span class="icon-locked" title="Calculated from Rentals tab — non-editable">🔒</span></td>
+                </tr>
+            </template>
+
+            <template id="tpl-compare-row">
+                <tr>
+                    <td data-ref="category"></td>
+                    <td class="col-num" data-ref="spend"></td>
+                    <td class="col-num" data-ref="cellA"></td>
+                    <td class="col-num" data-ref="cellB"></td>
+                    <td data-ref="winner"></td>
+                </tr>
+            </template>
+
+            <template id="tpl-compare-cell">
+                <span>
+                    <span data-ref="rate"></span>
+                    <span aria-hidden="true"> &rarr; </span>
+                    <span data-ref="reward"></span>
+                    <span class="empty-state" data-ref="note" hidden></span>
+                </span>
+            </template>
+
+            <template id="tpl-winner-cell">
+                <span>
+                    <span data-ref="name"></span>
+                    <span class="badge" data-ref="badge" hidden></span>
+                </span>
+            </template>
+
+            <template id="tpl-best-combo-card">
+                <div class="best-combo-card">
+                    <div>
+                        <span class="combo-tag">Top 2-Card Combination</span>
+                        <div class="combo-title" data-ref="title"></div>
+                        <div class="combo-sub" data-ref="sub"></div>
+                    </div>
+                    <div class="combo-value-wrap">
+                        <div class="combo-value">
+                            <span data-ref="value"></span><span class="combo-unit">/mo net</span>
+                        </div>
+                        <div class="combo-value-sub" data-ref="valueSub"></div>
+                        <button type="button" class="button-inline" data-ref="loadBtn">Compare this pair</button>
+                    </div>
+                </div>
+            </template>
         </section>
     </main>
 </div>
