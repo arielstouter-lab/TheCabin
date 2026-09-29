@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   'calendar.js',
   'chores.js',
   'creditcards.js',
+  'dom.js',
   'category-row.js',
   'summary-card.js',
   'lists/lists.js',
