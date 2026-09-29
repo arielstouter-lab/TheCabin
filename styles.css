@@ -480,6 +480,11 @@ select { cursor: pointer; }
   &:hover { background: var(--line); }
 }
 
+.cal-overlay-btn {
+  background: transparent;
+  border: none;
+}
+
 .cal-month-label { font-weight: 600; font-size: var(--text-md); min-width: 120px; text-align: center; }
 
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
