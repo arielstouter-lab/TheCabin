@@ -274,6 +274,8 @@
         renderGrid();
         renderEventsPanel();
 
+        console.log('overlay clicked');
+
     });
 
     window.addEventListener('beforeunload', () => {
