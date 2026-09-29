@@ -258,7 +258,7 @@
 
     document.addEventListener('click', e => {
 
-        const btn = e.target.closest('.overlay-btn');
+        const btn = e.target.closest('.cal-overlay-btn');
         if (!btn) return;
 
         const layer = btn.dataset.layer;
