@@ -69,9 +69,9 @@
 
                     <div id="moon-panel" class="card-head hidden">
 
-                        <h2>Moon Statistics</h2>
+                        <h2 class="card-title">Moon Statistics</h2>
                         <div class="card-body">
-                            <label>
+                            <label class="lst-item lst-item-row">
                                 Calculate using:
                                 <select id="moon-lookback">
                                     <option value="3">Last 3 Months</option>
@@ -82,26 +82,24 @@
                                 </select>
                             </label>
 
-                            <p>Average Length: <span id="moon-avg-length">--</span></p>
-
-                            <p>Average Between Starts: <span id="moon-avg-between">--</span></p>
-
-                            <p>Next Estimated Start: <span id="moon-next-1">--</span></p>
-
-                            <p>Following Estimated Start: <span id="moon-next-2">--</span></p>
+                            <p class="lst-item lst-item-row">Average Length: <span id="moon-avg-length">--</span></p>
+                            <p class="lst-item lst-item-row">Average Between Starts: <span id="moon-avg-between">--</span></p>
+                            <p class="lst-item lst-item-row">Next Estimated Start: <span id="moon-next-1">--</span></p>
+                            <p class="lst-item lst-item-row">Following Estimated Start: <span id="moon-next-2">--</span></p>
                         </div>
                     </div>
 
                     <div id="o-panel" class="card-head hidden">
-                        <h2>Denial Statistics</h2>
+                        <h2 class="card-title">Denial Statistics</h2>
                         <div class="card-body">
-                            Days Since Last:
-                            <span id="o-days-since">--</span>
-                        </div>
-
-                        <div>
-                            Longest Denial Period:
-                            <span id="o-longest-gap">--</span>
+                            <div class="lst-item lst-item-row">
+                                Days Since Last:
+                                <span id="o-days-since">--</span>
+                            </div>
+                            <div class="lst-item lst-item-row">
+                                Longest Denial Period:
+                                <span id="o-longest-gap">--</span>
+                            </div>
                         </div>
                     </div>
                 </div>
