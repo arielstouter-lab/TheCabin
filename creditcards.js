@@ -1,4 +1,4 @@
-import { cloneEl, refs, focusAtEnd } from './dom.js';
+import { cloneEl, refs } from './dom.js';
 import { buildCategoryRow } from './category-row.js';
 import { renderSummaryCards } from './summary-card.js';
 
@@ -8,7 +8,6 @@ const CARDS_TABLE = 'credit_cards';
 const REWARDS_TABLE = 'card_rewards';
 const TAX_TABLE = 'income_tax';
 
-// Categories Table Columns
 const COL_CAT_ID = 'id';
 const COL_CAT_CATEGORY = 'category';
 const COL_CAT_FREQUENCY = 'frequency';
@@ -20,15 +19,11 @@ const COL_CAT_PROPERTY = 'property';
 const COL_CAT_NOTES = 'notes';
 const COL_CAT_CREATED_AT = 'created_at';
 
-// Credit Cards Table Columns
 const COL_CARD_ID = 'id';
 const COL_CARD_CREATED_AT = 'created_at';
-
-// Card Rewards Table Columns
 const COL_REWARD_ID = 'id';
 const COL_REWARD_CREATED_AT = 'created_at';
 
-// Income Tax Table Columns
 const COL_TAX_ID = 'id';
 const COL_TAX_STREAM = 'income_stream';
 const COL_TAX_RATE = 'tax_rate';
@@ -37,13 +32,13 @@ const COL_TAX_MORTGAGE_INTEREST = 'mortgage_interest';
 
 const RENTAL_PROPERTIES = ['San Jacinto', 'County Line'];
 
-let spendRows = [];       // {id, category, frequency, amount, monthly_spend, account_type: 'credit_cards', type: 'spending'}
-let bankSpendRows = [];   // {id, category, frequency, amount, monthly_spend, account_type: 'bank', type: 'spending'}
-let incomeRows = [];      // {id, category, frequency, amount, monthly_spend, account_type: 'income', type: 'income'}
-let rentalRows = [];      // {id, property, category, frequency, amount, monthly_spend, account_type: 'rental', type: 'income'|'spending'}
-let cardsRows = [];       // {id, name, annual_fee, base_rate}
-let rewardRows = [];      // {id, card_id, category, rate, special_refund}
-let taxRows = [];         // {id, income_stream, tax_rate, depreciation, mortgage_interest}
+// Unified store for every row in income_expense_categories — credit card
+// spend, bank spend, income, and rental (income + spending) all live here,
+// distinguished by account_type/type/property. Replaces four parallel arrays.
+let categoryRows = [];
+let cardsRows = [];
+let rewardRows = [];
+let taxRows = [];
 
 let realtimeChannel = null;
 let realtimeDebounceTimer = null;
@@ -57,24 +52,178 @@ function fmt$(n) {
 
 function computeMonthlySpend(amount, frequency) {
     const val = parseFloat(amount) || 0;
-    const freq = String(frequency || 'monthly').toLowerCase();
-    switch (freq) {
-        case 'semimonthly':
-            return val * 2;
-        case 'biweekly':
-            return (val * 26) / 12;
-        case 'annual':
-            return val / 12;
-        case 'monthly':
-        default:
-            return val;
+    switch (String(frequency || 'monthly').toLowerCase()) {
+        case 'semimonthly': return val * 2;
+        case 'biweekly': return (val * 26) / 12;
+        case 'annual': return val / 12;
+        default: return val;
     }
+}
+
+// -------------------------------------------------------------------
+// Unified category-row normalization + derived views
+// -------------------------------------------------------------------
+function normalizeCategoryRow(r) {
+    const frequency = r[COL_CAT_FREQUENCY] || 'monthly';
+    const amount = r[COL_CAT_AMOUNT] !== undefined && r[COL_CAT_AMOUNT] !== null ? r[COL_CAT_AMOUNT] : (r[COL_CAT_MONTHLY_SPEND] ?? 0);
+    const monthly_spend = parseFloat(r[COL_CAT_MONTHLY_SPEND] ?? r.monthly_spend ?? amount) || 0;
+    const notes = r[COL_CAT_NOTES] || '';
+
+    const acc = String(r[COL_CAT_ACCOUNT_TYPE] || '').toLowerCase();
+    const flow = String(r[COL_CAT_TYPE] || '').toLowerCase();
+    const isRental = acc === 'rental' || acc === 'rentals' || Boolean(r[COL_CAT_PROPERTY]);
+
+    if (isRental) {
+        const property = r[COL_CAT_PROPERTY] || 'San Jacinto';
+        const isIncome = flow === 'income' || (r[COL_CAT_CATEGORY] && r[COL_CAT_CATEGORY].trim().toLowerCase() === 'rent');
+        return { ...r, property, category: r[COL_CAT_CATEGORY] || (isIncome ? 'Rent' : 'Expense'), frequency, amount, notes, monthly_spend, account_type: 'rental', type: isIncome ? 'income' : 'spending' };
+    }
+    if (acc === 'income' || flow === 'income') {
+        return { ...r, category: r[COL_CAT_CATEGORY] || '', frequency, amount, notes, monthly_spend, account_type: 'income', type: 'income' };
+    }
+    if (acc === 'bank') {
+        return { ...r, category: r[COL_CAT_CATEGORY] || '', frequency, amount, notes, monthly_spend, account_type: 'bank', type: 'spending' };
+    }
+    return { ...r, category: r[COL_CAT_CATEGORY] || '', frequency, amount, notes, monthly_spend, account_type: 'credit_cards', type: 'spending' };
+}
+
+const spendRows = () => categoryRows.filter(r => r.account_type === 'credit_cards');
+const bankSpendRows = () => categoryRows.filter(r => r.account_type === 'bank');
+const incomeRows = () => categoryRows.filter(r => r.account_type === 'income');
+const getRentalIncomeRow = property => categoryRows.find(r => r.account_type === 'rental' && r.property === property && r.type === 'income');
+const getRentalExpenseRows = property => categoryRows.filter(r => r.account_type === 'rental' && r.property === property && r.type === 'spending');
+
+// -------------------------------------------------------------------
+// Generic category-row CRUD — one add/update/delete for spend, bank
+// spend, income, and rental rows (previously four near-identical sets).
+// -------------------------------------------------------------------
+async function addCategoryRow(fields, tag) {
+    if (!sb) return false;
+    const frequency = fields.frequency || 'monthly';
+    const amount = fields.amount || 0;
+    const monthly_spend = computeMonthlySpend(amount, frequency);
+    const payload = {
+        [COL_CAT_CATEGORY]: fields.category,
+        [COL_CAT_FREQUENCY]: frequency,
+        [COL_CAT_AMOUNT]: amount,
+        [COL_CAT_NOTES]: fields.notes || '',
+        [COL_CAT_MONTHLY_SPEND]: monthly_spend,
+        [COL_CAT_ACCOUNT_TYPE]: tag.account_type,
+        [COL_CAT_TYPE]: tag.type,
+        ...(tag.property ? { [COL_CAT_PROPERTY]: tag.property } : {})
+    };
+    try {
+        const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
+        if (error) throw error;
+        if (inserted) {
+            categoryRows.push(normalizeCategoryRow(inserted));
+            render();
+        }
+        if (window.setStatus) window.setStatus(tag.addedMessage || 'Added.');
+        return true;
+    } catch (err) {
+        console.error('Could not add row:', err);
+        if (window.setStatus) window.setStatus('Could not add: ' + (err.message || err));
+        return false;
+    }
+}
+
+async function updateCategoryRow(id, patch) {
+    if (!sb) return false;
+    try {
+        const row = categoryRows.find(r => r.id === id);
+        if (row) {
+            Object.assign(row, patch);
+            row.monthly_spend = computeMonthlySpend(row.amount, row.frequency);
+        }
+        render();
+        const payload = { ...patch };
+        if (row) {
+            payload[COL_CAT_FREQUENCY] = row.frequency;
+            payload[COL_CAT_AMOUNT] = row.amount;
+            payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
+            if (row.notes !== undefined) payload[COL_CAT_NOTES] = row.notes;
+        }
+        const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error('Could not update row:', err);
+        if (window.setStatus) window.setStatus('Could not update.');
+        return false;
+    }
+}
+
+async function deleteCategoryRow(id, message) {
+    if (!sb) return false;
+    try {
+        const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
+        if (error) throw error;
+        categoryRows = categoryRows.filter(r => r.id !== id);
+        render();
+        if (window.setStatus) window.setStatus(message || 'Deleted.');
+        return true;
+    } catch (err) {
+        console.error('Could not delete row:', err);
+        if (window.setStatus) window.setStatus('Could not delete.');
+        return false;
+    }
+}
+
+async function setRentalRent(propertyName, rentAmount) {
+    const val = parseFloat(rentAmount) || 0;
+    const existing = getRentalIncomeRow(propertyName);
+    const ok = existing
+        ? await updateCategoryRow(existing.id, { amount: val })
+        : await addCategoryRow({ category: 'Rent', frequency: 'monthly', amount: val, notes: '' }, { account_type: 'rental', type: 'income', property: propertyName });
+    if (ok) { if (window.setStatus) window.setStatus(`Updated rent for ${propertyName}.`); }
+}
+
+// -------------------------------------------------------------------
+// Add-form wiring — one helper for the five "name, frequency, amount,
+// notes" forms (credit card / bank / income / two rental expense forms),
+// replacing five near-identical click handlers.
+// -------------------------------------------------------------------
+function wireAddForm({ buttonId, fieldIds, requiredMessage, onAdd }) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return null;
+    const els = {
+        category: document.getElementById(fieldIds.category),
+        frequency: document.getElementById(fieldIds.frequency),
+        amount: document.getElementById(fieldIds.amount),
+        notes: document.getElementById(fieldIds.notes)
+    };
+
+    function submit() {
+        const value = {
+            category: els.category ? els.category.value.trim() : '',
+            frequency: els.frequency ? (els.frequency.value || 'monthly') : 'monthly',
+            amount: els.amount ? (parseFloat(els.amount.value) || 0) : 0,
+            notes: els.notes ? els.notes.value.trim() : ''
+        };
+        if (!value.category) {
+            if (window.setStatus) window.setStatus(requiredMessage);
+            return;
+        }
+        onAdd(value);
+        if (els.category) els.category.value = '';
+        if (els.amount) els.amount.value = '';
+        if (els.notes) els.notes.value = '';
+        if (els.frequency) els.frequency.value = 'monthly';
+        if (els.category) els.category.focus();
+    }
+
+    btn.addEventListener('click', submit);
+    [els.category, els.amount, els.notes].forEach(el => {
+        if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    });
+
+    return btn;
 }
 
 // -------------------------------------------------------------------
 // Row builders (page-specific — cards, rewards, rental income, compare)
 // -------------------------------------------------------------------
-
 function buildCardRow(row, { onUpdate, onDelete }) {
     const tr = cloneEl('tpl-card-row');
     const r = refs(tr);
@@ -142,7 +291,6 @@ function buildRentalIncomeRow(property, profit) {
     return tr;
 }
 
-// eff: { rate, refund, isDefault, none }
 function buildCompareCell(eff, reward) {
     const cell = cloneEl('tpl-compare-cell');
     const r = refs(cell);
@@ -224,20 +372,16 @@ function buildBestComboCard(combo, onLoad) {
 // Rental Helpers
 // -------------------------------------------------------------------
 function getRentalRent(propertyName) {
-    const rentRow = rentalRows.find(r => r.property === propertyName && r.type === 'income');
-    return rentRow ? (rentRow.monthly_spend || 0) : 0;
-}
-
-function getRentalExpenses(propertyName) {
-    return rentalRows.filter(r => r.property === propertyName && r.type === 'spending');
+    const row = getRentalIncomeRow(propertyName);
+    return row ? (row.monthly_spend || 0) : 0;
 }
 
 function getRentalOperatingExpenses(propertyName) {
-    return getRentalExpenses(propertyName).reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    return getRentalExpenseRows(propertyName).reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
 }
 
 function getRentalMortgage(propertyName) {
-    return getRentalExpenses(propertyName)
+    return getRentalExpenseRows(propertyName)
         .filter(r => (r.category || '').trim().toLowerCase() === 'mortgage')
         .reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
 }
@@ -292,13 +436,14 @@ function renderSpendGrid() {
     const empty = document.getElementById('spendGridEmpty');
     if (!body) return;
 
+    const rows = spendRows();
     body.replaceChildren();
-    if (empty) empty.hidden = spendRows.length > 0;
+    if (empty) empty.hidden = rows.length > 0;
 
-    spendRows.forEach(row => {
+    rows.forEach(row => {
         body.append(buildCategoryRow(row, {
             onUpdate: updateCategoryRow,
-            onDelete: deleteCategoryRow,
+            onDelete: id => deleteCategoryRow(id, 'Deleted category.'),
             deleteTitle: 'Delete category',
             fmt$
         }));
@@ -313,13 +458,14 @@ function renderBankSpendGrid() {
     const empty = document.getElementById('bankSpendGridEmpty');
     if (!body) return;
 
+    const rows = bankSpendRows();
     body.replaceChildren();
-    if (empty) empty.hidden = bankSpendRows.length > 0;
+    if (empty) empty.hidden = rows.length > 0;
 
-    bankSpendRows.forEach(row => {
+    rows.forEach(row => {
         body.append(buildCategoryRow(row, {
-            onUpdate: updateBankSpendRow,
-            onDelete: deleteBankSpendRow,
+            onUpdate: updateCategoryRow,
+            onDelete: id => deleteCategoryRow(id, 'Deleted bank expense.'),
             deleteTitle: 'Delete expense',
             fmt$
         }));
@@ -334,14 +480,14 @@ function renderIncomeGrid() {
     const empty = document.getElementById('incomeGridEmpty');
     if (!body) return;
 
+    const rows = incomeRows();
     body.replaceChildren();
-    const totalSources = incomeRows.length + RENTAL_PROPERTIES.length;
-    if (empty) empty.hidden = totalSources > 0;
+    if (empty) empty.hidden = (rows.length + RENTAL_PROPERTIES.length) > 0;
 
-    incomeRows.forEach(row => {
+    rows.forEach(row => {
         body.append(buildCategoryRow(row, {
-            onUpdate: updateIncomeRow,
-            onDelete: deleteIncomeRow,
+            onUpdate: updateCategoryRow,
+            onDelete: id => deleteCategoryRow(id, 'Deleted income source.'),
             deleteTitle: 'Delete income source',
             fmt$
         }));
@@ -359,19 +505,15 @@ function renderBalanceSummary() {
     const container = document.getElementById('balanceSummaryGrid');
     if (!container) return;
 
-    const totalCcSpend = spendRows.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const totalBankSpend = bankSpendRows.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const spend = spendRows(), bank = bankSpendRows(), income = incomeRows();
+    const totalCcSpend = spend.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const totalBankSpend = bank.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
     const totalSpending = totalCcSpend + totalBankSpend;
 
-    const regularIncome = incomeRows.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const regularIncome = income.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
     const rentalProfits = RENTAL_PROPERTIES.reduce((sum, prop) => sum + getRentalProfit(prop), 0);
     const totalIncome = regularIncome + rentalProfits;
-
     const netBalance = totalIncome - totalSpending;
-
-    const annualIncome = totalIncome * 12;
-    const annualSpending = totalSpending * 12;
-    const annualBalance = netBalance * 12;
 
     const isSurplus = netBalance >= 0;
     const statusClass = isSurplus ? 'surplus' : 'deficit';
@@ -381,18 +523,18 @@ function renderBalanceSummary() {
         {
             label: 'Total Income',
             value: fmt$(totalIncome),
-            foot: `${fmt$(annualIncome)}/yr &middot; across ${incomeRows.length} source${incomeRows.length === 1 ? '' : 's'} + ${RENTAL_PROPERTIES.length} rental${RENTAL_PROPERTIES.length === 1 ? '' : 's'}`
+            foot: `${fmt$(totalIncome * 12)}/yr &middot; across ${income.length} source${income.length === 1 ? '' : 's'} + ${RENTAL_PROPERTIES.length} rental${RENTAL_PROPERTIES.length === 1 ? '' : 's'}`
         },
         {
             label: 'Total Spending',
             value: fmt$(totalSpending),
-            foot: `CC: ${fmt$(totalCcSpend)}/mo &middot; Bank: ${fmt$(totalBankSpend)}/mo &middot; ${fmt$(annualSpending)}/yr`
+            foot: `CC: ${fmt$(totalCcSpend)}/mo &middot; Bank: ${fmt$(totalBankSpend)}/mo &middot; ${fmt$(totalSpending * 12)}/yr`
         },
         {
             label: `Net Balance (${statusText})`,
             value: fmt$(netBalance),
             statusClass,
-            foot: `Income (${fmt$(totalIncome)}) &minus; Spending (${fmt$(totalSpending)}) = ${fmt$(netBalance)}/mo (${fmt$(annualBalance)}/yr)`
+            foot: `Income (${fmt$(totalIncome)}) &minus; Spending (${fmt$(totalSpending)}) = ${fmt$(netBalance)}/mo (${fmt$(netBalance * 12)}/yr)`
         }
     ]);
 }
@@ -402,52 +544,34 @@ function renderBalanceSummary() {
 // -------------------------------------------------------------------
 function renderRentals() {
     renderPropertySection('San Jacinto', {
-        rentInputId: 'sanJacintoRentInput',
-        spendGridBodyId: 'sanJacintoSpendGridBody',
-        spendGridEmptyId: 'sanJacintoSpendGridEmpty',
-        profitSummaryId: 'sanJacintoProfitSummary',
-        taxRentId: 'sanJacintoTaxRent',
-        taxExpensesId: 'sanJacintoTaxExpenses',
-        depreciationInputId: 'sanJacintoDepreciation',
-        mortgageInterestInputId: 'sanJacintoMortgageInterest',
-        taxRateInputId: 'sanJacintoTaxRate',
-        taxSumId: 'sanJacintoTaxSum'
+        rentInputId: 'sanJacintoRentInput', spendGridBodyId: 'sanJacintoSpendGridBody', spendGridEmptyId: 'sanJacintoSpendGridEmpty',
+        profitSummaryId: 'sanJacintoProfitSummary', taxRentId: 'sanJacintoTaxRent', taxExpensesId: 'sanJacintoTaxExpenses',
+        depreciationInputId: 'sanJacintoDepreciation', mortgageInterestInputId: 'sanJacintoMortgageInterest', taxRateInputId: 'sanJacintoTaxRate', taxSumId: 'sanJacintoTaxSum'
     });
-
     renderPropertySection('County Line', {
-        rentInputId: 'countyLineRentInput',
-        spendGridBodyId: 'countyLineSpendGridBody',
-        spendGridEmptyId: 'countyLineSpendGridEmpty',
-        profitSummaryId: 'countyLineProfitSummary',
-        taxRentId: 'countyLineTaxRent',
-        taxExpensesId: 'countyLineTaxExpenses',
-        depreciationInputId: 'countyLineDepreciation',
-        mortgageInterestInputId: 'countyLineMortgageInterest',
-        taxRateInputId: 'countyLineTaxRate',
-        taxSumId: 'countyLineTaxSum'
+        rentInputId: 'countyLineRentInput', spendGridBodyId: 'countyLineSpendGridBody', spendGridEmptyId: 'countyLineSpendGridEmpty',
+        profitSummaryId: 'countyLineProfitSummary', taxRentId: 'countyLineTaxRent', taxExpensesId: 'countyLineTaxExpenses',
+        depreciationInputId: 'countyLineDepreciation', mortgageInterestInputId: 'countyLineMortgageInterest', taxRateInputId: 'countyLineTaxRate', taxSumId: 'countyLineTaxSum'
     });
 }
 
 function renderPropertySection(propertyName, elements) {
     const rentInput = document.getElementById(elements.rentInputId);
-    const rentRow = rentalRows.find(r => r.property === propertyName && r.type === 'income');
-    const rentVal = rentRow ? (rentRow.amount !== undefined && rentRow.amount !== null ? rentRow.amount : (rentRow.monthly_spend || 0)) : 0;
-    if (rentInput && document.activeElement !== rentInput) {
-        rentInput.value = rentVal ? rentVal : '';
-    }
+    const rentRow = getRentalIncomeRow(propertyName);
+    const rentVal = rentRow ? (rentRow.amount ?? rentRow.monthly_spend ?? 0) : 0;
+    if (rentInput && document.activeElement !== rentInput) rentInput.value = rentVal ? rentVal : '';
 
     const body = document.getElementById(elements.spendGridBodyId);
     const empty = document.getElementById(elements.spendGridEmptyId);
-    const expenses = getRentalExpenses(propertyName);
+    const expenses = getRentalExpenseRows(propertyName);
 
     if (body) {
         body.replaceChildren();
         if (empty) empty.hidden = expenses.length > 0;
-
         expenses.forEach(row => {
             body.append(buildCategoryRow(row, {
-                onUpdate: updateRentalExpenseRow,
-                onDelete: deleteRentalRow,
+                onUpdate: updateCategoryRow,
+                onDelete: id => deleteCategoryRow(id, 'Deleted rental entry.'),
                 deleteTitle: 'Delete expense',
                 fmt$
             }));
@@ -461,24 +585,15 @@ function renderPropertySection(propertyName, elements) {
 
     const taxRentEl = document.getElementById(elements.taxRentId);
     if (taxRentEl) taxRentEl.textContent = fmt$(rent);
-
     const taxExpensesEl = document.getElementById(elements.taxExpensesId);
     if (taxExpensesEl) taxExpensesEl.textContent = fmt$(operatingExpenses);
 
     const depInput = document.getElementById(elements.depreciationInputId);
-    if (depInput && document.activeElement !== depInput) {
-        depInput.value = taxSettings.depreciation ? taxSettings.depreciation : '';
-    }
-
+    if (depInput && document.activeElement !== depInput) depInput.value = taxSettings.depreciation ? taxSettings.depreciation : '';
     const mortgageInput = document.getElementById(elements.mortgageInterestInputId);
-    if (mortgageInput && document.activeElement !== mortgageInput) {
-        mortgageInput.value = taxSettings.mortgage_interest ? taxSettings.mortgage_interest : '';
-    }
-
+    if (mortgageInput && document.activeElement !== mortgageInput) mortgageInput.value = taxSettings.mortgage_interest ? taxSettings.mortgage_interest : '';
     const taxRateInput = document.getElementById(elements.taxRateInputId);
-    if (taxRateInput && document.activeElement !== taxRateInput) {
-        taxRateInput.value = taxSettings.tax_rate ? taxSettings.tax_rate : '';
-    }
+    if (taxRateInput && document.activeElement !== taxRateInput) taxRateInput.value = taxSettings.tax_rate ? taxSettings.tax_rate : '';
 
     const taxSumEl = document.getElementById(elements.taxSumId);
     if (taxSumEl) taxSumEl.textContent = `${fmt$(monthlyTax)}/mo`;
@@ -487,72 +602,51 @@ function renderPropertySection(propertyName, elements) {
     if (summary) {
         const totalExpenses = getRentalTotalExpenses(propertyName);
         const profit = rent - totalExpenses;
-        const annualProfit = profit * 12;
         const isProfit = profit >= 0;
         const statusClass = isProfit ? 'surplus' : 'deficit';
         const statusText = isProfit ? 'Net Profit' : 'Net Loss';
 
         renderSummaryCards(summary, [
-            {
-                label: 'Monthly Rent (Income)',
-                value: fmt$(rent),
-                foot: `${fmt$(rent * 12)}/yr`
-            },
-            {
-                label: 'Total Expenses',
-                value: fmt$(totalExpenses),
-                foot: `${fmt$(operatingExpenses)}/mo expenses + ${fmt$(monthlyTax)}/mo tax &middot; ${fmt$(totalExpenses * 12)}/yr`
-            },
-            {
-                label: statusText,
-                value: fmt$(profit),
-                statusClass,
-                foot: `Rent (${fmt$(rent)}) &minus; Expenses (${fmt$(totalExpenses)}) = ${fmt$(profit)}/mo (${fmt$(annualProfit)}/yr)`
-            }
+            { label: 'Monthly Rent (Income)', value: fmt$(rent), foot: `${fmt$(rent * 12)}/yr` },
+            { label: 'Total Expenses', value: fmt$(totalExpenses), foot: `${fmt$(operatingExpenses)}/mo expenses + ${fmt$(monthlyTax)}/mo tax &middot; ${fmt$(totalExpenses * 12)}/yr` },
+            { label: statusText, value: fmt$(profit), statusClass, foot: `Rent (${fmt$(rent)}) &minus; Expenses (${fmt$(totalExpenses)}) = ${fmt$(profit)}/mo (${fmt$(profit * 12)}/yr)` }
         ]);
     }
 }
 
 // -------------------------------------------------------------------
-// Grid 2: Credit Cards (name, annual fee, base rate)
+// Grid 2: Credit Cards
 // -------------------------------------------------------------------
 function renderCardsGrid() {
     const body = document.getElementById('cardsGridBody');
     const empty = document.getElementById('cardsGridEmpty');
     if (!body) return;
-
     body.replaceChildren();
     if (empty) empty.hidden = cardsRows.length > 0;
-
-    cardsRows.forEach(row => {
-        body.append(buildCardRow(row, { onUpdate: updateCardRow, onDelete: deleteCardRow }));
-    });
+    cardsRows.forEach(row => body.append(buildCardRow(row, { onUpdate: updateCardRow, onDelete: deleteCardRow })));
 }
 
 // -------------------------------------------------------------------
-// Grid 3: Card Rewards (category-specific overrides)
+// Grid 3: Card Rewards
 // -------------------------------------------------------------------
 function renderRewardsGrid() {
     const body = document.getElementById('rewardsGridBody');
     const empty = document.getElementById('rewardsGridEmpty');
     if (!body) return;
-
     body.replaceChildren();
     if (empty) empty.hidden = rewardRows.length > 0;
-
-    rewardRows.forEach(row => {
-        body.append(buildRewardRow(row, { onUpdate: updateRewardRow, onDelete: deleteRewardRow }));
-    });
+    rewardRows.forEach(row => body.append(buildRewardRow(row, { onUpdate: updateRewardRow, onDelete: deleteRewardRow })));
 }
 
 function renderCardOptions() {
     const newRewardCard = document.getElementById('newRewardCard');
+    const sortedCards = [...cardsRows].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
     if (newRewardCard) {
         const current = newRewardCard.value;
         populateCardSelect(newRewardCard, cardsRows.some(c => c.id === current) ? current : '');
     }
 
-    const sortedCards = [...cardsRows].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const aSel = document.getElementById('cardASelect');
     const bSel = document.getElementById('cardBSelect');
     if (!aSel || !bSel) return;
@@ -561,13 +655,11 @@ function renderCardOptions() {
         const current = sel.value;
         sel.replaceChildren();
         const blank = document.createElement('option');
-        blank.value = '';
-        blank.textContent = 'Choose a card…';
+        blank.value = ''; blank.textContent = 'Choose a card…';
         sel.append(blank);
         sortedCards.forEach(c => {
             const opt = document.createElement('option');
-            opt.value = c.id;
-            opt.textContent = c.name;
+            opt.value = c.id; opt.textContent = c.name;
             sel.append(opt);
         });
         if (sortedCards.some(c => c.id === current)) sel.value = current;
@@ -591,38 +683,31 @@ function getAnnualFee(cardId) {
 // Best Two-Card Combination
 // -------------------------------------------------------------------
 function findBestTwoCardCombo() {
-    if (cardsRows.length < 2 || !spendRows.length) return null;
-
+    const spend = spendRows();
+    if (cardsRows.length < 2 || !spend.length) return null;
     let bestCombo = null;
 
     for (let i = 0; i < cardsRows.length; i++) {
         for (let j = i + 1; j < cardsRows.length; j++) {
-            const cardA = cardsRows[i];
-            const cardB = cardsRows[j];
-            const aFee = getAnnualFee(cardA.id);
-            const bFee = getAnnualFee(cardB.id);
+            const cardA = cardsRows[i], cardB = cardsRows[j];
+            const aFee = getAnnualFee(cardA.id), bFee = getAnnualFee(cardB.id);
 
             let grossTotal = 0;
-            spendRows.forEach(catRow => {
-                const cat = catRow.category;
-                const spend = catRow.monthly_spend || 0;
-                const a = getEffectiveRate(cardA.id, cat);
-                const b = getEffectiveRate(cardB.id, cat);
-                const aReward = (spend * a.rate / 100) + a.refund;
-                const bReward = (spend * b.rate / 100) + b.refund;
-                grossTotal += Math.max(aReward, bReward);
+            spend.forEach(catRow => {
+                const s = catRow.monthly_spend || 0;
+                const a = getEffectiveRate(cardA.id, catRow.category);
+                const b = getEffectiveRate(cardB.id, catRow.category);
+                grossTotal += Math.max((s * a.rate / 100) + a.refund, (s * b.rate / 100) + b.refund);
             });
 
             const combinedMonthlyFee = (aFee + bFee) / 12;
             const netMonthly = grossTotal - combinedMonthlyFee;
-            const netAnnual = netMonthly * 12;
 
             if (!bestCombo || netMonthly > bestCombo.netMonthly) {
-                bestCombo = { cardA, cardB, grossTotal, aFee, bFee, combinedMonthlyFee, netMonthly, netAnnual };
+                bestCombo = { cardA, cardB, grossTotal, aFee, bFee, combinedMonthlyFee, netMonthly, netAnnual: netMonthly * 12 };
             }
         }
     }
-
     return bestCombo;
 }
 
@@ -630,13 +715,7 @@ function renderBestCombo() {
     const container = document.getElementById('bestComboContainer');
     if (!container) return;
 
-    if (cardsRows.length < 2 || !spendRows.length) {
-        container.replaceChildren();
-        container.hidden = true;
-        return;
-    }
-
-    const combo = findBestTwoCardCombo();
+    const combo = (cardsRows.length >= 2 && spendRows().length) ? findBestTwoCardCombo() : null;
     if (!combo) {
         container.replaceChildren();
         container.hidden = true;
@@ -663,22 +742,20 @@ function renderComparison() {
     const bSel = document.getElementById('cardBSelect');
     if (!aSel || !bSel) return;
 
-    const aId = aSel.value;
-    const bId = bSel.value;
+    const aId = aSel.value, bId = bSel.value;
     const compareTableWrap = document.getElementById('compareTableWrap');
     const compareEmpty = document.getElementById('compareEmpty');
     const summaryGrid = document.getElementById('summaryGrid');
+    const spend = spendRows();
 
-    if (!aId || !bId || aId === bId || !spendRows.length) {
+    if (!aId || !bId || aId === bId || !spend.length) {
         if (compareTableWrap) compareTableWrap.hidden = true;
         if (summaryGrid) summaryGrid.hidden = true;
         if (compareEmpty) {
             compareEmpty.hidden = false;
-            compareEmpty.textContent = !spendRows.length
+            compareEmpty.textContent = !spend.length
                 ? 'Add spending categories in the Budget tab and at least two cards to compare.'
-                : (!aId || !bId)
-                    ? 'Pick two different cards above to compare.'
-                    : 'Pick two different cards to compare.';
+                : (!aId || !bId) ? 'Pick two different cards above to compare.' : 'Pick two different cards to compare.';
         }
         return;
     }
@@ -690,30 +767,22 @@ function renderComparison() {
     if (compareTableWrap) compareTableWrap.hidden = false;
     if (summaryGrid) summaryGrid.hidden = false;
 
-    const headA = document.getElementById('headA');
-    const headB = document.getElementById('headB');
+    const headA = document.getElementById('headA'), headB = document.getElementById('headB');
     if (headA) headA.textContent = aName;
     if (headB) headB.textContent = bName;
 
-    const aFee = getAnnualFee(aId);
-    const bFee = getAnnualFee(bId);
-
+    const aFee = getAnnualFee(aId), bFee = getAnnualFee(bId);
     let aTotal = 0, bTotal = 0, bestTotal = 0;
     const tbody = document.getElementById('compareBody');
     if (!tbody) return;
     tbody.replaceChildren();
 
-    const categoryResults = spendRows.map(catRow => {
-        const cat = catRow.category;
-        const spend = catRow.monthly_spend || 0;
-        const a = getEffectiveRate(aId, cat);
-        const b = getEffectiveRate(bId, cat);
-        const aReward = (spend * a.rate / 100) + a.refund;
-        const bReward = (spend * b.rate / 100) + b.refund;
-        return { cat, spend, a, b, aReward, bReward, aName, bName, best: Math.max(aReward, bReward) };
-    });
-
-    categoryResults.sort((x, y) => y.best - x.best);
+    const categoryResults = spend.map(catRow => {
+        const s = catRow.monthly_spend || 0;
+        const a = getEffectiveRate(aId, catRow.category), b = getEffectiveRate(bId, catRow.category);
+        const aReward = (s * a.rate / 100) + a.refund, bReward = (s * b.rate / 100) + b.refund;
+        return { cat: catRow.category, spend: s, a, b, aReward, bReward, aName, bName, best: Math.max(aReward, bReward) };
+    }).sort((x, y) => y.best - x.best);
 
     categoryResults.forEach(result => {
         aTotal += result.aReward;
@@ -723,430 +792,31 @@ function renderComparison() {
     });
 
     if (summaryGrid) {
-        const aNet = aTotal - aFee / 12;
-        const bNet = bTotal - bFee / 12;
-        const bestNet = bestTotal - (aFee + bFee) / 12;
+        const aNet = aTotal - aFee / 12, bNet = bTotal - bFee / 12, bestNet = bestTotal - (aFee + bFee) / 12;
         renderSummaryCards(summaryGrid, [
-            {
-                label: aName,
-                value: fmt$(aNet),
-                unit: '/mo net',
-                foot: `Rewards ${fmt$(aTotal)}/mo &middot; Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) &middot; Net ${fmt$(aNet)}/mo`
-            },
-            {
-                label: bName,
-                value: fmt$(bNet),
-                unit: '/mo net',
-                foot: `Rewards ${fmt$(bTotal)}/mo &middot; Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) &middot; Net ${fmt$(bNet)}/mo`
-            },
-            {
-                label: 'Best of Both (optimal routing)',
-                value: fmt$(bestNet),
-                unit: '/mo net',
-                statusClass: 'best',
-                foot: `Rewards ${fmt$(bestTotal)}/mo if you used whichever card wins each category &middot; minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestNet)}/mo`
-            }
+            { label: aName, value: fmt$(aNet), unit: '/mo net', foot: `Rewards ${fmt$(aTotal)}/mo &middot; Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) &middot; Net ${fmt$(aNet)}/mo` },
+            { label: bName, value: fmt$(bNet), unit: '/mo net', foot: `Rewards ${fmt$(bTotal)}/mo &middot; Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) &middot; Net ${fmt$(bNet)}/mo` },
+            { label: 'Best of Both (optimal routing)', value: fmt$(bestNet), unit: '/mo net', statusClass: 'best', foot: `Rewards ${fmt$(bestTotal)}/mo if you used whichever card wins each category &middot; minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestNet)}/mo` }
         ]);
     }
 }
 
 // -------------------------------------------------------------------
-// Supabase CRUD — Consolidated Spending Categories
+// Supabase load — categories, cards, rewards, tax
 // -------------------------------------------------------------------
 async function loadSpendingCategories() {
     if (!sb) return;
     try {
         const { data, error } = await sb.from(CATEGORIES_TABLE).select('*').order(COL_CAT_CREATED_AT, { ascending: true });
         if (error) throw error;
-
-        spendRows = [];
-        bankSpendRows = [];
-        incomeRows = [];
-        rentalRows = [];
-
-        (data || []).forEach(r => {
-            const freq = r[COL_CAT_FREQUENCY] || 'monthly';
-            const amt = r[COL_CAT_AMOUNT] !== undefined && r[COL_CAT_AMOUNT] !== null ? r[COL_CAT_AMOUNT] : (r[COL_CAT_MONTHLY_SPEND] ?? 0);
-            const monthly = parseFloat(r[COL_CAT_MONTHLY_SPEND] ?? r.monthly_spend ?? amt) || 0;
-
-            const acc = String(r[COL_CAT_ACCOUNT_TYPE] || '').toLowerCase();
-            const flow = String(r[COL_CAT_TYPE] || '').toLowerCase();
-            const isRental = acc === 'rental' || acc === 'rentals' || Boolean(r[COL_CAT_PROPERTY]);
-
-            if (isRental) {
-                const prop = r[COL_CAT_PROPERTY] || 'San Jacinto';
-                const isIncome = flow === 'income' || (r[COL_CAT_CATEGORY] && r[COL_CAT_CATEGORY].trim().toLowerCase() === 'rent');
-                rentalRows.push({
-                    ...r,
-                    property: prop,
-                    category: r[COL_CAT_CATEGORY] || (isIncome ? 'Rent' : 'Expense'),
-                    frequency: freq,
-                    amount: amt,
-                    notes: r[COL_CAT_NOTES] || '',
-                    monthly_spend: monthly,
-                    account_type: 'rental',
-                    type: isIncome ? 'income' : 'spending'
-                });
-            } else if (acc === 'income' || flow === 'income') {
-                incomeRows.push({
-                    ...r,
-                    category: r[COL_CAT_CATEGORY] || '',
-                    frequency: freq,
-                    amount: amt,
-                    notes: r[COL_CAT_NOTES] || '',
-                    monthly_spend: monthly,
-                    account_type: 'income',
-                    type: 'income'
-                });
-            } else if (acc === 'bank') {
-                bankSpendRows.push({
-                    ...r,
-                    category: r[COL_CAT_CATEGORY] || '',
-                    frequency: freq,
-                    amount: amt,
-                    notes: r[COL_CAT_NOTES] || '',
-                    monthly_spend: monthly,
-                    account_type: 'bank',
-                    type: 'spending'
-                });
-            } else {
-                spendRows.push({
-                    ...r,
-                    category: r[COL_CAT_CATEGORY] || '',
-                    frequency: freq,
-                    amount: amt,
-                    notes: r[COL_CAT_NOTES] || '',
-                    monthly_spend: monthly,
-                    account_type: 'credit_cards',
-                    type: 'spending'
-                });
-            }
-        });
+        categoryRows = (data || []).map(normalizeCategoryRow);
     } catch (err) {
         console.error('Error loading spending categories:', err);
         if (window.setStatus) window.setStatus('Could not load spending categories.');
-        spendRows = [];
-        bankSpendRows = [];
-        incomeRows = [];
-        rentalRows = [];
+        categoryRows = [];
     }
 }
 
-// --- Credit Card Spending ---
-async function addCategoryRow(data) {
-    if (!sb) return;
-    try {
-        const freq = data.frequency || 'monthly';
-        const amt = data.amount || 0;
-        const monthly = computeMonthlySpend(amt, freq);
-        const notes = data.notes || '';
-        const payload = {
-            [COL_CAT_CATEGORY]: data.category,
-            [COL_CAT_FREQUENCY]: freq,
-            [COL_CAT_AMOUNT]: amt,
-            [COL_CAT_NOTES]: notes,
-            [COL_CAT_MONTHLY_SPEND]: monthly,
-            [COL_CAT_ACCOUNT_TYPE]: 'credit_cards',
-            [COL_CAT_TYPE]: 'spending'
-        };
-        const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
-        if (error) throw error;
-        if (inserted) {
-            spendRows.push({ ...inserted, frequency: freq, amount: amt, notes, monthly_spend: monthly, account_type: 'credit_cards', type: 'spending' });
-            render();
-        }
-        if (window.setStatus) window.setStatus('Added credit card category.');
-    } catch (err) {
-        console.error('Could not add category:', err);
-        if (window.setStatus) window.setStatus('Could not add category: ' + (err.message || err));
-    }
-}
-
-async function updateCategoryRow(id, patch) {
-    if (!sb) return;
-    try {
-        const row = spendRows.find(r => r.id === id);
-        if (row) {
-            Object.assign(row, patch);
-            row.monthly_spend = computeMonthlySpend(row.amount, row.frequency);
-        }
-        render();
-        const payload = { ...patch };
-        if (row) {
-            payload[COL_CAT_FREQUENCY] = row.frequency;
-            payload[COL_CAT_AMOUNT] = row.amount;
-            payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
-            if (row.notes !== undefined) payload[COL_CAT_NOTES] = row.notes;
-        }
-        const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
-        if (error) throw error;
-    } catch (err) {
-        console.error('Could not update category:', err);
-        if (window.setStatus) window.setStatus('Could not update category.');
-    }
-}
-
-async function deleteCategoryRow(id) {
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
-        if (error) throw error;
-        spendRows = spendRows.filter(r => r.id !== id);
-        render();
-        if (window.setStatus) window.setStatus('Deleted category.');
-    } catch (err) {
-        console.error('Could not delete category:', err);
-        if (window.setStatus) window.setStatus('Could not delete category.');
-    }
-}
-
-// --- Bank Account Spending ---
-async function addBankSpendRow(data) {
-    if (!sb) return;
-    try {
-        const freq = data.frequency || 'monthly';
-        const amt = data.amount || 0;
-        const monthly = computeMonthlySpend(amt, freq);
-        const notes = data.notes || '';
-        const payload = {
-            [COL_CAT_CATEGORY]: data.category,
-            [COL_CAT_FREQUENCY]: freq,
-            [COL_CAT_AMOUNT]: amt,
-            [COL_CAT_NOTES]: notes,
-            [COL_CAT_MONTHLY_SPEND]: monthly,
-            [COL_CAT_ACCOUNT_TYPE]: 'bank',
-            [COL_CAT_TYPE]: 'spending'
-        };
-        const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
-        if (error) throw error;
-        if (inserted) {
-            bankSpendRows.push({ ...inserted, frequency: freq, amount: amt, notes, monthly_spend: monthly, account_type: 'bank', type: 'spending' });
-            render();
-        }
-        if (window.setStatus) window.setStatus('Added bank expense.');
-    } catch (err) {
-        console.error('Could not add bank expense:', err);
-        if (window.setStatus) window.setStatus('Could not add bank expense: ' + (err.message || err));
-    }
-}
-
-async function updateBankSpendRow(id, patch) {
-    if (!sb) return;
-    try {
-        const row = bankSpendRows.find(r => r.id === id);
-        if (row) {
-            Object.assign(row, patch);
-            row.monthly_spend = computeMonthlySpend(row.amount, row.frequency);
-        }
-        render();
-        const payload = { ...patch };
-        if (row) {
-            payload[COL_CAT_FREQUENCY] = row.frequency;
-            payload[COL_CAT_AMOUNT] = row.amount;
-            payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
-            if (row.notes !== undefined) payload[COL_CAT_NOTES] = row.notes;
-        }
-        const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
-        if (error) throw error;
-    } catch (err) {
-        console.error('Could not update bank expense:', err);
-        if (window.setStatus) window.setStatus('Could not update bank expense.');
-    }
-}
-
-async function deleteBankSpendRow(id) {
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
-        if (error) throw error;
-        bankSpendRows = bankSpendRows.filter(r => r.id !== id);
-        render();
-        if (window.setStatus) window.setStatus('Deleted bank expense.');
-    } catch (err) {
-        console.error('Could not delete bank expense:', err);
-        if (window.setStatus) window.setStatus('Could not delete bank expense.');
-    }
-}
-
-// --- Income ---
-async function addIncomeRow(data) {
-    if (!sb) return;
-    try {
-        const freq = data.frequency || 'monthly';
-        const amt = data.amount || 0;
-        const monthly = computeMonthlySpend(amt, freq);
-        const cat = data.category || data.source || '';
-        const notes = data.notes || '';
-        const payload = {
-            [COL_CAT_CATEGORY]: cat,
-            [COL_CAT_FREQUENCY]: freq,
-            [COL_CAT_AMOUNT]: amt,
-            [COL_CAT_NOTES]: notes,
-            [COL_CAT_MONTHLY_SPEND]: monthly,
-            [COL_CAT_ACCOUNT_TYPE]: 'income',
-            [COL_CAT_TYPE]: 'income'
-        };
-        const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
-        if (error) throw error;
-        if (inserted) {
-            incomeRows.push({ ...inserted, category: cat, frequency: freq, amount: amt, notes, monthly_spend: monthly, account_type: 'income', type: 'income' });
-            render();
-        }
-        if (window.setStatus) window.setStatus('Added income source.');
-    } catch (err) {
-        console.error('Could not add income source:', err);
-        if (window.setStatus) window.setStatus('Could not add income source: ' + (err.message || err));
-    }
-}
-
-async function updateIncomeRow(id, patch) {
-    if (!sb) return;
-    try {
-        const row = incomeRows.find(r => r.id === id);
-        if (row) {
-            Object.assign(row, patch);
-            row.monthly_spend = computeMonthlySpend(row.amount, row.frequency);
-        }
-        render();
-        const payload = { ...patch };
-        if (row) {
-            payload[COL_CAT_FREQUENCY] = row.frequency;
-            payload[COL_CAT_AMOUNT] = row.amount;
-            payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
-            if (row.notes !== undefined) payload[COL_CAT_NOTES] = row.notes;
-        }
-        const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
-        if (error) throw error;
-    } catch (err) {
-        console.error('Could not update income source:', err);
-        if (window.setStatus) window.setStatus('Could not update income source.');
-    }
-}
-
-async function deleteIncomeRow(id) {
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
-        if (error) throw error;
-        incomeRows = incomeRows.filter(r => r.id !== id);
-        render();
-        if (window.setStatus) window.setStatus('Deleted income source.');
-    } catch (err) {
-        console.error('Could not delete income source:', err);
-        if (window.setStatus) window.setStatus('Could not delete income source.');
-    }
-}
-
-// --- Rentals ---
-async function setRentalRent(propertyName, rentAmount) {
-    if (!sb) return;
-    const val = parseFloat(rentAmount) || 0;
-    let existing = rentalRows.find(r => r.property === propertyName && r.type === 'income');
-    try {
-        if (existing) {
-            existing.amount = val;
-            existing.monthly_spend = val;
-            render();
-            const { error } = await sb.from(CATEGORIES_TABLE).update({
-                [COL_CAT_AMOUNT]: val,
-                [COL_CAT_MONTHLY_SPEND]: val
-            }).eq(COL_CAT_ID, existing.id);
-            if (error) throw error;
-        } else {
-            const payload = {
-                [COL_CAT_CATEGORY]: 'Rent',
-                [COL_CAT_PROPERTY]: propertyName,
-                [COL_CAT_FREQUENCY]: 'monthly',
-                [COL_CAT_AMOUNT]: val,
-                [COL_CAT_MONTHLY_SPEND]: val,
-                [COL_CAT_ACCOUNT_TYPE]: 'rental',
-                [COL_CAT_TYPE]: 'income'
-            };
-            const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
-            if (error) throw error;
-            if (inserted) {
-                rentalRows.push({ ...inserted, property: propertyName, category: 'Rent', frequency: 'monthly', amount: val, monthly_spend: val, account_type: 'rental', type: 'income' });
-                render();
-            }
-        }
-        if (window.setStatus) window.setStatus(`Updated rent for ${propertyName}.`);
-    } catch (err) {
-        console.error('Could not save rental income:', err);
-        if (window.setStatus) window.setStatus('Could not save rental income.');
-    }
-}
-
-async function addRentalExpenseRow(propertyName, data) {
-    if (!sb) return;
-    try {
-        const freq = data.frequency || 'monthly';
-        const amt = data.amount || 0;
-        const monthly = computeMonthlySpend(amt, freq);
-        const notes = data.notes || '';
-        const payload = {
-            [COL_CAT_CATEGORY]: data.category,
-            [COL_CAT_PROPERTY]: propertyName,
-            [COL_CAT_FREQUENCY]: freq,
-            [COL_CAT_AMOUNT]: amt,
-            [COL_CAT_NOTES]: notes,
-            [COL_CAT_MONTHLY_SPEND]: monthly,
-            [COL_CAT_ACCOUNT_TYPE]: 'rental',
-            [COL_CAT_TYPE]: 'spending'
-        };
-        const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
-        if (error) throw error;
-        if (inserted) {
-            rentalRows.push({ ...inserted, property: propertyName, category: data.category, frequency: freq, amount: amt, notes, monthly_spend: monthly, account_type: 'rental', type: 'spending' });
-            render();
-        }
-        if (window.setStatus) window.setStatus(`Added expense for ${propertyName}.`);
-    } catch (err) {
-        console.error('Could not add rental expense:', err);
-        if (window.setStatus) window.setStatus('Could not add rental expense: ' + (err.message || err));
-    }
-}
-
-async function updateRentalExpenseRow(id, patch) {
-    if (!sb) return;
-    try {
-        const row = rentalRows.find(r => r.id === id);
-        if (row) {
-            Object.assign(row, patch);
-            row.monthly_spend = computeMonthlySpend(row.amount, row.frequency);
-        }
-        render();
-        const payload = { ...patch };
-        if (row) {
-            payload[COL_CAT_FREQUENCY] = row.frequency;
-            payload[COL_CAT_AMOUNT] = row.amount;
-            payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
-            if (row.notes !== undefined) payload[COL_CAT_NOTES] = row.notes;
-        }
-        const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
-        if (error) throw error;
-    } catch (err) {
-        console.error('Could not update rental expense:', err);
-        if (window.setStatus) window.setStatus('Could not update rental expense.');
-    }
-}
-
-async function deleteRentalRow(id) {
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
-        if (error) throw error;
-        rentalRows = rentalRows.filter(r => r.id !== id);
-        render();
-        if (window.setStatus) window.setStatus('Deleted rental entry.');
-    } catch (err) {
-        console.error('Could not delete rental entry:', err);
-        if (window.setStatus) window.setStatus('Could not delete rental entry.');
-    }
-}
-
-// -------------------------------------------------------------------
-// Supabase CRUD — cards
-// -------------------------------------------------------------------
 async function loadCards() {
     if (!sb) return;
     try {
@@ -1201,9 +871,6 @@ async function deleteCardRow(id) {
     }
 }
 
-// -------------------------------------------------------------------
-// Supabase CRUD — card rewards (category overrides)
-// -------------------------------------------------------------------
 async function loadRewards() {
     if (!sb) return;
     try {
@@ -1258,9 +925,6 @@ async function deleteRewardRow(id) {
     }
 }
 
-// -------------------------------------------------------------------
-// Supabase CRUD — income tax
-// -------------------------------------------------------------------
 async function loadIncomeTax() {
     if (!sb) return;
     try {
@@ -1276,12 +940,7 @@ async function loadIncomeTax() {
 async function updateTaxRow(streamName, patch) {
     let row = taxRows.find(r => (r[COL_TAX_STREAM] || r.income_stream) === streamName);
     if (!row) {
-        row = {
-            [COL_TAX_STREAM]: streamName,
-            [COL_TAX_RATE]: 0,
-            [COL_TAX_DEPRECIATION]: 0,
-            [COL_TAX_MORTGAGE_INTEREST]: 0
-        };
+        row = { [COL_TAX_STREAM]: streamName, [COL_TAX_RATE]: 0, [COL_TAX_DEPRECIATION]: 0, [COL_TAX_MORTGAGE_INTEREST]: 0 };
         taxRows.push(row);
     }
     Object.assign(row, patch);
@@ -1309,7 +968,7 @@ async function updateTaxRow(streamName, patch) {
 }
 
 // -------------------------------------------------------------------
-// Realtime sync (Consolidated table + cards + rewards + tax)
+// Realtime + init
 // -------------------------------------------------------------------
 function setupRealtime() {
     if (realtimeChannel || !sb) return;
@@ -1325,9 +984,7 @@ function debounceReload() {
     clearTimeout(realtimeDebounceTimer);
     realtimeDebounceTimer = setTimeout(async () => {
         const activeEl = document.activeElement;
-        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
-            return;
-        }
+        if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName)) return;
         await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax()]);
         render();
     }, 400);
@@ -1346,171 +1003,71 @@ async function loadAll() {
 // -------------------------------------------------------------------
 // Wire up UI
 // -------------------------------------------------------------------
-const addCategoryBtn = document.getElementById('addCategoryBtn');
-if (addCategoryBtn) {
-    addCategoryBtn.addEventListener('click', () => {
-        const catInput = document.getElementById('newCategory');
-        const freqSelect = document.getElementById('newCategoryFrequency');
-        const amountInput = document.getElementById('newCategoryAmount');
-        const notesInput = document.getElementById('newCategoryNotes');
-        const category = catInput.value.trim();
-        const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
-        const amount = parseFloat(amountInput.value) || 0;
-        const notes = notesInput ? notesInput.value.trim() : '';
-        if (!category) {
-            if (window.setStatus) window.setStatus('Category name is required.');
-            return;
-        }
-        addCategoryRow({ category, frequency, amount, notes });
-        catInput.value = '';
-        amountInput.value = '';
-        if (notesInput) notesInput.value = '';
-        if (freqSelect) freqSelect.value = 'monthly';
-        catInput.focus();
-    });
-}
+wireAddForm({
+    buttonId: 'addCategoryBtn',
+    fieldIds: { category: 'newCategory', frequency: 'newCategoryFrequency', amount: 'newCategoryAmount', notes: 'newCategoryNotes' },
+    requiredMessage: 'Category name is required.',
+    onAdd: v => addCategoryRow(v, { account_type: 'credit_cards', type: 'spending', addedMessage: 'Added credit card category.' })
+});
 
-const addBankCategoryBtn = document.getElementById('addBankCategoryBtn');
-if (addBankCategoryBtn) {
-    addBankCategoryBtn.addEventListener('click', () => {
-        const catInput = document.getElementById('newBankCategory');
-        const freqSelect = document.getElementById('newBankCategoryFrequency');
-        const amountInput = document.getElementById('newBankCategoryAmount');
-        const notesInput = document.getElementById('newBankCategoryNotes');
-        const category = catInput.value.trim();
-        const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
-        const amount = parseFloat(amountInput.value) || 0;
-        const notes = notesInput ? notesInput.value.trim() : '';
-        if (!category) {
-            if (window.setStatus) window.setStatus('Expense name is required.');
-            return;
-        }
-        addBankSpendRow({ category, frequency, amount, notes });
-        catInput.value = '';
-        amountInput.value = '';
-        if (notesInput) notesInput.value = '';
-        if (freqSelect) freqSelect.value = 'monthly';
-        catInput.focus();
-    });
-}
+wireAddForm({
+    buttonId: 'addBankCategoryBtn',
+    fieldIds: { category: 'newBankCategory', frequency: 'newBankCategoryFrequency', amount: 'newBankCategoryAmount', notes: 'newBankCategoryNotes' },
+    requiredMessage: 'Expense name is required.',
+    onAdd: v => addCategoryRow(v, { account_type: 'bank', type: 'spending', addedMessage: 'Added bank expense.' })
+});
 
-const addIncomeBtn = document.getElementById('addIncomeBtn');
-if (addIncomeBtn) {
-    addIncomeBtn.addEventListener('click', () => {
-        const sourceInput = document.getElementById('newIncomeSource');
-        const freqSelect = document.getElementById('newIncomeFrequency');
-        const amountInput = document.getElementById('newIncomeAmount');
-        const notesInput = document.getElementById('newIncomeNotes');
-        const source = sourceInput.value.trim();
-        const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
-        const amount = parseFloat(amountInput.value) || 0;
-        const notes = notesInput ? notesInput.value.trim() : '';
-        if (!source) {
-            if (window.setStatus) window.setStatus('Income source is required.');
-            return;
-        }
-        addIncomeRow({ category: source, frequency, amount, notes });
-        sourceInput.value = '';
-        amountInput.value = '';
-        if (notesInput) notesInput.value = '';
-        if (freqSelect) freqSelect.value = 'monthly';
-        sourceInput.focus();
-    });
-}
+wireAddForm({
+    buttonId: 'addIncomeBtn',
+    fieldIds: { category: 'newIncomeSource', frequency: 'newIncomeFrequency', amount: 'newIncomeAmount', notes: 'newIncomeNotes' },
+    requiredMessage: 'Income source is required.',
+    onAdd: v => addCategoryRow(v, { account_type: 'income', type: 'income', addedMessage: 'Added income source.' })
+});
 
+wireAddForm({
+    buttonId: 'sanJacintoAddCategoryBtn',
+    fieldIds: { category: 'sanJacintoNewCategory', frequency: 'sanJacintoNewCategoryFrequency', amount: 'sanJacintoNewCategoryAmount', notes: 'sanJacintoNewCategoryNotes' },
+    requiredMessage: 'Expense category is required.',
+    onAdd: v => addCategoryRow(v, { account_type: 'rental', type: 'spending', property: 'San Jacinto', addedMessage: 'Added expense for San Jacinto.' })
+});
+
+wireAddForm({
+    buttonId: 'countyLineAddCategoryBtn',
+    fieldIds: { category: 'countyLineNewCategory', frequency: 'countyLineNewCategoryFrequency', amount: 'countyLineNewCategoryAmount', notes: 'countyLineNewCategoryNotes' },
+    requiredMessage: 'Expense category is required.',
+    onAdd: v => addCategoryRow(v, { account_type: 'rental', type: 'spending', property: 'County Line', addedMessage: 'Added expense for County Line.' })
+});
+
+// Rent inputs commit on change, and Enter blurs (rather than submitting a form)
 const sanJacintoRentInput = document.getElementById('sanJacintoRentInput');
-if (sanJacintoRentInput) {
-    sanJacintoRentInput.addEventListener('change', () => {
-        setRentalRent('San Jacinto', sanJacintoRentInput.value);
-    });
-}
-
-const sanJacintoAddCategoryBtn = document.getElementById('sanJacintoAddCategoryBtn');
-if (sanJacintoAddCategoryBtn) {
-    sanJacintoAddCategoryBtn.addEventListener('click', () => {
-        const catInput = document.getElementById('sanJacintoNewCategory');
-        const freqSelect = document.getElementById('sanJacintoNewCategoryFrequency');
-        const amountInput = document.getElementById('sanJacintoNewCategoryAmount');
-        const notesInput = document.getElementById('sanJacintoNewCategoryNotes');
-        const category = catInput.value.trim();
-        const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
-        const amount = parseFloat(amountInput.value) || 0;
-        const notes = notesInput ? notesInput.value.trim() : '';
-        if (!category) {
-            if (window.setStatus) window.setStatus('Expense category is required.');
-            return;
-        }
-        addRentalExpenseRow('San Jacinto', { category, frequency, amount, notes });
-        catInput.value = '';
-        amountInput.value = '';
-        if (notesInput) notesInput.value = '';
-        if (freqSelect) freqSelect.value = 'monthly';
-        catInput.focus();
-    });
-}
+if (sanJacintoRentInput) sanJacintoRentInput.addEventListener('change', () => setRentalRent('San Jacinto', sanJacintoRentInput.value));
+const countyLineRentInput = document.getElementById('countyLineRentInput');
+if (countyLineRentInput) countyLineRentInput.addEventListener('change', () => setRentalRent('County Line', countyLineRentInput.value));
 
 ['sanJacintoDepreciation', 'sanJacintoMortgageInterest', 'sanJacintoTaxRate'].forEach(id => {
     const input = document.getElementById(id);
-    if (input) {
-        input.addEventListener('change', () => {
-            const dep = parseFloat(document.getElementById('sanJacintoDepreciation')?.value) || 0;
-            const mortgage = parseFloat(document.getElementById('sanJacintoMortgageInterest')?.value) || 0;
-            const rate = parseFloat(document.getElementById('sanJacintoTaxRate')?.value) || 0;
-            updateTaxRow('San Jacinto', {
-                [COL_TAX_DEPRECIATION]: dep,
-                [COL_TAX_MORTGAGE_INTEREST]: mortgage,
-                [COL_TAX_RATE]: rate
-            });
-        });
-    }
+    if (input) input.addEventListener('change', () => updateTaxRow('San Jacinto', {
+        [COL_TAX_DEPRECIATION]: parseFloat(document.getElementById('sanJacintoDepreciation')?.value) || 0,
+        [COL_TAX_MORTGAGE_INTEREST]: parseFloat(document.getElementById('sanJacintoMortgageInterest')?.value) || 0,
+        [COL_TAX_RATE]: parseFloat(document.getElementById('sanJacintoTaxRate')?.value) || 0
+    }));
 });
-
-const countyLineRentInput = document.getElementById('countyLineRentInput');
-if (countyLineRentInput) {
-    countyLineRentInput.addEventListener('change', () => {
-        setRentalRent('County Line', countyLineRentInput.value);
-    });
-}
-
-const countyLineAddCategoryBtn = document.getElementById('countyLineAddCategoryBtn');
-if (countyLineAddCategoryBtn) {
-    countyLineAddCategoryBtn.addEventListener('click', () => {
-        const catInput = document.getElementById('countyLineNewCategory');
-        const freqSelect = document.getElementById('countyLineNewCategoryFrequency');
-        const amountInput = document.getElementById('countyLineNewCategoryAmount');
-        const notesInput = document.getElementById('countyLineNewCategoryNotes');
-        const category = catInput.value.trim();
-        const frequency = freqSelect ? (freqSelect.value || 'monthly') : 'monthly';
-        const amount = parseFloat(amountInput.value) || 0;
-        const notes = notesInput ? notesInput.value.trim() : '';
-        if (!category) {
-            if (window.setStatus) window.setStatus('Expense category is required.');
-            return;
-        }
-        addRentalExpenseRow('County Line', { category, frequency, amount, notes });
-        catInput.value = '';
-        amountInput.value = '';
-        if (notesInput) notesInput.value = '';
-        if (freqSelect) freqSelect.value = 'monthly';
-        catInput.focus();
-    });
-}
 
 ['countyLineDepreciation', 'countyLineMortgageInterest', 'countyLineTaxRate'].forEach(id => {
     const input = document.getElementById(id);
-    if (input) {
-        input.addEventListener('change', () => {
-            const dep = parseFloat(document.getElementById('countyLineDepreciation')?.value) || 0;
-            const mortgage = parseFloat(document.getElementById('countyLineMortgageInterest')?.value) || 0;
-            const rate = parseFloat(document.getElementById('countyLineTaxRate')?.value) || 0;
-            updateTaxRow('County Line', {
-                [COL_TAX_DEPRECIATION]: dep,
-                [COL_TAX_MORTGAGE_INTEREST]: mortgage,
-                [COL_TAX_RATE]: rate
-            });
-        });
-    }
+    if (input) input.addEventListener('change', () => updateTaxRow('County Line', {
+        [COL_TAX_DEPRECIATION]: parseFloat(document.getElementById('countyLineDepreciation')?.value) || 0,
+        [COL_TAX_MORTGAGE_INTEREST]: parseFloat(document.getElementById('countyLineMortgageInterest')?.value) || 0,
+        [COL_TAX_RATE]: parseFloat(document.getElementById('countyLineTaxRate')?.value) || 0
+    }));
 });
+
+[sanJacintoRentInput, countyLineRentInput,
+    'sanJacintoDepreciation', 'sanJacintoMortgageInterest', 'sanJacintoTaxRate',
+    'countyLineDepreciation', 'countyLineMortgageInterest', 'countyLineTaxRate']
+    .map(el => (typeof el === 'string' ? document.getElementById(el) : el))
+    .filter(Boolean)
+    .forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } }));
 
 const addCardBtn = document.getElementById('addCardBtn');
 if (addCardBtn) {
@@ -1518,21 +1075,13 @@ if (addCardBtn) {
         const nameInput = document.getElementById('newCardName');
         const feeInput = document.getElementById('newCardFee');
         const baseRateInput = document.getElementById('newCardBaseRate');
-
         const name = nameInput.value.trim();
-        const annual_fee = parseFloat(feeInput.value) || 0;
-        const base_rate = parseFloat(baseRateInput.value) || 0;
-
-        if (!name) {
-            if (window.setStatus) window.setStatus('Card name is required.');
-            return;
-        }
-
-        addCardRow({ name, annual_fee, base_rate });
-        nameInput.value = '';
-        feeInput.value = '';
-        baseRateInput.value = '';
-        nameInput.focus();
+        if (!name) { if (window.setStatus) window.setStatus('Card name is required.'); return; }
+        addCardRow({ name, annual_fee: parseFloat(feeInput.value) || 0, base_rate: parseFloat(baseRateInput.value) || 0 });
+        nameInput.value = ''; feeInput.value = ''; baseRateInput.value = ''; nameInput.focus();
+    });
+    ['newCardName', 'newCardFee', 'newCardBaseRate'].forEach(id => {
+        document.getElementById(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCardBtn.click(); } });
     });
 }
 
@@ -1543,26 +1092,15 @@ if (addRewardBtn) {
         const catInput = document.getElementById('newRewardCategory');
         const rateInput = document.getElementById('newRate');
         const refundInput = document.getElementById('newSpecialRefund');
-
         const card = cardSelect.value;
         const category = catInput.value.trim();
-        const rate = parseFloat(rateInput.value) || 0;
-        const special_refund = parseFloat(refundInput.value) || 0;
-
-        if (!card) {
-            if (window.setStatus) window.setStatus("Choose a card first — add one above if it's not listed yet.");
-            return;
-        }
-        if (!category) {
-            if (window.setStatus) window.setStatus('Category is required for a reward override.');
-            return;
-        }
-
-        addRewardRow({ card_id: card, category, rate, special_refund });
-        catInput.value = '';
-        rateInput.value = '';
-        refundInput.value = '';
-        catInput.focus();
+        if (!card) { if (window.setStatus) window.setStatus("Choose a card first — add one above if it's not listed yet."); return; }
+        if (!category) { if (window.setStatus) window.setStatus('Category is required for a reward override.'); return; }
+        addRewardRow({ card_id: card, category, rate: parseFloat(rateInput.value) || 0, special_refund: parseFloat(refundInput.value) || 0 });
+        catInput.value = ''; rateInput.value = ''; refundInput.value = ''; catInput.focus();
+    });
+    ['newRewardCategory', 'newRate', 'newSpecialRefund'].forEach(id => {
+        document.getElementById(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addRewardBtn.click(); } });
     });
 }
 
@@ -1572,70 +1110,28 @@ if (cardASelect) cardASelect.addEventListener('change', renderComparison);
 if (cardBSelect) cardBSelect.addEventListener('change', renderComparison);
 
 // -------------------------------------------------------------------
-// Tabs Navigation — hash-routed to match the Lists page's pattern
+// Tabs — hash-routed
 // -------------------------------------------------------------------
 const TAB_KEYS = ['budget', 'comparison', 'rental'];
-
-function tabFromHash() {
-    const key = location.hash.slice(1);
-    return TAB_KEYS.includes(key) ? key : TAB_KEYS[0];
-}
+const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
 
 function switchTab(tabKey) {
-    const tabBtns = document.querySelectorAll('#cc-tabs .tab');
-    tabBtns.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tabKey);
+    document.querySelectorAll('#cc-tabs .tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabKey));
+    ['budget', 'comparison', 'rental'].forEach(key => {
+        const pane = document.getElementById(`tab-${key}`);
+        if (pane) pane.hidden = key !== tabKey;
     });
-
-    const budgetPane = document.getElementById('tab-budget');
-    const comparisonPane = document.getElementById('tab-comparison');
-    const rentalPane = document.getElementById('tab-rental');
-    if (budgetPane) budgetPane.hidden = tabKey !== 'budget';
-    if (comparisonPane) comparisonPane.hidden = tabKey !== 'comparison';
-    if (rentalPane) rentalPane.hidden = tabKey !== 'rental';
 }
 
-function setupTabs() {
-    const tabsContainer = document.getElementById('cc-tabs');
-    if (!tabsContainer) return;
-    tabsContainer.addEventListener('click', (e) => {
+const tabsContainer = document.getElementById('cc-tabs');
+if (tabsContainer) {
+    tabsContainer.addEventListener('click', e => {
         const btn = e.target.closest('.tab');
-        if (btn && btn.dataset.tab) {
-            location.hash = btn.dataset.tab;
-        }
+        if (btn && btn.dataset.tab) location.hash = btn.dataset.tab;
     });
     window.addEventListener('hashchange', () => switchTab(tabFromHash()));
     switchTab(tabFromHash());
 }
-
-setupTabs();
-
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        const targetId = e.target.id;
-        if (['newCategory', 'newCategoryAmount', 'newCategoryNotes'].includes(targetId)) {
-            if (addCategoryBtn) addCategoryBtn.click();
-        } else if (['newBankCategory', 'newBankCategoryAmount', 'newBankCategoryNotes'].includes(targetId)) {
-            if (addBankCategoryBtn) addBankCategoryBtn.click();
-        } else if (['newIncomeSource', 'newIncomeAmount', 'newIncomeNotes'].includes(targetId)) {
-            if (addIncomeBtn) addIncomeBtn.click();
-        } else if (['sanJacintoRentInput'].includes(targetId)) {
-            if (sanJacintoRentInput) sanJacintoRentInput.blur();
-        } else if (['sanJacintoNewCategory', 'sanJacintoNewCategoryAmount', 'sanJacintoNewCategoryNotes'].includes(targetId)) {
-            if (sanJacintoAddCategoryBtn) sanJacintoAddCategoryBtn.click();
-        } else if (['countyLineRentInput'].includes(targetId)) {
-            if (countyLineRentInput) countyLineRentInput.blur();
-        } else if (['countyLineNewCategory', 'countyLineNewCategoryAmount', 'countyLineNewCategoryNotes'].includes(targetId)) {
-            if (countyLineAddCategoryBtn) countyLineAddCategoryBtn.click();
-        } else if (['sanJacintoDepreciation', 'sanJacintoMortgageInterest', 'sanJacintoTaxRate', 'countyLineDepreciation', 'countyLineMortgageInterest', 'countyLineTaxRate'].includes(targetId)) {
-            if (e.target && typeof e.target.blur === 'function') e.target.blur();
-        } else if (['newCardName', 'newCardFee', 'newCardBaseRate'].includes(targetId)) {
-            if (addCardBtn) addCardBtn.click();
-        } else if (['newRewardCategory', 'newRate', 'newSpecialRefund'].includes(targetId)) {
-            if (addRewardBtn) addRewardBtn.click();
-        }
-    }
-});
 
 // -------------------------------------------------------------------
 // Init
