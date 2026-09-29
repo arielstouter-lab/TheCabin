@@ -260,6 +260,45 @@
         }
     }
 
+    function buildMoonCycles(dates) {
+
+        const cycles = [];
+
+        if (!dates.length) return cycles;
+
+        let current = [
+            new Date(dates[0].event_date + 'T00:00:00')
+        ];
+
+        for (let i = 1; i < dates.length; i++) {
+
+            const prev =
+                new Date(dates[i - 1].event_date + 'T00:00:00');
+
+            const curr =
+                new Date(dates[i].event_date + 'T00:00:00');
+
+            const diff =
+                (curr - prev) / (1000 * 60 * 60 * 24);
+
+            if (diff === 1) {
+
+                current.push(curr);
+
+            } else {
+
+                cycles.push(current);
+                current = [curr];
+
+            }
+        }
+
+        cycles.push(current);
+
+        return cycles;
+    }
+
+
     function getMoonStats(){
         const lookback = document.getElementById('moon-lookback');
         if(!lookback) return null;
