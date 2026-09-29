@@ -272,7 +272,10 @@
 
         const cycles = buildMoonCycles(filtered);
 
-        if (!cycles.length) {
+        // Filter out 1-day cycles
+        const validCycles = cycles.filter(cycle => cycle.length > 1);
+
+        if (!validCycles.length) {
 
             document.getElementById('moon-avg-length').textContent = '--';
             document.getElementById('moon-avg-between').textContent = '--';
