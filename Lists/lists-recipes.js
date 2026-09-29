@@ -68,7 +68,6 @@ function buildRecipeCard(recipe){
     r.url.addEventListener('keydown', e => {
         if(e.key === 'Enter'){ e.preventDefault(); r.url.blur(); }
     });
-    r.editUrl.addEventListener('click', () => focusAtEnd(r.url));
 
     const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
     if(ingredients.length){
