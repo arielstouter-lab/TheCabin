@@ -8,7 +8,7 @@ import {
     personName, dueClass, removeItemLocally, updateItemLocally,
     saveToLocalCache, requestRender
 } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState } from './lists-dom.js';
+import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
 
 function makeChip(text, extraClass){
     const chip = cloneEl('tpl-chip');

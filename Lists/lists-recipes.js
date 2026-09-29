@@ -2,7 +2,7 @@
 // and an editable URL field with a small "open link" anchor kept in sync.
 
 import { state, sb, saveToLocalCache, requestRender, addIngredientsToGroceries } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState, focusAtEnd } from './lists-dom.js';
+import { cloneFragment, cloneEl, refs, emptyState, focusAtEnd } from '../dom.js';
 
 let recipeSearchQuery = '';
 

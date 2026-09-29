@@ -5,7 +5,7 @@ import {
     state, sb, loadAll, orderedSections, sectionSlug, findSectionBySlug,
     isPantry, isRecipes, isGroceries, PERMANENT_TABS, onStateChange, stopRealtime
 } from './lists-state.js';
-import { cloneEl, refs, emptyState } from './lists-dom.js';
+import { cloneEl, refs, emptyState } from '../dom.js';
 import { renderListPanel, reorderItems } from './lists-panel.js';
 import { renderPantryPanel } from './lists-pantry.js';
 import { renderRecipesPanel } from './lists-recipes.js';

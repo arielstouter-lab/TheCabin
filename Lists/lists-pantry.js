@@ -5,7 +5,7 @@ import {
     state, sb, insertListItemWithRetry, saveToLocalCache, requestRender,
     addIngredientsToGroceries, updateItemLocally, removeItemLocally
 } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState } from './lists-dom.js';
+import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
 
 async function deleteItem(id){
     removeItemLocally(id);
