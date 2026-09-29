@@ -388,6 +388,17 @@ select { cursor: pointer; }
 
 .nav-icon { width: 20px; text-align: center; opacity: 0.8; }
 
+.nav-icon svg {
+  color: var(--ochre);
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .sidebar-bottom { margin-top: auto; }
 
 .user-card { display: flex; align-items: center; gap: 9px; padding: 10px 8px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
