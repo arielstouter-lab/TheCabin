@@ -125,6 +125,25 @@ async function addItem(sec, r, grocery){
     }
 }
 
+async function clearCheckedItems(sec){
+    const checked = (state.itemsBySection[sec.id] || []).filter(i => i.checked);
+    if(!checked.length) return;
+    if(!confirm(`Remove ${checked.length} checked item${checked.length === 1 ? '' : 's'}?`)) return;
+
+    const ids = checked.map(i => i.id);
+    state.itemsBySection[sec.id] = (state.itemsBySection[sec.id] || []).filter(i => !i.checked);
+    saveToLocalCache();
+    requestRender();
+
+    try{
+        const { error } = await sb.from('household_list_items').delete().in('id', ids);
+        if(error) throw error;
+    } catch(err){
+        console.error(err);
+        setStatus('Could not clear checked items.');
+    }
+}
+
 // Returns a DocumentFragment; main.js puts it in the panel.
 export function renderListPanel(sec){
     const grocery = isGroceries(sec);
@@ -135,6 +154,13 @@ export function renderListPanel(sec){
 
     if(grocery){
         r.head.append(cloneEl('tpl-manage-link'));
+
+        const hasChecked = (state.itemsBySection[sec.id] || []).some(i => i.checked);
+        if(hasChecked){
+            const clearBtn = cloneEl('tpl-clear-checked');
+            clearBtn.addEventListener('click', () => clearCheckedItems(sec));
+            r.head.append(clearBtn);
+        }
     } else if(!isPermanent(sec)){
         const delBtn = cloneEl('tpl-delete-tab');
         delBtn.addEventListener('click', () => deleteSection(sec));
