@@ -393,8 +393,8 @@ select { cursor: pointer; }
 }
 
 .nav-icon svg {
-  color: var(--ochre);
-  filter: drop-shadow(0 0 4px rgba(212, 175, 55, 0.6));
+  color: #edad4e;
+  filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.6));
   width: 18px;
   height: 18px;
   fill: none;
