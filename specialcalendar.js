@@ -373,6 +373,12 @@
             longestGap = Math.max(longestGap, gap);
         }
 
+        const currentGap =
+            Math.floor((today - lastDate) / msPerDay);
+
+        longestGap =
+            Math.max(longestGap, currentGap);
+
         document.getElementById('o-days-since').textContent =
             String(daysSince);
 

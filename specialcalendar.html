@@ -69,39 +69,38 @@
 
                     <div id="moon-panel" class="card-head hidden">
 
-                        <h3>Moon Statistics</h3>
+                        <h2>Moon Statistics</h2>
+                        <div class="card-body">
+                            <label>
+                                Calculate using:
+                                <select id="moon-lookback">
+                                    <option value="3">Last 3 Months</option>
+                                    <option value="6">Last 6 Months</option>
+                                    <option value="12" selected>Last 12 Months</option>
+                                    <option value="24">Last 24 Months</option>
+                                    <option value="999">All Data</option>
+                                </select>
+                            </label>
 
-                        <label>
-                            Calculate using:
-                            <select id="moon-lookback">
-                                <option value="3">Last 3 Months</option>
-                                <option value="6">Last 6 Months</option>
-                                <option value="12" selected>Last 12 Months</option>
-                                <option value="24">Last 24 Months</option>
-                                <option value="999">All Data</option>
-                            </select>
-                        </label>
+                            <p>Average Length: <span id="moon-avg-length">--</span></p>
 
-                        <p>Average Length: <span id="moon-avg-length">--</span></p>
+                            <p>Average Between Starts: <span id="moon-avg-between">--</span></p>
 
-                        <p>Average Between Starts: <span id="moon-avg-between">--</span></p>
+                            <p>Next Estimated Start: <span id="moon-next-1">--</span></p>
 
-                        <p>Next Estimated Start: <span id="moon-next-1">--</span></p>
-
-                        <p>Following Estimated Start: <span id="moon-next-2">--</span></p>
-
+                            <p>Following Estimated Start: <span id="moon-next-2">--</span></p>
+                        </div>
                     </div>
 
                     <div id="o-panel" class="card-head hidden">
-                        <h3>O Statistics</h3>
-
-                        <div>
+                        <h2>Denial Statistics</h2>
+                        <div class="card-body">
                             Days Since Last:
                             <span id="o-days-since">--</span>
                         </div>
 
                         <div>
-                            Longest Period Between:
+                            Longest Denial Period:
                             <span id="o-longest-gap">--</span>
                         </div>
                     </div>
