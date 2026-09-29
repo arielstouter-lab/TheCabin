@@ -390,11 +390,11 @@ select { cursor: pointer; }
   width: 20px;
   opacity: 0.8;
   display: inline-flex;
-  align-items: center;
+  justify-content: center;
 }
 
 .nav-icon:not(:has(svg)) {
-  transform: translateY(-2px); /* try -2px if needed */
+  transform: translateY(-3px); /* try -2px if needed */
 }
 
 .nav-icon svg {
