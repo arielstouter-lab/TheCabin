@@ -543,7 +543,7 @@ select { cursor: pointer; }
 .cal-day-o {
   position: absolute;
   top: 5px;
-  right: 3px;
+  right: 0;
   font-size: var(--text-sm);
   line-height: inherit;
 }
