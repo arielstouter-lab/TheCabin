@@ -19,8 +19,8 @@
 
         <header class="topbar">
             <div class="text-center">
-                <h1>Calendar</h1>
-                <p>Shared household events — click a day to add or remove things.</p>
+                <h1>Special Calendar</h1>
+                <p>Click overlays</p>
             </div>
         </header>
 
@@ -29,6 +29,15 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Month</h2>
+                        <div class="calendar-overlays">
+                            <button class="cal-overlay-btn" data-layer="moon">
+                                🌙
+                            </button>
+
+                            <button class="cal-overlay-btn" data-layer="o">
+                                💥
+                            </button>
+                        </div>
                         <div class="cal-nav">
                             <button class="cal-nav-btn" id="cal-prev">&lsaquo;</button>
                             <span class="cal-month-label" id="cal-month-label"></span>
@@ -48,11 +57,60 @@
                         <h2 class="card-title">Events</h2>
                         <span class="cal-selected-label" id="cal-selected-label"></span>
                     </div>
-                    <div class="cal-events" id="cal-events"></div>
+
+                    <div id="cal-events-wrap">
+                        <div class="cal-events" id="cal-events"></div>
+                        <hr class="cal-events-divider hidden" id="cal-events-divider">
+                        <div class="cal-events" id="cal-events-pinned"></div>
+                        <p class="empty-state hidden" id="cal-events-empty">No events yet.</p>
+                    </div>
+
+                    <template id="cal-event-template">
+                        <div class="cal-event">
+                            <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
+                            <span class="cal-event-title"></span>
+                            <button class="icon-delete" title="Remove">✕</button>
+                        </div>
+                    </template>
+
                     <div class="add-item">
                         <label for="cal-new-event" class="visually-hidden">New event</label>
                         <input type="text" id="cal-new-event" class="text-input" placeholder="Add an event for this day" />
+                        <select id="cal-event-layer">
+                            <option value="">Default</option>
+                        </select>
                         <button class="button-inline" id="cal-add-event">Add</button>
+                    </div>
+
+                    <div id="moon-panel" class="card-head hidden">
+
+                        <h2 class="card-title">Period Statistics</h2>
+                        <div class="card-body" style="font-size: var(--text-md)">
+                            <label>
+                                Calculate using:
+                                <select id="moon-lookback">
+                                    <option value="3">Last 3 Months</option>
+                                    <option value="6">Last 6 Months</option>
+                                    <option value="12" selected>Last 12 Months</option>
+                                    <option value="24">Last 24 Months</option>
+                                    <option value="999">All Data</option>
+                                </select>
+                            </label>
+                            <p>Average Length: <span id="moon-avg-length">--</span></p>
+                            <p>Average Time Between: <span id="moon-avg-between">--</span></p>
+                            <p>Next Estimated Start: <span id="moon-next-1">--</span></p>
+                            <p>Following Estimated Start: <span id="moon-next-2">--</span></p>
+                        </div>
+                    </div>
+
+                    <div id="o-panel" class="card-head hidden">
+                        <h2 class="card-title">Denial Statistics</h2>
+                        <div class="card-body" style="font-size: var(--text-md)">
+
+                            <p>Days Since Last: <span id="o-days-since">--</span></p>
+                            <p>Longest Denial Period: <span id="o-longest-gap">--</span></p>
+
+                        </div>
                     </div>
                 </div>
             </div>

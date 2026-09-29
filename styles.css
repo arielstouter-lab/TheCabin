@@ -536,9 +536,8 @@ select { cursor: pointer; }
 .flow-heavy    { background: var(--flowheavy); opacity: 0.7; }
 
 .flow-projected {
-  background: color-mix(in srgb, var(--flowlight) 40%, transparent);
+  background: color-mix(in srgb, var(--flowlight) 30%, transparent);
   outline: 1px dashed color-mix(in srgb, var(--flowheavy) 70%, transparent);
-  /*outline-offset: -1px;*/
 }
 
 .cal-day-o {
@@ -553,7 +552,7 @@ select { cursor: pointer; }
 
 .cal-day-dot-row { display: flex; flex-wrap: wrap; gap: 3px; }
 
-.cal-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary-hover); }
+.cal-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft); }
 
 .cal-selected-label { font-size: var(--text-xs); color: var(--ink-soft); }
 
