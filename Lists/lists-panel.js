@@ -152,13 +152,14 @@ export function renderListPanel(sec){
 
     r.title.textContent = sec.name;
 
+    const hasChecked = (state.itemsBySection[sec.id] || []).some(i => i.checked);
+    if(hasChecked){
+        const clearBtn = cloneEl('tpl-clear-checked');
+        clearBtn.addEventListener('click', () => clearCheckedItems(sec));
+        r.head.append(clearBtn);
+    }
+
     if(grocery){
-        const hasChecked = (state.itemsBySection[sec.id] || []).some(i => i.checked);
-        if(hasChecked){
-            const clearBtn = cloneEl('tpl-clear-checked');
-            clearBtn.addEventListener('click', () => clearCheckedItems(sec));
-            r.head.append(clearBtn);
-        }
         r.head.append(cloneEl('tpl-manage-link'));
 
     } else if(!isPermanent(sec)){
