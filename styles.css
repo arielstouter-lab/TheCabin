@@ -18,8 +18,7 @@
   --font-serif: 'Fraunces', Georgia, serif;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
   --white: #ffffff;
-  --flowspotting: #d00018;
-  --flowlight: #9c0012;
+  --flowlight: #d00018;
   --flowmedium: #82000f;
   --flowheavy: #4e0009;
   --radius-sm: 8px;
@@ -525,7 +524,7 @@ select { cursor: pointer; }
   z-index: -1;          /* behind number/dots, above the cell background */
 }
 
-.flow-spotting { background: var(--flowspotting); opacity: 0.4; }
+.flow-spotting { background: var(--flowlight); opacity: 0.4; }
 .flow-light    { background: var(--flowlight); opacity: 0.5; }
 .flow-medium   { background: var(--flowmedium); opacity: 0.6; }
 .flow-heavy    { background: var(--flowheavy); opacity: 0.7; }

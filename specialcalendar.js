@@ -441,30 +441,31 @@
     async function reorderEvents(fromIndex, toIndex){
         if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
 
-        const list = eventsByDate[selectedDate];
-        if (!list || !list[fromIndex]) return;
+        const visible = (eventsByDate[selectedDate] || [])
+            .filter(ev => visibleLayers.has(layerOf(ev)));
+        if (!visible[fromIndex]) return;
 
-        const [moved] = list.splice(fromIndex, 1);
-        list.splice(toIndex, 0, moved);
+        const slots = visible.map(ev => ev.sort_order);   // the values already in use
+        const [moved] = visible.splice(fromIndex, 1);
+        visible.splice(toIndex, 0, moved);
+        visible.forEach((ev, i) => { ev.sort_order = slots[i]; });
 
-        list.forEach((ev, idx) => {
-            ev.sort_order = idx + 1;
-        });
-
+        // optimistic UI so the drop doesn't lag
+        eventsByDate[selectedDate].sort((a, b) => a.sort_order - b.sort_order);
         renderEventsPanel();
 
         try {
-            const updates = list.map((ev, idx) =>
+            const results = await Promise.all(visible.map(ev =>
                 sb.from('household_events')
-                    .update({ sort_order: idx + 1 })
+                    .update({ sort_order: ev.sort_order })
                     .eq('id', ev.id)
-            );
-            const results = await Promise.all(updates);
+            ));
             const failed = results.find(r => r.error);
-            if (failed && failed.error) throw failed.error;
+            if (failed) throw failed.error;
         } catch (err) {
             console.error('Failed to save event order:', err);
             setStatus('Could not save event order.');
+            loadMonth();   // resync from the db instead of trying to undo locally
         }
     }
 
