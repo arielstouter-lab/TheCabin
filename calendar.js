@@ -167,7 +167,8 @@
         const addRow = (parent, ev, index) => {
             const row = tpl.content.firstElementChild.cloneNode(true);
             row.dataset.eventRow = ev.id;
-            row.querySelector('.cal-event-title').textContent = ev.title;
+            row.querySelector('.cal-event-title').textContent =
+                (ev.layer === 'moon' ? 'Flow: ' : '') + ev.title;
             row.querySelector('.icon-delete').dataset.delEvent = ev.id;
             if(index === null){
                 row.querySelector('.drag-handle').remove();
