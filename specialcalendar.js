@@ -12,8 +12,6 @@
     ]);
     const layerOf = ev => ev.layer || 'default';   // null layer = default
 
-    visibleLayers.has(layerOf(ev)); // null layer -> 'default' -> true
-
     const FLOW_KEYS = ['spotting', 'light', 'medium', 'heavy']; // placeholder names, match your titles
 
     function pad(n){ return String(n).padStart(2,'0'); }
