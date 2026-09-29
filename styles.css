@@ -525,10 +525,10 @@ select { cursor: pointer; }
   z-index: -1;          /* behind number/dots, above the cell background */
 }
 
-.flow-spotting { background: var(--flowspotting); opacity(0.15); }
-.flow-light    { background: var(--flowlight); opacity(0.30); }
-.flow-medium   { background: var(--flowmedium); opacity(0.35); }
-.flow-heavy    { background: var(--flowheavy); opacity(0.50); }
+.flow-spotting { background: var(--flowspotting); opacity: 0.3; }
+.flow-light    { background: var(--flowlight); opacity: 0.3; }
+.flow-medium   { background: var(--flowmedium); opacity: 0.4; }
+.flow-heavy    { background: var(--flowheavy); opacity: 0.5; }
 
 .cal-day-o {
   position: absolute;
