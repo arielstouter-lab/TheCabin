@@ -535,6 +535,12 @@ select { cursor: pointer; }
 .flow-medium   { background: var(--flowmedium); opacity: 0.6; }
 .flow-heavy    { background: var(--flowheavy); opacity: 0.7; }
 
+.flow-projected {
+  background: color-mix(in srgb, var(--flowheavy) 12%, transparent);
+  outline: 1px dashed color-mix(in srgb, var(--flowheavy) 50%, transparent);
+  outline-offset: -1px;
+}
+
 .cal-day-o {
   position: absolute;
   top: 2px;
