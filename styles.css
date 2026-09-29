@@ -395,8 +395,8 @@ select { cursor: pointer; }
 .nav-icon svg {
   color: #edad4e;
   filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.6));
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
