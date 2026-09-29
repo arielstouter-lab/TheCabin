@@ -388,8 +388,13 @@ select { cursor: pointer; }
 
 .nav-icon {
   width: 20px;
-  text-align: center;
   opacity: 0.8;
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-icon:not(:has(svg)) {
+  transform: translateY(-2px); /* try -2px if needed */
 }
 
 .nav-icon svg {
