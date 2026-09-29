@@ -11,6 +11,7 @@
         'default'
     ]);
     const layerOf = ev => ev.layer || 'default';   // null layer = default
+    const isDefault = ev => layerOf(ev) === 'default';
 
     const FLOW_KEYS = ['spotting', 'light', 'medium', 'heavy']; // placeholder names, match your titles
 
@@ -199,26 +200,43 @@
     }
 
     function renderEventsPanel(){
-        const label = document.getElementById('cal-selected-label');
-        const list = document.getElementById('cal-events');
-        if(!selectedDate){
-            label.textContent = '';
-            list.innerHTML = '<p class="empty-state">Select a day to see events.</p>';
-            return;
-        }
+        const list    = document.getElementById('cal-events');
+        const pinned  = document.getElementById('cal-events-pinned');
+        const divider = document.getElementById('cal-events-divider');
+        const empty   = document.getElementById('cal-events-empty');
+        const tpl     = document.getElementById('cal-event-template');
+
         const d = new Date(selectedDate + 'T00:00:00');
-        label.textContent = d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
+        document.getElementById('cal-selected-label').textContent =
+            d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
+
+        const addRow = (parent, ev, index) => {
+            const row = tpl.content.firstElementChild.cloneNode(true);
+            row.dataset.eventRow = ev.id;
+            row.querySelector('.cal-event-title').textContent = ev.title;
+            row.querySelector('.icon-delete').dataset.delEvent = ev.id;
+            if(index === null){
+                row.querySelector('.drag-handle').remove();
+            } else {
+                row.classList.add('draggable-item');
+                row.draggable = true;
+                row.dataset.index = index;
+            }
+            parent.appendChild(row);
+        };
 
         const evs = (eventsByDate[selectedDate] || [])
             .filter(ev => visibleLayers.has(layerOf(ev)));
-        list.innerHTML = evs.length
-            ? evs.map((ev, index) => `
-          <div class="cal-event draggable-item" draggable="true" data-index="${index}" data-event-row="${ev.id}">
-            <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
-            <span class="cal-event-title">${escapeHtml(ev.title)}</span>
-            <button class="icon-delete" data-del-event="${ev.id}" title="Remove">✕</button>
-          </div>`).join('')
-            : '<p class="empty-state">No events yet.</p>';
+        const defaults = evs.filter(isDefault);
+        const others   = evs.filter(ev => !isDefault(ev));
+
+        list.replaceChildren();
+        pinned.replaceChildren();
+        defaults.forEach((ev, i) => addRow(list, ev, i));
+        others.forEach(ev => addRow(pinned, ev, null));
+
+        divider.classList.toggle('hidden', !(defaults.length && others.length));
+        empty.classList.toggle('hidden', evs.length > 0);
     }
 
     function selectDate(dateStr){
@@ -441,21 +459,19 @@
     async function reorderEvents(fromIndex, toIndex){
         if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
 
-        const visible = (eventsByDate[selectedDate] || [])
-            .filter(ev => visibleLayers.has(layerOf(ev)));
-        if (!visible[fromIndex]) return;
+        const defaults = (eventsByDate[selectedDate] || []).filter(isDefault);
+        if (!defaults[fromIndex]) return;
 
-        const slots = visible.map(ev => ev.sort_order);   // the values already in use
-        const [moved] = visible.splice(fromIndex, 1);
-        visible.splice(toIndex, 0, moved);
-        visible.forEach((ev, i) => { ev.sort_order = slots[i]; });
+        const slots = defaults.map(ev => ev.sort_order);
+        const [moved] = defaults.splice(fromIndex, 1);
+        defaults.splice(toIndex, 0, moved);
+        defaults.forEach((ev, i) => { ev.sort_order = slots[i]; });
 
-        // optimistic UI so the drop doesn't lag
         eventsByDate[selectedDate].sort((a, b) => a.sort_order - b.sort_order);
         renderEventsPanel();
 
         try {
-            const results = await Promise.all(visible.map(ev =>
+            const results = await Promise.all(defaults.map(ev =>
                 sb.from('household_events')
                     .update({ sort_order: ev.sort_order })
                     .eq('id', ev.id)
@@ -465,7 +481,7 @@
         } catch (err) {
             console.error('Failed to save event order:', err);
             setStatus('Could not save event order.');
-            loadMonth();   // resync from the db instead of trying to undo locally
+            loadMonth();
         }
     }
 
@@ -512,7 +528,7 @@
         }
     });
 
-    document.getElementById('cal-events').addEventListener('click', async (e) => {
+    document.getElementById('cal-events-wrap').addEventListener('click', async (e) => {
         const btn = e.target.closest('[data-del-event]');
         if(!btn) return;
         const id = btn.getAttribute('data-del-event');

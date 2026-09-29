@@ -57,7 +57,22 @@
                         <h2 class="card-title">Events</h2>
                         <span class="cal-selected-label" id="cal-selected-label"></span>
                     </div>
-                    <div class="cal-events" id="cal-events"></div>
+
+                    <div id="cal-events-wrap">
+                        <div class="cal-events" id="cal-events"></div>
+                        <hr class="cal-events-divider hidden" id="cal-events-divider">
+                        <div class="cal-events" id="cal-events-pinned"></div>
+                        <p class="empty-state hidden" id="cal-events-empty">No events yet.</p>
+                    </div>
+
+                    <template id="cal-event-template">
+                        <div class="cal-event">
+                            <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
+                            <span class="cal-event-title"></span>
+                            <button class="icon-delete" title="Remove">✕</button>
+                        </div>
+                    </template>
+
                     <div class="add-item">
                         <label for="cal-new-event" class="visually-hidden">New event</label>
                         <input type="text" id="cal-new-event" class="text-input" placeholder="Add an event for this day" />

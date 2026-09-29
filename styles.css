@@ -321,6 +321,12 @@ select { cursor: pointer; }
 .lst-item,
 .cal-event { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); }
 
+.cal-events-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0.5rem 0;
+}
+
 .card {
   display: flex;
   flex-direction: column;
