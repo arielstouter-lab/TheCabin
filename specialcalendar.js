@@ -6,6 +6,9 @@
     let viewYear, viewMonth; // 0-indexed month
     let selectedDate; // 'YYYY-MM-DD'
     let eventsByDate = {}; // {'YYYY-MM-DD': [{id, title}]}
+    const visibleLayers = new Set([
+        'default'
+    ]);
 
     function pad(n){ return String(n).padStart(2,'0'); }
     function toDateStr(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
@@ -66,16 +69,18 @@
         }
 
         document.getElementById('cal-days').innerHTML = cells.map(c => {
-            const count = (eventsByDate[c.dateStr] || []).length;
+            const visibleEvents = (eventsByDate[c.dateStr] || [])
+                .filter(ev => visibleLayers.has(ev.layer));
+
+            const count = visibleEvents.length;
             const classes = ['cal-day'];
             if(c.otherMonth) classes.push('other-month');
             if(c.dateStr === today) classes.push('today');
             if(c.dateStr === selectedDate) classes.push('selected');
             const dots = count ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(count,4))}</div>` : '';
-            const countLabel = count ? `<span class="cal-day-count">${count} event${count>1?'s':''}</span>` : '';
             return `<div class="${classes.join(' ')}" data-date="${c.dateStr}">
         <span class="cal-day-num">${c.label}</span>
-        ${dots}${countLabel}
+        ${dots}
       </div>`;
         }).join('');
     }
@@ -91,7 +96,8 @@
         const d = new Date(selectedDate + 'T00:00:00');
         label.textContent = d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
 
-        const evs = eventsByDate[selectedDate] || [];
+        const evs = (eventsByDate[selectedDate] || [])
+            .filter(ev => visibleLayers.has(ev.layer));
         list.innerHTML = evs.length
             ? evs.map((ev, index) => `
           <div class="cal-event draggable-item" draggable="true" data-index="${index}" data-event-row="${ev.id}">
@@ -239,6 +245,26 @@
         loadMonth();
         setupRealtime();
     }
+
+    document.addEventListener('click', e => {
+
+        const btn = e.target.closest('.overlay-btn');
+        if (!btn) return;
+
+        const layer = btn.dataset.layer;
+
+        if (visibleLayers.has(layer)) {
+            visibleLayers.delete(layer);
+            btn.classList.remove('active');
+        } else {
+            visibleLayers.add(layer);
+            btn.classList.add('active');
+        }
+
+        renderGrid();
+        renderEventsPanel();
+
+    });
 
     window.addEventListener('beforeunload', () => {
         if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
