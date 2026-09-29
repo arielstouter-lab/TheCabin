@@ -3,10 +3,10 @@
     const getSeason = window.getSeason;
     const todayStr = window.todayStr;
     const updateSeason = window.updateSeason || function(){};
+    const histories = {};
     let viewYear, viewMonth; // 0-indexed month
     let selectedDate; // 'YYYY-MM-DD'
     let eventsByDate = {}; // {'YYYY-MM-DD': [{id, title}]}
-    let oHistory = [];
     const visibleLayers = new Set([
         'default'
     ]);
@@ -45,27 +45,86 @@
         updateOPanel();
     }
 
-    async function loadOHistory() {
+    async function loadLayerOptions() {
+
+        try {
+
+            const { data, error } = await sb
+                .from('household_events')
+                .select('layer');
+
+            if (error) throw error;
+
+            const select =
+                document.getElementById('cal-event-layer');
+
+            if (!select) return;
+
+            // Remember current selection
+            const currentValue = select.value;
+
+            // Get unique non-null layers
+            const layers = [...new Set(
+                (data || [])
+                    .map(row => row.layer)
+                    .filter(layer => layer)
+            )].sort();
+
+            // Rebuild dropdown
+            select.innerHTML =
+                '<option value="">Default</option>';
+
+            layers.forEach(layer => {
+
+                const option =
+                    document.createElement('option');
+
+                option.value = layer;
+                option.textContent = layer;
+
+                select.appendChild(option);
+
+            });
+
+            // Restore previous selection if it still exists
+            if (
+                [...select.options]
+                    .some(option => option.value === currentValue)
+            ) {
+                select.value = currentValue;
+            }
+
+        } catch (err) {
+
+            console.error(
+                'Failed to load layer options',
+                err
+            );
+
+        }
+    }
+
+    async function loadAllHistory(layer, callback) {
 
         try {
 
             const { data, error } = await sb
                 .from('household_events')
                 .select('event_date')
-                .eq('layer', 'o')
+                .eq('layer', layer)
                 .order('event_date', { ascending: true });
 
             if (error) throw error;
 
-            oHistory = data || [];
+            histories[layer] = data || [];
 
-            console.log('O data:', data);
-
-            updateOPanel();
+            if (callback) {
+                callback();
+            }
 
         } catch (err) {
 
-            console.error('Failed to load O history', err);
+            console.error(`Failed to load ${layer} history`, err);
 
         }
     }
@@ -152,9 +211,138 @@
         }
     }
 
-    function updateOPanel() {
+    function buildMoonCycles(dates) {
 
-        if (!oHistory.length) return;
+        const cycles = [];
+
+        if (!dates.length) return cycles;
+
+        let current = [
+            new Date(dates[0].event_date + 'T00:00:00')
+        ];
+
+        for (let i = 1; i < dates.length; i++) {
+
+            const prev =
+                new Date(dates[i - 1].event_date + 'T00:00:00');
+
+            const curr =
+                new Date(dates[i].event_date + 'T00:00:00');
+
+            const diff =
+                (curr - prev) / (1000 * 60 * 60 * 24);
+
+            if (diff === 1) {
+
+                current.push(curr);
+
+            } else {
+
+                cycles.push(current);
+                current = [curr];
+
+            }
+        }
+
+        cycles.push(current);
+
+        return cycles;
+    }
+
+    function updateMoonPanel() {
+
+        const moonHistory = histories.moon || [];
+
+        const lookback = document.getElementById('moon-lookback');
+
+        if (!lookback) return;
+
+        const months = Number(lookback.value);
+
+        const cutoff = new Date();
+
+        if (months !== 999) {
+            cutoff.setMonth(cutoff.getMonth() - months);
+        }
+
+        const filtered = moonHistory.filter(row =>
+            months === 999 ||
+            new Date(row.event_date) >= cutoff
+        );
+
+        const cycles = buildMoonCycles(filtered);
+
+        if (!cycles.length) {
+
+            document.getElementById('moon-avg-length').textContent = '--';
+            document.getElementById('moon-avg-between').textContent = '--';
+            document.getElementById('moon-next-1').textContent = '--';
+            document.getElementById('moon-next-2').textContent = '--';
+
+            return;
+        }
+
+        const avgLength =
+            cycles.reduce(
+                (sum, cycle) => sum + cycle.length,
+                0
+            ) / cycles.length;
+
+        let totalGap = 0;
+
+        for (let i = 1; i < cycles.length; i++) {
+
+            const previousStart = cycles[i - 1][0];
+            const currentStart = cycles[i][0];
+
+            totalGap +=
+                (currentStart - previousStart) /
+                (1000 * 60 * 60 * 24);
+        }
+
+        const avgGap =
+            cycles.length > 1
+                ? totalGap / (cycles.length - 1)
+                : 0;
+
+        const lastStart =
+            cycles[cycles.length - 1][0];
+
+        const nextStart =
+            new Date(
+                lastStart.getTime() +
+                avgGap * 86400000
+            );
+
+        const nextSecond =
+            new Date(
+                nextStart.getTime() +
+                avgGap * 86400000
+            );
+
+        document.getElementById('moon-avg-length')
+            .textContent = avgLength.toFixed(1);
+
+        document.getElementById('moon-avg-between')
+            .textContent = avgGap.toFixed(1);
+
+        document.getElementById('moon-next-1')
+            .textContent = nextStart.toLocaleDateString();
+
+        document.getElementById('moon-next-2')
+            .textContent = nextSecond.toLocaleDateString();
+    }
+
+    function updateOPanel() {
+        const oHistory = histories.o || [];
+
+        if (!oHistory.length) {
+
+            document.getElementById('o-days-since').textContent = '--';
+            document.getElementById('o-longest-gap').textContent = '--';
+
+            return;
+        }
 
         const msPerDay = 1000 * 60 * 60 * 24;
 
@@ -190,6 +378,12 @@
 
         document.getElementById('o-longest-gap').textContent =
             String(longestGap);
+    }
+
+    const lookback = document.getElementById('moon-lookback');
+
+    if (lookback) {
+        lookback.addEventListener('change', updateMoonPanel);
     }
 
     document.getElementById('cal-prev').addEventListener('click', () => {
@@ -251,6 +445,8 @@
         if(!selectedDate){ setStatus('Select a day first.'); return; }
         const input = document.getElementById('cal-new-event');
         const title = input.value.trim();
+        const layer =
+            document.getElementById('cal-event-layer').value || null;
         if(!title) return;
 
         const currentEvents = eventsByDate[selectedDate] || [];
@@ -260,7 +456,12 @@
 
         try{
             const {data, error} = await sb.from('household_events')
-                .insert({event_date: selectedDate, title, sort_order})
+                .insert({
+                    event_date: selectedDate,
+                    title,
+                    sort_order,
+                    layer
+                })
                 .select()
                 .single();
             if(error || !data){ setStatus('Could not add event.'); return; }
@@ -285,7 +486,9 @@
         const id = btn.getAttribute('data-del-event');
         try{
             await sb.from('household_events').delete().eq('id', id);
-            eventsByDate[selectedDate] = (eventsByDate[selectedDate] || []).filter(ev => ev.id !== id);
+            eventsByDate[selectedDate] =
+                (eventsByDate[selectedDate] || [])
+                    .filter(ev => ev.id !== id);
             renderGrid();
             renderEventsPanel();
         } catch(err){
@@ -309,6 +512,11 @@
                 clearTimeout(realtimeDebounceTimer);
                 realtimeDebounceTimer = setTimeout(() => {
                     loadMonth();
+
+                    loadLayerOptions();
+
+                    loadAllHistory('o', updateOPanel);
+                    loadAllHistory('moon', updateMoonPanel);
                 }, 300);
             })
             .subscribe();
@@ -322,7 +530,12 @@
         selectedDate = todayStr();
 
         loadMonth();
-        loadOHistory();
+
+        loadLayerOptions();
+
+        loadAllHistory('o', updateOPanel);
+        loadAllHistory('moon', updateMoonPanel);
+
         setupRealtime();
     }
 
@@ -348,6 +561,9 @@
                 'hidden',
                 !visibleLayers.has('moon')
             );
+            if (visibleLayers.has('moon')) {
+                updateMoonPanel();
+            }
         }
 
         // show/hide o panel
