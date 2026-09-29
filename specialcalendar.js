@@ -212,7 +212,7 @@
         label.textContent = d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
 
         const evs = (eventsByDate[selectedDate] || [])
-            .filter(ev => visibleLayers.has(ev.layer));
+            .filter(ev => visibleLayers.has(layerOf(ev)));
         list.innerHTML = evs.length
             ? evs.map((ev, index) => `
           <div class="cal-event draggable-item" draggable="true" data-index="${index}" data-event-row="${ev.id}">
