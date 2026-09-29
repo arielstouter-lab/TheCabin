@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thecabin-v2';
+const CACHE_NAME = 'thecabin-v3';
 const STATIC_ASSETS = [
   './',
   'index.html',
