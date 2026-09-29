@@ -542,10 +542,10 @@ select { cursor: pointer; }
 
 .cal-day-o {
   position: absolute;
-  top: 2px;
+  top: 5px;
   right: 3px;
-  font-size: 0.8em;
-  line-height: 1;
+  font-size: var(--text-sm);
+  line-height: inherit;
 }
 
 .cal-day-num { font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
