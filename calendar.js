@@ -1,32 +1,48 @@
 (function(){
     const sb = window.supabaseClient;
-    const getSeason = window.getSeason;
     const todayStr = window.todayStr;
     const updateSeason = window.updateSeason || function(){};
-    const histories = {};
-    let viewYear, viewMonth; // 0-indexed month
-    let selectedDate; // 'YYYY-MM-DD'
-    let eventsByDate = {}; // {'YYYY-MM-DD': [{id, title}]}
-    const visibleLayers = new Set([
-        'default'
-    ]);
+
+    // ---------- constants ----------
+    const MS_PER_DAY = 86400000;
+    const PROJECTION_CYCLES = 12;
+    const FLOW_KEYS = ['spotting', 'light', 'medium', 'heavy']; // match your moon event titles
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const LAYER_PANELS = { moon: 'moon-panel', o: 'o-panel' };  // layer -> stats panel id
+
+    // ---------- state ----------
+    const histories = { o: [], moon: [] };        // every event_date per layer, ascending
+    const visibleLayers = new Set(['default']);
+    let viewYear, viewMonth;                      // month is 0-indexed
+    let selectedDate;                             // 'YYYY-MM-DD'
+    let eventsByDate = {};                        // 'YYYY-MM-DD' -> [event rows]
+    let projectedMoonDays = new Set();            // 'YYYY-MM-DD' strings
+
+    // ---------- helpers ----------
+    const $ = id => document.getElementById(id);
+    const setText = (id, text) => { const el = $(id); if(el) el.textContent = text; };
+    const pad = n => String(n).padStart(2, '0');
+    const toDateStr = date => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    const parseDate = str => new Date(str + 'T00:00:00');
+    const addDays = (date, n) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+    const daysBetween = (a, b) => Math.round((b - a) / MS_PER_DAY);   // round: DST days aren't 24h
+    const average = list => list.length ? list.reduce((sum, n) => sum + n, 0) / list.length : 0;
+
     const layerOf = ev => ev.layer || 'default';   // null layer = default
     const isDefault = ev => layerOf(ev) === 'default';
-    let projectedMoonDays = new Set();   // 'YYYY-MM-DD' strings, put near visibleLayers
-    const PROJECTION_CYCLES = 12;
-    const FLOW_KEYS = ['spotting', 'light', 'medium', 'heavy']; // placeholder names, match your titles
-    const addDays = (date, n) =>
-        new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+    const isVisible = ev => visibleLayers.has(layerOf(ev));
 
-    function pad(n){ return String(n).padStart(2,'0'); }
-    function toDateStr(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
+    function render(){
+        renderGrid();
+        renderEventsPanel();
+    }
 
+    // ---------- data loading ----------
     async function loadMonth(){
-        const first = toDateStr(viewYear, viewMonth, 1);
-        const lastDay = new Date(viewYear, viewMonth + 1, 0).getDate();
-        const last = toDateStr(viewYear, viewMonth, lastDay);
+        const first = toDateStr(new Date(viewYear, viewMonth, 1));
+        const last = toDateStr(new Date(viewYear, viewMonth + 1, 0));
         try{
-            const {data, error} = await sb.from('household_events')
+            const { data, error } = await sb.from('household_events')
                 .select('*')
                 .gte('event_date', first)
                 .lte('event_date', last)
@@ -34,191 +50,120 @@
             if(error) throw error;
             eventsByDate = {};
             (data || []).forEach(ev => {
-                eventsByDate[ev.event_date] = eventsByDate[ev.event_date] || [];
-                eventsByDate[ev.event_date].push({
-                    id: ev.id,
-                    title: ev.title,
-                    sort_order: ev.sort_order,
-                    layer: ev.layer
-                });
+                (eventsByDate[ev.event_date] ||= []).push(ev);
             });
         } catch(err){
             console.error('Failed to load events:', err);
             setStatus('Could not load events.');
             eventsByDate = {};
         }
-        renderGrid();
-        renderEventsPanel();
-        updateOPanel();
+        render();
     }
 
-    async function loadLayerOptions() {
+    async function loadLayerOptions(){
+        const select = $('cal-event-layer');
+        if(!select) return;
+        try{
+            const { data, error } = await sb.from('household_events').select('layer');
+            if(error) throw error;
 
-        try {
+            const layers = [...new Set((data || []).map(row => row.layer).filter(Boolean))].sort();
+            const current = select.value;
 
-            const { data, error } = await sb
-                .from('household_events')
-                .select('layer');
-
-            if (error) throw error;
-
-            const select =
-                document.getElementById('cal-event-layer');
-
-            if (!select) return;
-
-            // Remember current selection
-            const currentValue = select.value;
-
-            // Get unique non-null layers
-            const layers = [...new Set(
-                (data || [])
-                    .map(row => row.layer)
-                    .filter(layer => layer)
-            )].sort();
-
-            // Rebuild dropdown
-            select.innerHTML =
-                '<option value="">Default</option>';
-
-            layers.forEach(layer => {
-
-                const option =
-                    document.createElement('option');
-
-                option.value = layer;
-                option.textContent = layer;
-
-                select.appendChild(option);
-
-            });
-
-            // Restore previous selection if it still exists
-            if (
-                [...select.options]
-                    .some(option => option.value === currentValue)
-            ) {
-                select.value = currentValue;
-            }
-
-        } catch (err) {
-
-            console.error(
-                'Failed to load layer options',
-                err
-            );
-
+            select.replaceChildren(new Option('Default', ''), ...layers.map(layer => new Option(layer, layer)));
+            if(layers.includes(current)) select.value = current;
+        } catch(err){
+            console.error('Failed to load layer options', err);
         }
     }
 
-    async function loadAllHistory(layer, callback) {
-
-        try {
-
-            const { data, error } = await sb
-                .from('household_events')
+    async function loadHistory(layer){
+        try{
+            const { data, error } = await sb.from('household_events')
                 .select('event_date')
                 .eq('layer', layer)
                 .order('event_date', { ascending: true });
-
-            if (error) throw error;
-
+            if(error) throw error;
             histories[layer] = data || [];
-
-            if (callback) {
-                callback();
-            }
-
-        } catch (err) {
-
+        } catch(err){
             console.error(`Failed to load ${layer} history`, err);
-
         }
     }
 
+    async function refreshStats(){
+        await Promise.all([loadHistory('o'), loadHistory('moon')]);
+        updateOPanel();
+        updateMoonPanel();
+        renderGrid();   // projection may have changed
+    }
+
+    function refreshAll(){
+        loadMonth();
+        loadLayerOptions();
+        refreshStats();
+    }
+
+    // ---------- calendar grid ----------
     function renderGrid(){
-        // viewMonth has no day — use the 1st of that month as a stand-in
-        updateSeason(new Date(viewYear, viewMonth, 1));
-        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-        document.getElementById('cal-month-label').textContent = `${monthNames[viewMonth]} ${viewYear}`;
+        updateSeason(new Date(viewYear, viewMonth, 1));   // month has no day, so use the 1st
+        setText('cal-month-label', `${MONTH_NAMES[viewMonth]} ${viewYear}`);
 
-        const firstOfMonth = new Date(viewYear, viewMonth, 1);
-        const startDow = firstOfMonth.getDay(); // 0=Sun
-        const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-        const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+        // always 6 weeks, starting on the Sunday on or before the 1st
+        const startOffset = 1 - new Date(viewYear, viewMonth, 1).getDay();
         const today = todayStr();
-
-        const cells = [];
-        for(let i = startDow - 1; i >= 0; i--){
-            const d = daysInPrevMonth - i;
-            const m = viewMonth === 0 ? 11 : viewMonth - 1;
-            const y = viewMonth === 0 ? viewYear - 1 : viewYear;
-            cells.push({dateStr: toDateStr(y,m,d), label: d, otherMonth: true});
-        }
-        for(let d = 1; d <= daysInMonth; d++){
-            cells.push({dateStr: toDateStr(viewYear, viewMonth, d), label: d, otherMonth: false});
-        }
-        while(cells.length % 7 !== 0 || cells.length < 42){
-            const last = cells[cells.length - 1];
-            const [y,m,d] = last.dateStr.split('-').map(Number);
-            const next = new Date(y, m - 1, d + 1);
-            cells.push({dateStr: toDateStr(next.getFullYear(), next.getMonth(), next.getDate()), label: next.getDate(), otherMonth: true});
-            if(cells.length >= 42) break;
-        }
-
-        document.getElementById('cal-days').innerHTML = cells.map(c => {
-            const events = eventsByDate[c.dateStr] || [];
-            const forLayer = layer =>
-                visibleLayers.has(layer) ? events.filter(ev => layerOf(ev) === layer) : [];
-
-            const defaultEvents = forLayer('default');
-            const oEvents       = forLayer('o');
-            const moonEvents    = forLayer('moon');
-
-            const classes = ['cal-day'];
-            if (c.otherMonth) classes.push('other-month');
-            if (c.dateStr === today) classes.push('today');
-            if (c.dateStr === selectedDate) classes.push('selected');
-
-            // dots: default layer only
-            const dots = defaultEvents.length
-                ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(defaultEvents.length, 4))}</div>`
-                : '';
-
-            // os: single icon if any o-layer event exists
-            const os = oEvents.length ? `<span class="cal-day-o">💥</span>` : '';
-
-            // flows: translucent overlay, color chosen by the event title
-            const flowKey = moonEvents
-                .map(ev => (ev.title || '').trim().toLowerCase())
-                .find(t => FLOW_KEYS.includes(t));
-
-            let flows = '';
-            if(flowKey){
-                flows = `<div class="cal-day-flow flow-${flowKey}"></div>`;
-            } else if(visibleLayers.has('moon') && !moonEvents.length && projectedMoonDays.has(c.dateStr)){
-                flows = `<div class="cal-day-flow flow-projected"></div>`;
-            }
-
-            return `<div class="${classes.join(' ')}" data-date="${c.dateStr}">
-        ${flows}
-        <span class="cal-day-num">${c.label}</span>
-        ${dots}${os}
-    </div>`;
-        }).join('');
+        $('cal-days').innerHTML = Array.from({ length: 42 }, (_, i) =>
+            renderDay(new Date(viewYear, viewMonth, startOffset + i), today)
+        ).join('');
     }
 
+    function renderDay(date, today){
+        const dateStr = toDateStr(date);
+        const events = (eventsByDate[dateStr] || []).filter(isVisible);
+        const inLayer = layer => events.filter(ev => layerOf(ev) === layer);
+
+        const defaultCount = inLayer('default').length;
+        const moonEvents = inLayer('moon');
+
+        const classes = ['cal-day'];
+        if(date.getMonth() !== viewMonth) classes.push('other-month');
+        if(dateStr === today) classes.push('today');
+        if(dateStr === selectedDate) classes.push('selected');
+
+        // dots: default layer
+        const dots = defaultCount
+            ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(defaultCount, 4))}</div>`
+            : '';
+
+        // os: single icon
+        const os = inLayer('o').length ? '<span class="cal-day-o">💥</span>' : '';
+
+        // flows: tint chosen by event title; logged days beat projected ones
+        const flowKey = moonEvents
+            .map(ev => (ev.title || '').trim().toLowerCase())
+            .find(title => FLOW_KEYS.includes(title));
+        const isProjected = visibleLayers.has('moon') && !moonEvents.length && projectedMoonDays.has(dateStr);
+        const flowClass = flowKey ? `flow-${flowKey}` : isProjected ? 'flow-projected' : '';
+        const flows = flowClass ? `<div class="cal-day-flow ${flowClass}"></div>` : '';
+
+        return `<div class="${classes.join(' ')}" data-date="${dateStr}">
+            ${flows}
+            <span class="cal-day-num">${date.getDate()}</span>
+            ${dots}${os}
+        </div>`;
+    }
+
+    // ---------- events panel ----------
     function renderEventsPanel(){
-        const list    = document.getElementById('cal-events');
-        const pinned  = document.getElementById('cal-events-pinned');
-        const divider = document.getElementById('cal-events-divider');
-        const empty   = document.getElementById('cal-events-empty');
-        const tpl     = document.getElementById('cal-event-template');
+        const list    = $('cal-events');
+        const pinned  = $('cal-events-pinned');
+        const divider = $('cal-events-divider');
+        const empty   = $('cal-events-empty');
+        const tpl     = $('cal-event-template');
 
-        const d = new Date(selectedDate + 'T00:00:00');
-        document.getElementById('cal-selected-label').textContent =
-            d.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
+        setText('cal-selected-label', parseDate(selectedDate)
+            .toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }));
 
+        // index === null means pinned (not draggable)
         const addRow = (parent, ev, index) => {
             const row = tpl.content.firstElementChild.cloneNode(true);
             row.dataset.eventRow = ev.id;
@@ -234,10 +179,9 @@
             parent.appendChild(row);
         };
 
-        const evs = (eventsByDate[selectedDate] || [])
-            .filter(ev => visibleLayers.has(layerOf(ev)));
+        const evs = (eventsByDate[selectedDate] || []).filter(isVisible);
         const defaults = evs.filter(isDefault);
-        const others   = evs.filter(ev => !isDefault(ev));
+        const others = evs.filter(ev => !isDefault(ev));
 
         list.replaceChildren();
         pinned.replaceChildren();
@@ -248,213 +192,13 @@
         empty.classList.toggle('hidden', evs.length > 0);
     }
 
-    function selectDate(dateStr){
-        selectedDate = dateStr;
-        const [y,m] = dateStr.split('-').map(Number);
-        if(y !== viewYear || (m - 1) !== viewMonth){
-            viewYear = y; viewMonth = m - 1;
-            loadMonth();
-        } else {
-            renderGrid();
-            renderEventsPanel();
-        }
-    }
-
-    function buildMoonCycles(dates) {
-
-        const cycles = [];
-
-        if (!dates.length) return cycles;
-
-        let current = [
-            new Date(dates[0].event_date + 'T00:00:00')
-        ];
-
-        for (let i = 1; i < dates.length; i++) {
-
-            const prev =
-                new Date(dates[i - 1].event_date + 'T00:00:00');
-
-            const curr =
-                new Date(dates[i].event_date + 'T00:00:00');
-
-            const diff =
-                (curr - prev) / (1000 * 60 * 60 * 24);
-
-            if (diff === 1) {
-
-                current.push(curr);
-
-            } else {
-
-                cycles.push(current);
-                current = [curr];
-
-            }
-        }
-
-        cycles.push(current);
-
-        return cycles;
-    }
-
-
-    function getMoonStats(){
-        const lookback = document.getElementById('moon-lookback');
-        if(!lookback) return null;
-
-        const months = Number(lookback.value);
-        const cutoff = new Date();
-        if(months !== 999) cutoff.setMonth(cutoff.getMonth() - months);
-
-        const filtered = (histories.moon || []).filter(row =>
-            months === 999 || new Date(row.event_date + 'T00:00:00') >= cutoff
-        );
-
-        // ignore 1-day "cycles"
-        const cycles = buildMoonCycles(filtered).filter(c => c.length > 1);
-        if(!cycles.length) return null;
-
-        const avgLength = cycles.reduce((s, c) => s + c.length, 0) / cycles.length;
-
-        let totalGap = 0;
-        for(let i = 1; i < cycles.length; i++){
-            totalGap += (cycles[i][0] - cycles[i - 1][0]) / 86400000;
-        }
-        const avgGap = cycles.length > 1 ? totalGap / (cycles.length - 1) : 0;
-
-        return { avgLength, avgGap, lastStart: cycles[cycles.length - 1][0] };
-    }
-
-    function buildProjection(stats){
-        const days = new Set();
-        if(!stats || stats.avgGap < 1) return days;   // need 2+ cycles to know the gap
-
-        const gap = Math.round(stats.avgGap);
-        const len = Math.max(1, Math.round(stats.avgLength));
-        const today = todayStr();
-
-        for(let k = 1; k <= PROJECTION_CYCLES; k++){
-            for(let i = 0; i < len; i++){
-                const dt = addDays(stats.lastStart, gap * k + i);
-                const str = toDateStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
-                if(str >= today) days.add(str);   // only future days
-            }
-        }
-        return days;
-    }
-
-    function updateMoonPanel(){
-        const stats = getMoonStats();
-        projectedMoonDays = buildProjection(stats);
-
-        const set = (id, text) => {
-            const el = document.getElementById(id);
-            if(el) el.textContent = text;
-        };
-
-        if(!stats || stats.avgGap < 1){
-            set('moon-avg-length', stats ? stats.avgLength.toFixed(1) : '--');
-            set('moon-avg-between', '--');
-            set('moon-next-1', '--');
-            set('moon-next-2', '--');
-        } else {
-            const gap = Math.round(stats.avgGap);
-            set('moon-avg-length', stats.avgLength.toFixed(1));
-            set('moon-avg-between', stats.avgGap.toFixed(1));
-            set('moon-next-1', addDays(stats.lastStart, gap).toLocaleDateString());
-            set('moon-next-2', addDays(stats.lastStart, gap * 2).toLocaleDateString());
-        }
-
-        renderGrid();   // projection changed, so redraw
-    }
-
-    function updateOPanel() {
-        const oHistory = histories.o || [];
-
-        if (!oHistory.length) {
-
-            document.getElementById('o-days-since').textContent = '--';
-            document.getElementById('o-longest-gap').textContent = '--';
-
-            return;
-        }
-
-        const msPerDay = 1000 * 60 * 60 * 24;
-
-        const today = new Date();
-
-        const lastDate = new Date(
-            oHistory[oHistory.length - 1].event_date + 'T00:00:00'
-        );
-
-        const daysSince =
-            Math.floor((today - lastDate) / msPerDay);
-
-        let longestGap = 0;
-
-        for (let i = 1; i < oHistory.length; i++) {
-
-            const prev = new Date(
-                oHistory[i - 1].event_date + 'T00:00:00'
-            );
-
-            const curr = new Date(
-                oHistory[i].event_date + 'T00:00:00'
-            );
-
-            const gap =
-                Math.floor((curr - prev) / msPerDay);
-
-            longestGap = Math.max(longestGap, gap);
-        }
-
-        const currentGap =
-            Math.floor((today - lastDate) / msPerDay);
-
-        longestGap =
-            Math.max(longestGap, currentGap);
-
-        document.getElementById('o-days-since').textContent =
-            String(daysSince);
-
-        document.getElementById('o-longest-gap').textContent =
-            String(longestGap);
-    }
-
-    const lookback = document.getElementById('moon-lookback');
-
-    if (lookback) {
-        lookback.addEventListener('change', updateMoonPanel);
-    }
-
-    document.getElementById('cal-prev').addEventListener('click', () => {
-        if(viewYear === undefined) return;
-        viewMonth--;
-        if(viewMonth < 0){ viewMonth = 11; viewYear--; }
-        loadMonth();
-    });
-    document.getElementById('cal-next').addEventListener('click', () => {
-        if(viewYear === undefined) return;
-        viewMonth++;
-        if(viewMonth > 11){ viewMonth = 0; viewYear++; }
-        loadMonth();
-    });
-
-    document.getElementById('cal-days').addEventListener('click', (e) => {
-        const cell = e.target.closest('.cal-day');
-        if(!cell) return;
-        selectDate(cell.dataset.date);
-    });
-
-    const eventsContainer = document.getElementById('cal-events');
-
     async function reorderEvents(fromIndex, toIndex){
-        if (isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
+        if(isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
 
         const defaults = (eventsByDate[selectedDate] || []).filter(isDefault);
-        if (!defaults[fromIndex]) return;
+        if(!defaults[fromIndex]) return;
 
+        // reuse the sort_order values already in use, just in the new order
         const slots = defaults.map(ev => ev.sort_order);
         const [moved] = defaults.splice(fromIndex, 1);
         defaults.splice(toIndex, 0, moved);
@@ -463,86 +207,125 @@
         eventsByDate[selectedDate].sort((a, b) => a.sort_order - b.sort_order);
         renderEventsPanel();
 
-        try {
+        try{
             const results = await Promise.all(defaults.map(ev =>
-                sb.from('household_events')
-                    .update({ sort_order: ev.sort_order })
-                    .eq('id', ev.id)
+                sb.from('household_events').update({ sort_order: ev.sort_order }).eq('id', ev.id)
             ));
             const failed = results.find(r => r.error);
-            if (failed) throw failed.error;
-        } catch (err) {
+            if(failed) throw failed.error;
+        } catch(err){
             console.error('Failed to save event order:', err);
             setStatus('Could not save event order.');
-            loadMonth();
+            loadMonth();   // resync from the db
         }
     }
 
-    initDragAndDrop(eventsContainer, {
-        onReorder: (fromIndex, toIndex) => reorderEvents(fromIndex, toIndex)
-    });
-
-    document.getElementById('cal-add-event').addEventListener('click', async () => {
-        if(!selectedDate){ setStatus('Select a day first.'); return; }
-        const input = document.getElementById('cal-new-event');
-        const title = input.value.trim();
-        const layer =
-            document.getElementById('cal-event-layer').value || null;
-        if(!title) return;
-
-        const currentEvents = eventsByDate[selectedDate] || [];
-        const sort_order = currentEvents.length > 0
-            ? Math.max(...currentEvents.map(ev => Number(ev.sort_order) || 0), currentEvents.length) + 1
-            : 1;
-
-        try{
-            const {data, error} = await sb.from('household_events')
-                .insert({
-                    event_date: selectedDate,
-                    title,
-                    sort_order,
-                    layer
-                })
-                .select()
-                .single();
-            if(error || !data){ setStatus('Could not add event.'); return; }
-            eventsByDate[selectedDate] = eventsByDate[selectedDate] || [];
-            eventsByDate[selectedDate].push({
-                id: data.id,
-                title: data.title,
-                sort_order: data.sort_order,
-                layer: data.layer
-            });
-            input.value = '';
-            renderGrid();
-            renderEventsPanel();
-        } catch(e){
-            setStatus('Could not add event.');
+    function selectDate(dateStr){
+        selectedDate = dateStr;
+        const date = parseDate(dateStr);
+        if(date.getFullYear() !== viewYear || date.getMonth() !== viewMonth){
+            viewYear = date.getFullYear();
+            viewMonth = date.getMonth();
+            loadMonth();
+        } else {
+            render();
         }
-    });
+    }
 
-    document.getElementById('cal-events-wrap').addEventListener('click', async (e) => {
-        const btn = e.target.closest('[data-del-event]');
-        if(!btn) return;
-        const id = btn.getAttribute('data-del-event');
-        try{
-            await sb.from('household_events').delete().eq('id', id);
-            eventsByDate[selectedDate] =
-                (eventsByDate[selectedDate] || [])
-                    .filter(ev => String(ev.id) !== id);
-            renderGrid();
-            renderEventsPanel();
-        } catch(err){
-            setStatus('Could not remove event.');
+    function changeMonth(delta){
+        if(viewYear === undefined) return;
+        const date = new Date(viewYear, viewMonth + delta, 1);
+        viewYear = date.getFullYear();
+        viewMonth = date.getMonth();
+        loadMonth();
+    }
+
+    // ---------- moon stats + projection ----------
+    // rows: [{event_date}] ascending -> array of cycles, each an array of consecutive Dates
+    function buildMoonCycles(rows){
+        const dates = [...new Set(rows.map(row => row.event_date))].map(parseDate);   // dedupe same-day events
+        const cycles = [];
+        dates.forEach((date, i) => {
+            if(i > 0 && daysBetween(dates[i - 1], date) === 1){
+                cycles[cycles.length - 1].push(date);
+            } else {
+                cycles.push([date]);
+            }
+        });
+        return cycles;
+    }
+
+    function getMoonStats(){
+        const lookback = $('moon-lookback');
+        if(!lookback) return null;
+
+        const months = Number(lookback.value);
+        const cutoff = new Date();
+        if(months !== 999) cutoff.setMonth(cutoff.getMonth() - months);
+
+        const rows = histories.moon.filter(row =>
+            months === 999 || parseDate(row.event_date) >= cutoff
+        );
+
+        // ignore 1-day "cycles"
+        const cycles = buildMoonCycles(rows).filter(cycle => cycle.length > 1);
+        if(!cycles.length) return null;
+
+        const gaps = cycles.slice(1).map((cycle, i) => daysBetween(cycles[i][0], cycle[0]));
+
+        return {
+            avgLength: average(cycles.map(cycle => cycle.length)),
+            avgGap: average(gaps),   // 0 when there's only one cycle
+            lastStart: cycles[cycles.length - 1][0]
+        };
+    }
+
+    const projectedStart = (stats, k) => addDays(stats.lastStart, Math.round(stats.avgGap) * k);
+
+    function buildProjection(stats){
+        const days = new Set();
+        const length = Math.max(1, Math.round(stats.avgLength));
+        const today = todayStr();
+
+        for(let k = 1; k <= PROJECTION_CYCLES; k++){
+            const start = projectedStart(stats, k);
+            for(let i = 0; i < length; i++){
+                const str = toDateStr(addDays(start, i));
+                if(str >= today) days.add(str);   // only future days
+            }
         }
-    });
+        return days;
+    }
 
-    document.addEventListener('keydown', (e) => {
-        if(e.key === 'Enter' && e.target.id === 'cal-new-event'){
-            document.getElementById('cal-add-event').click();
+    function updateMoonPanel(){
+        const stats = getMoonStats();
+        const canProject = !!stats && stats.avgGap >= 1;   // need 2+ cycles to know the gap
+
+        projectedMoonDays = canProject ? buildProjection(stats) : new Set();
+
+        setText('moon-avg-length', stats ? stats.avgLength.toFixed(1) : '--');
+        setText('moon-avg-between', canProject ? stats.avgGap.toFixed(1) : '--');
+        setText('moon-next-1', canProject ? projectedStart(stats, 1).toLocaleDateString() : '--');
+        setText('moon-next-2', canProject ? projectedStart(stats, 2).toLocaleDateString() : '--');
+    }
+
+    // ---------- "o" stats ----------
+    function updateOPanel(){
+        const dates = histories.o.map(row => parseDate(row.event_date));
+        if(!dates.length){
+            setText('o-days-since', '--');
+            setText('o-longest-gap', '--');
+            return;
         }
-    });
 
+        const daysSince = daysBetween(dates[dates.length - 1], parseDate(todayStr()));
+        const gaps = dates.slice(1).map((date, i) => daysBetween(dates[i], date));
+
+        setText('o-days-since', String(daysSince));
+        setText('o-longest-gap', String(Math.max(daysSince, ...gaps)));   // the current streak counts too
+    }
+
+    // ---------- realtime ----------
     let realtimeChannel = null;
     let realtimeDebounceTimer = null;
 
@@ -551,79 +334,100 @@
         realtimeChannel = sb.channel('calendar-realtime-channel')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'household_events' }, () => {
                 clearTimeout(realtimeDebounceTimer);
-                realtimeDebounceTimer = setTimeout(() => {
-                    loadMonth();
-
-                    loadLayerOptions();
-
-                    loadAllHistory('o', updateOPanel);
-                    loadAllHistory('moon', updateMoonPanel);
-                }, 300);
+                realtimeDebounceTimer = setTimeout(refreshAll, 300);
             })
             .subscribe();
     }
 
-    function init(){
-        const now = new Date();
+    // ---------- event listeners ----------
+    $('cal-prev').addEventListener('click', () => changeMonth(-1));
+    $('cal-next').addEventListener('click', () => changeMonth(1));
 
-        viewYear = now.getFullYear();
-        viewMonth = now.getMonth();
-        selectedDate = todayStr();
+    $('cal-days').addEventListener('click', e => {
+        const cell = e.target.closest('.cal-day');
+        if(cell) selectDate(cell.dataset.date);
+    });
 
-        loadMonth();
+    $('moon-lookback')?.addEventListener('change', () => {
+        updateMoonPanel();
+        renderGrid();
+    });
 
-        loadLayerOptions();
-
-        loadAllHistory('o', updateOPanel);
-        loadAllHistory('moon', updateMoonPanel);
-
-        setupRealtime();
-    }
-
+    // overlay buttons: toggle the layer and its stats panel
     document.addEventListener('click', e => {
-
         const btn = e.target.closest('.cal-overlay-btn');
-        if (!btn) return;
+        if(!btn) return;
 
         const layer = btn.dataset.layer;
+        const nowVisible = !visibleLayers.has(layer);
+        if(nowVisible) visibleLayers.add(layer); else visibleLayers.delete(layer);
 
-        if (visibleLayers.has(layer)) {
-            visibleLayers.delete(layer);
-            btn.classList.remove('active');
-        } else {
-            visibleLayers.add(layer);
-            btn.classList.add('active');
+        btn.classList.toggle('active', nowVisible);
+        $(LAYER_PANELS[layer])?.classList.toggle('hidden', !nowVisible);
+        render();
+    });
+
+    initDragAndDrop($('cal-events'), { onReorder: reorderEvents });
+
+    $('cal-add-event').addEventListener('click', async () => {
+        const input = $('cal-new-event');
+        const title = input.value.trim();
+        if(!title) return;
+
+        const layer = $('cal-event-layer').value || null;
+        const events = eventsByDate[selectedDate] || [];
+        const sort_order = Math.max(0, events.length, ...events.map(ev => Number(ev.sort_order) || 0)) + 1;
+
+        try{
+            const { data, error } = await sb.from('household_events')
+                .insert({ event_date: selectedDate, title, sort_order, layer })
+                .select()
+                .single();
+            if(error) throw error;
+            (eventsByDate[selectedDate] ||= []).push(data);
+            input.value = '';
+            render();
+        } catch(err){
+            console.error('Failed to add event:', err);
+            setStatus('Could not add event.');
         }
+    });
 
-        // show/hide moon panel
-        const moonPanel = document.getElementById('moon-panel');
-        if (moonPanel) {
-            moonPanel.classList.toggle(
-                'hidden',
-                !visibleLayers.has('moon')
-            );
-            if (visibleLayers.has('moon')) {
-                updateMoonPanel();
-            }
+    $('cal-new-event').addEventListener('keydown', e => {
+        if(e.key === 'Enter') $('cal-add-event').click();
+    });
+
+    $('cal-events-wrap').addEventListener('click', async e => {
+        const btn = e.target.closest('[data-del-event]');
+        if(!btn) return;
+
+        const id = btn.dataset.delEvent;
+        try{
+            const { error } = await sb.from('household_events').delete().eq('id', id);
+            if(error) throw error;
+            eventsByDate[selectedDate] = (eventsByDate[selectedDate] || [])
+                .filter(ev => String(ev.id) !== id);
+            render();
+        } catch(err){
+            console.error('Failed to remove event:', err);
+            setStatus('Could not remove event.');
         }
-
-        // show/hide o panel
-        const oPanel = document.getElementById('o-panel');
-        if (oPanel) {
-            oPanel.classList.toggle(
-                'hidden',
-                !visibleLayers.has('o')
-            );
-        }
-
-        renderGrid();
-        renderEventsPanel();
-
     });
 
     window.addEventListener('beforeunload', () => {
         if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
     });
+
+    // ---------- init ----------
+    function init(){
+        const now = new Date();
+        viewYear = now.getFullYear();
+        viewMonth = now.getMonth();
+        selectedDate = todayStr();
+
+        refreshAll();
+        setupRealtime();
+    }
 
     if(window.initAppPage){
         window.initAppPage(init);
