@@ -505,10 +505,33 @@ select { cursor: pointer; }
   display: flex;
   flex-direction: column;
   gap: 4px;
+  position: relative;
+  isolation: isolate;   /* keeps z-index: -1 inside this cell */
   &:hover { border-color: var(--primary-hover); }
   &.other-month { opacity: 0.35; }
   &.selected { border-color: var(--primary); border-width: 2px; background: var(--card); }
   &.today .cal-day-num { color: var(--ochre); font-weight: 700; }
+}
+
+.cal-day-flow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;          /* behind number/dots, above the cell background */
+}
+
+.flow-spotting { background: rgba(244, 114, 182, 0.15); }
+.flow-light    { background: rgba(244, 114, 182, 0.30); }
+.flow-medium   { background: rgba(225, 29, 72, 0.35); }
+.flow-heavy    { background: rgba(159, 18, 57, 0.50); }
+
+.cal-day-o {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.8em;
+  line-height: 1;
 }
 
 .cal-day-num { font-size: var(--text-sm); font-weight: 600; color: var(--ink); }

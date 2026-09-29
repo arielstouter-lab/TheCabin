@@ -10,6 +10,8 @@
     const visibleLayers = new Set([
         'default'
     ]);
+    const layerOf = ev => ev.layer || 'default';   // null layer = default
+    const FLOW_KEYS = ['spotting', 'light', 'medium', 'heavy']; // placeholder names, match your titles
 
     function pad(n){ return String(n).padStart(2,'0'); }
     function toDateStr(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
@@ -160,19 +162,38 @@
         }
 
         document.getElementById('cal-days').innerHTML = cells.map(c => {
-            const visibleEvents = (eventsByDate[c.dateStr] || [])
-                .filter(ev => visibleLayers.has(ev.layer));
+            const events = eventsByDate[c.dateStr] || [];
+            const forLayer = layer =>
+                visibleLayers.has(layer) ? events.filter(ev => layerOf(ev) === layer) : [];
 
-            const count = visibleEvents.length;
+            const defaultEvents = forLayer('default');
+            const oEvents       = forLayer('o');
+            const moonEvents    = forLayer('moon');
+
             const classes = ['cal-day'];
-            if(c.otherMonth) classes.push('other-month');
-            if(c.dateStr === today) classes.push('today');
-            if(c.dateStr === selectedDate) classes.push('selected');
-            const dots = count ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(count,4))}</div>` : '';
+            if (c.otherMonth) classes.push('other-month');
+            if (c.dateStr === today) classes.push('today');
+            if (c.dateStr === selectedDate) classes.push('selected');
+
+            // dots: default layer only
+            const dots = defaultEvents.length
+                ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(defaultEvents.length, 4))}</div>`
+                : '';
+
+            // os: single icon if any o-layer event exists
+            const os = oEvents.length ? `<span class="cal-day-o">💥</span>` : '';
+
+            // flows: translucent overlay, color chosen by the event title
+            const flowKey = moonEvents
+                .map(ev => (ev.title || '').trim().toLowerCase())
+                .find(t => FLOW_KEYS.includes(t));
+            const flows = flowKey ? `<div class="cal-day-flow flow-${flowKey}"></div>` : '';
+
             return `<div class="${classes.join(' ')}" data-date="${c.dateStr}">
+        ${flows}
         <span class="cal-day-num">${c.label}</span>
-        ${dots}
-      </div>`;
+        ${dots}${os}
+    </div>`;
         }).join('');
     }
 
