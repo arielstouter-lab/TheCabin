@@ -571,7 +571,7 @@ select { cursor: pointer; }
   right: 5px;
   font-size: var(--text-sm);
   line-height: inherit;
-  z-index: 1;
+  z-index: -1;
 }
 
 .cal-day-num { font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
