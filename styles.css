@@ -413,6 +413,10 @@ select { cursor: pointer; }
   &:focus { opacity: 0.7; }
 }
 
+.hidden {
+  display: none;
+}
+
 .secret-hint {
   position: relative;
   display: inline-block;
@@ -480,7 +484,7 @@ select { cursor: pointer; }
   &:hover { background: var(--line); }
 }
 
-.cal-overlay-btn {
+button.cal-overlay-btn {
   background: transparent;
   border: none;
 }

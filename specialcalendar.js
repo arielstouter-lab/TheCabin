@@ -271,10 +271,26 @@
             btn.classList.add('active');
         }
 
+        // show/hide moon panel
+        const moonPanel = document.getElementById('moon-panel');
+        if (moonPanel) {
+            moonPanel.classList.toggle(
+                'hidden',
+                !visibleLayers.has('moon')
+            );
+        }
+
+        // show/hide o panel
+        const oPanel = document.getElementById('o-panel');
+        if (oPanel) {
+            oPanel.classList.toggle(
+                'hidden',
+                !visibleLayers.has('o')
+            );
+        }
+
         renderGrid();
         renderEventsPanel();
-
-        console.log('overlay clicked');
 
     });
 
