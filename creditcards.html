@@ -4,6 +4,14 @@
     <title>Credit Cards</title>
     <link rel="stylesheet" href="styles.css">
     <script src="head-loader.js"></script>
+
+    <script>
+  window.addEventListener('error', (e) => {
+    document.body.insertAdjacentHTML('afterbegin',
+      `<pre style="background:#900;color:#fff;padding:12px;white-space:pre-wrap;font-size:12px;">${e.message}\n${e.filename}:${e.lineno}</pre>`);
+  });
+</script>
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
