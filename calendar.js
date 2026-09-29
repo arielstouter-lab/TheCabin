@@ -529,7 +529,7 @@
             await sb.from('household_events').delete().eq('id', id);
             eventsByDate[selectedDate] =
                 (eventsByDate[selectedDate] || [])
-                    .filter(ev => ev.id !== id);
+                    .filter(ev => String(ev.id) !== id);
             renderGrid();
             renderEventsPanel();
         } catch(err){
