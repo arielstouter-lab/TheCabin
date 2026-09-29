@@ -6,6 +6,7 @@
     let viewYear, viewMonth; // 0-indexed month
     let selectedDate; // 'YYYY-MM-DD'
     let eventsByDate = {}; // {'YYYY-MM-DD': [{id, title}]}
+    let oHistory = [];
     const visibleLayers = new Set([
         'default'
     ]);
@@ -41,6 +42,30 @@
         }
         renderGrid();
         renderEventsPanel();
+        updateOPanel();
+    }
+
+    async function loadOHistory() {
+
+        try {
+
+            const { data, error } = await sb
+                .from('household_events')
+                .select('event_date')
+                .eq('layer', 'o')
+                .order('event_date', { ascending: true });
+
+            if (error) throw error;
+
+            oHistory = data || [];
+
+            updateOPanel();
+
+        } catch (err) {
+
+            console.error('Failed to load O history', err);
+
+        }
     }
 
     function renderGrid(){
@@ -123,6 +148,46 @@
             renderGrid();
             renderEventsPanel();
         }
+    }
+
+    function updateOPanel() {
+
+        if (!oHistory.length) return;
+
+        const msPerDay = 1000 * 60 * 60 * 24;
+
+        const today = new Date();
+
+        const lastDate = new Date(
+            oHistory[oHistory.length - 1].event_date + 'T00:00:00'
+        );
+
+        const daysSince =
+            Math.floor((today - lastDate) / msPerDay);
+
+        let longestGap = 0;
+
+        for (let i = 1; i < oHistory.length; i++) {
+
+            const prev = new Date(
+                oHistory[i - 1].event_date + 'T00:00:00'
+            );
+
+            const curr = new Date(
+                oHistory[i].event_date + 'T00:00:00'
+            );
+
+            const gap =
+                Math.floor((curr - prev) / msPerDay);
+
+            longestGap = Math.max(longestGap, gap);
+        }
+
+        document.getElementById('o-days-since').textContent =
+            daysSince;
+
+        document.getElementById('o-longest-gap').textContent =
+            longestGap;
     }
 
     document.getElementById('cal-prev').addEventListener('click', () => {
@@ -249,10 +314,13 @@
 
     function init(){
         const now = new Date();
+
         viewYear = now.getFullYear();
         viewMonth = now.getMonth();
         selectedDate = todayStr();
+
         loadMonth();
+        loadOHistory();
         setupRealtime();
     }
 
