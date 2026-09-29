@@ -27,7 +27,12 @@
             eventsByDate = {};
             (data || []).forEach(ev => {
                 eventsByDate[ev.event_date] = eventsByDate[ev.event_date] || [];
-                eventsByDate[ev.event_date].push({id: ev.id, title: ev.title, sort_order: ev.sort_order});
+                eventsByDate[ev.event_date].push({
+                    id: ev.id,
+                    title: ev.title,
+                    sort_order: ev.sort_order,
+                    layer: ev.layer
+                });
             });
         } catch(err){
             console.error('Failed to load events:', err);
@@ -193,7 +198,12 @@
                 .single();
             if(error || !data){ setStatus('Could not add event.'); return; }
             eventsByDate[selectedDate] = eventsByDate[selectedDate] || [];
-            eventsByDate[selectedDate].push({id: data.id, title: data.title, sort_order: data.sort_order});
+            eventsByDate[selectedDate].push({
+                id: data.id,
+                title: data.title,
+                sort_order: data.sort_order,
+                layer: data.layer
+            });
             input.value = '';
             renderGrid();
             renderEventsPanel();
