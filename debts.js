@@ -503,7 +503,7 @@ function buildDebtRow(it) {
     r.override.value = s.payment_override ?? '';
     r.override.placeholder = 'auto';
     r.inBudget.checked = !!d.in_budget;
-    r.minRule.hidden = isMort;
+    // r.minRule.hidden = isMort;
     r.minNA.hidden = !isMort;
     // Promo rate (cards/loans). The start date shows today until one is saved.
     r.promoApr.value = d.promo_apr ?? '';
