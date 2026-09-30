@@ -11,7 +11,7 @@
 import { cloneEl, refs } from './dom.js';
 import { renderSummaryCards } from './summary-card.js';
 import {
-    mortgagePayment, minimumPayment, amortizationSchedule, scheduledBalanceAt,
+    amortizedPayment, minimumPayment, amortizationSchedule, scheduledBalanceAt,
     simulate, effectiveApr, addMonths, isYm, MAX_MONTHS
 } from './debt-engine.js';
 
@@ -190,11 +190,11 @@ function firstPaymentYm(d) {
     return null;
 }
 
-function mortgageInfo(d, aprPct) {
+function loanInfo(d, aprPct) {
     const principal = num(d.original_principal);
     const term = Math.round(num(d.term_months));
     const first = firstPaymentYm(d);
-    const pi = principal > 0 && term > 0 ? mortgagePayment(principal, aprPct, term) : 0;
+    const pi = principal > 0 && term > 0 ? amortizedPayment(principal, aprPct, term) : 0;
     const rows = pi > 0 && first
         ? amortizationSchedule({ principal, aprPct, termMonths: term, firstPaymentYm: first, payment: pi })
         : null;
@@ -212,9 +212,9 @@ async function createSnapshot(month) {
         const prior = mine.find(s => s.month < month) || mine[0];
         if (!prior) return;
         let balance = num(prior.balance);
-        if (d.kind === 'mortgage') {
+        if (d.kind === 'mortgage' || d.kind === 'loan') {
             // Carry the balance forward by the scheduled principal for the months that passed
-            const info = mortgageInfo(d, num(prior.apr));
+            const info = loanInfo(d, num(prior.apr));
             if (info.rows) {
                 const drop = scheduledBalanceAt(info.rows, info.principal, prior.month) - scheduledBalanceAt(info.rows, info.principal, month);
                 balance = Math.max(0, balance - Math.max(0, drop));
@@ -361,11 +361,14 @@ function buildModel() {
             const balance = num(s.balance);
             const apr = num(s.apr);
             const override = num(s.payment_override) > 0 ? num(s.payment_override) : null;
-            const isMort = d.kind === 'mortgage';
+            const isMortgage = d.kind === 'mortgage';
+            const isTermLoan =
+                d.kind === 'mortgage' ||
+                d.kind === 'loan';
             const minPct = 1;
             const minFloor = 35;
             const addsInterest = d.min_adds_interest !== false;
-            const promoApr = !isMort ? numOrNull(d.promo_apr) : null;
+            const promoApr = !isMortgage ? numOrNull(d.promo_apr) : null;
             const promoStartYm = dateToYm(d.promo_start);
             const promoEndYm = dateToYm(d.promo_end);
             // Rate charged in the first projected month (the month after the snapshot)
@@ -377,9 +380,11 @@ function buildModel() {
                 else if (promoStartYm && promoEndYm <= promoStartYm) warnings.push(`${d.name}: the promo expires before it starts.`);
             }
 
-            const mort = isMort ? mortgageInfo(d, apr) : null;
+            const mort = isTermLoan
+                ? loanInfo(d, apr)
+                : null;
             const cardMin = minimumPayment({ balance, apr: rateNow, minPct, minFloor, addsInterest });
-            const autoMin = isMort && mort.pi > 0 ? mort.pi : cardMin;
+            const autoMin = mort && mort.pi > 0 ? mort.pi : cardMin;
             const scheduled = balance > 0 ? Math.min(balance + interest, override ?? autoMin) : 0;
 
             if (balance > 0 && scheduled > 0 && scheduled <= interest + 0.005) {
@@ -389,11 +394,11 @@ function buildModel() {
             // PMI modelling (mortgage only)
             const homeValue = num(d.home_value);
             const ltv = d.target_ltv == null ? 79 : num(d.target_ltv);
-            const pmiRowAmount = isMort ? rowAmt(d.pmi_row_id) : 0;
-            const targetBalance = isMort && homeValue > 0 ? (homeValue * ltv) / 100 : 0;
+            const pmiRowAmount = isMortgage ? rowAmt(d.pmi_row_id) : 0;
+            const targetBalance = isMortgage && homeValue > 0 ? (homeValue * ltv) / 100 : 0;
             const pmiAmount = targetBalance > 0 ? pmiRowAmount : 0;
 
-            if (isMort) {
+            if (isMortgage) {
                 if (!(mort.pi > 0)) warnings.push(`${d.name}: add the original principal and term so the payment and schedule can be calculated.`);
                 if (pmiRowAmount > 0 && !(homeValue > 0)) warnings.push(`${d.name}: enter the home value to model when PMI drops.`);
                 const payRowAmt = rowAmt(d.payment_row_id);
@@ -403,13 +408,13 @@ function buildModel() {
             }
 
             return {
-                s, d, isMort, balance, apr, rateNow, override, interest, autoMin, scheduled, mort,
+                s, d, isMortgage: isMortgage, balance, apr, rateNow, override, interest, autoMin, scheduled, mort,
                 homeValue, ltv, targetBalance, pmiAmount, pmiRowAmount,
                 engine: {
                     id: d.id, name: d.name, kind: d.kind, balance, apr, promoApr, promoStartYm, promoEndYm,
                     minPct, minFloor, addsInterest,
                     paymentOverride: override || 0, inBudget: !!d.in_budget,
-                    piPayment: isMort ? mort.pi : 0, pmiAmount, targetBalance
+                    piPayment: mort ? mort.pi : 0, pmiAmount, targetBalance
                 }
             };
         });
@@ -451,7 +456,7 @@ export function renderDebts() {
     renderToolbar(model);
     renderDebtGrid(model);
     renderDebtSummary(model);
-    renderMortgageCards(model);
+    renderLoanCards(model);
     renderMoney(model);
     renderResults(model);
 
@@ -489,7 +494,7 @@ function renderToolbar(model) {
 }
 
 function buildDebtRow(it) {
-    const { d, s, isMort } = it;
+    const { d, s, isMortgage } = it;
     const tr = cloneEl('tpl-debt-row');
     const r = refs(tr);
     ['name', 'kind', 'balance', 'apr', 'promoApr', 'promoStart', 'promoEnd', 'override', 'inBudget'].forEach(k => { r[k].dataset.fk = `${s.id}:${k}`; });
@@ -505,8 +510,8 @@ function buildDebtRow(it) {
     r.promoApr.value = d.promo_apr ?? '';
     r.promoStart.value = d.promo_start ? String(d.promo_start).slice(0, 10) : todayIso();
     r.promoEnd.value = d.promo_end ? String(d.promo_end).slice(0, 10) : '';
-    r.promoWrap.hidden = isMort;
-    r.promoNA.hidden = !isMort;
+    r.promoWrap.hidden = isMortgage;
+    r.promoNA.hidden = !isMortgage;
     r.interest.title = it.rateNow !== it.apr ? `Promo rate ${it.rateNow}% applies next month` : '';
     r.minPay.textContent = fmt$(it.scheduled);
     r.minPay.title = it.override ? 'Using your override' : 'Calculated minimum';
@@ -546,14 +551,27 @@ function renderDebtSummary(model) {
     if (!model || !model.items.length) { box.replaceChildren(); return; }
     const items = model.items;
     const total = items.reduce((t, i) => t + i.balance, 0);
-    const interest = items.reduce((t, i) => t + i.interest, 0);
+    const interest = items
+        .filter(i => !i.isMortgage)
+        .reduce((t, i) => t + i.interest, 0);
     const scheduled = items.reduce((t, i) => t + i.scheduled, 0);
     const budgeted = items.filter(i => i.d.in_budget).reduce((t, i) => t + i.scheduled, 0);
-    const wApr = total > 0 ? items.reduce((t, i) => t + i.rateNow * i.balance, 0) / total : 0;
+    const nonMortgage = items.filter(i => !i.isMortgage);
+
+    const nonMortgageTotal =
+        nonMortgage.reduce((t, i) => t + i.balance, 0);
+
+    const wApr =
+        nonMortgageTotal > 0
+            ? nonMortgage.reduce(
+            (t, i) => t + i.rateNow * i.balance,
+            0
+        ) / nonMortgageTotal
+            : 0;
 
     renderSummaryCards(box, [
         { label: 'Total Debt', value: fmt$(total), unit: '', foot: `${items.length} debt${items.length === 1 ? '' : 's'} &middot; snapshot ${fmtYm(model.month)}` },
-        { label: 'Interest This Month', value: fmt$(interest), foot: `${fmt$(interest * 12)}/yr &middot; weighted APR ${wApr.toFixed(2)}%` },
+        { label: 'Consumer Debt Interest This Month', value: fmt$(interest), foot: `${fmt$(interest * 12)}/yr · weighted APR ${wApr.toFixed(2)}%` },
         { label: 'Scheduled Payments', value: fmt$(scheduled), foot: `${fmt$(scheduled - budgeted)}/mo not in the Budget &middot; ${fmt$(budgeted)}/mo already in the Budget` }
     ]);
 }
@@ -573,10 +591,11 @@ function fillRowSelect(select, selectedId) {
     select.value = match ? String(match.id) : '';
 }
 
-function buildMortgageCard(it) {
+function buildLoanCard(it) {
     const { d, s, mort } = it;
     const card = cloneEl('tpl-mortgage-card');
     const r = refs(card);
+    const isMortgage = d.kind === 'mortgage';
     ['principal', 'term', 'origin', 'firstPay', 'payRow', 'pmiRow', 'homeValue', 'ltv'].forEach(k => { r[k].dataset.fk = `${d.id}:m:${k}`; });
 
     r.title.textContent = d.name;
@@ -588,16 +607,29 @@ function buildMortgageCard(it) {
     r.homeValue.value = d.home_value ?? '';
     r.ltv.value = d.target_ltv ?? 79;
     fillRowSelect(r.payRow, d.payment_row_id);
-    fillRowSelect(r.pmiRow, d.pmi_row_id);
 
     r.principal.addEventListener('change', () => updateDebt(d.id, { original_principal: numOrNull(r.principal.value) }));
     r.term.addEventListener('change', () => updateDebt(d.id, { term_months: r.term.value ? Math.round(num(r.term.value)) : null }));
     r.origin.addEventListener('change', () => updateDebt(d.id, { origination_date: r.origin.value || null }));
     r.firstPay.addEventListener('change', () => updateDebt(d.id, { first_payment_month: isYm(r.firstPay.value) ? r.firstPay.value : null }));
     r.payRow.addEventListener('change', () => updateDebt(d.id, { payment_row_id: r.payRow.value || null }));
-    r.pmiRow.addEventListener('change', () => updateDebt(d.id, { pmi_row_id: r.pmiRow.value || null }));
-    r.homeValue.addEventListener('change', () => updateDebt(d.id, { home_value: numOrNull(r.homeValue.value) }));
-    r.ltv.addEventListener('change', () => updateDebt(d.id, { target_ltv: num(r.ltv.value) || 79 }));
+
+    r.pmiRowWrap.hidden = !isMortgage;
+    r.homeValueWrap.hidden = !isMortgage;
+    r.ltvWrap.hidden = !isMortgage;
+
+    if (isMortgage) {
+        fillRowSelect(r.pmiRow, d.pmi_row_id);
+
+        r.pmiRow.addEventListener('change', () =>
+            updateDebt(d.id, { pmi_row_id: r.pmiRow.value || null }));
+
+        r.homeValue.addEventListener('change', () =>
+            updateDebt(d.id, { home_value: numOrNull(r.homeValue.value) }));
+
+        r.ltv.addEventListener('change', () =>
+            updateDebt(d.id, { target_ltv: num(r.ltv.value) || 79 }));
+    }
 
     // --- read-outs
     const payRowAmt = (deps.getBankRows() || []).filter(b => sameId(b.id, d.payment_row_id)).reduce((t, b) => t + num(b.monthly_spend), 0);
@@ -608,28 +640,62 @@ function buildMortgageCard(it) {
 
     const cards = [
         {
-            label: 'Principal & Interest', value: fmt$(mort.pi), foot: payRowAmt > 0
-                ? `Budget row ${fmt$(payRowAmt)} &rarr; about ${fmt$(escrow)}/mo escrow or other`
+            label: 'Principal & Interest',
+            value: fmt$(mort.pi),
+            foot: payRowAmt > 0
+                ? `Budget row ${fmt$(payRowAmt)} → about ${fmt$(escrow)}/mo escrow or other`
                 : 'Pick the Budget row to compare against'
         },
         {
-            label: 'Balance vs. Schedule', value: fmt$(it.balance), unit: '',
-            foot: sched == null ? 'Add the loan details to see the schedule'
-                : `Scheduled ${fmt$(sched)} &middot; ${it.balance > sched + 1 ? fmt$(it.balance - sched) + ' behind' : it.balance < sched - 1 ? fmt$(sched - it.balance) + ' ahead' : 'on schedule'}`
-        },
-        {
-            label: `PMI Target (${it.ltv}% of value)`, unit: '',
-            value: it.targetBalance > 0 ? fmt$(it.targetBalance) : '—',
-            statusClass: it.targetBalance > 0 && need === 0 ? 'surplus' : '',
-            foot: it.targetBalance > 0
-                ? (need > 0 ? `${fmt$(need)} more principal needed &middot; LTV now ${((it.balance / it.homeValue) * 100).toFixed(1)}%` : 'Target reached')
-                : 'Enter the home value'
-        },
-        {
-            label: 'PMI', value: fmt$(it.pmiRowAmount),
-            foot: targetRow ? `Target reached on the normal schedule by ${fmtYm(targetRow.ym)}` : (it.pmiRowAmount > 0 ? 'Pick the Budget row and loan details' : 'Pick the Budget row that holds PMI')
+            label: 'Balance vs. Schedule',
+            value: fmt$(it.balance),
+            unit: '',
+            foot: sched == null
+                ? 'Add the loan details to see the schedule'
+                : `Scheduled ${fmt$(sched)} · ${
+                    it.balance > sched + 1
+                        ? fmt$(it.balance - sched) + ' behind'
+                        : it.balance < sched - 1
+                            ? fmt$(sched - it.balance) + ' ahead'
+                            : 'on schedule'
+                }`
         }
     ];
+
+    if (isMortgage) {
+        cards.push(
+            {
+                label: `PMI Target (${it.ltv}% of value)`,
+                unit: '',
+                value: it.targetBalance > 0
+                    ? fmt$(it.targetBalance)
+                    : '—',
+                statusClass:
+                    it.targetBalance > 0 && need === 0
+                        ? 'surplus'
+                        : '',
+                foot: it.targetBalance > 0
+                    ? (
+                        need > 0
+                            ? `${fmt$(need)} more principal needed · LTV now ${((it.balance / it.homeValue) * 100).toFixed(1)}%`
+                            : 'Target reached'
+                    )
+                    : 'Enter the home value'
+            },
+            {
+                label: 'PMI',
+                value: fmt$(it.pmiRowAmount),
+                foot: targetRow
+                    ? `Target reached on the normal schedule by ${fmtYm(targetRow.ym)}`
+                    : (
+                        it.pmiRowAmount > 0
+                            ? 'Pick the Budget row and loan details'
+                            : 'Pick the Budget row that holds PMI'
+                    )
+            }
+        );
+    }
+
     renderSummaryCards(r.summary, cards);
 
     // --- amortization schedule (original terms, no extra payments)
@@ -654,10 +720,15 @@ function buildMortgageCard(it) {
     return card;
 }
 
-function renderMortgageCards(model) {
+function renderLoanCards(model) {
     const box = $('mortgageCards');
     if (!box) return;
-    box.replaceChildren(...(model ? model.items.filter(i => i.isMort).map(buildMortgageCard) : []));
+    box.replaceChildren(...(model ? model.items
+        .filter(i =>
+            i.d.kind === 'mortgage' ||
+            i.d.kind === 'loan'
+        )
+        .map(buildLoanCard) : []));
 }
 
 // ------------------------------------------------------ money available

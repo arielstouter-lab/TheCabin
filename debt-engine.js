@@ -17,7 +17,7 @@ export const isYm = s => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(s || ''));
 
 // ------------------------------------------------------- payment formulas
 // Fixed principal-and-interest payment for a fully amortizing loan.
-export function mortgagePayment(principal, aprPct, termMonths) {
+export function amortizedPayment(principal, aprPct, termMonths) {
     const P = Number(principal) || 0;
     const n = Math.round(Number(termMonths) || 0);
     if (P <= 0 || n <= 0) return 0;
@@ -67,7 +67,7 @@ export function amortizationSchedule({ principal, aprPct, termMonths, firstPayme
     const n = Math.round(Number(termMonths) || 0);
     if (P <= 0 || n <= 0 || !isYm(firstPaymentYm)) return [];
     const r = (Number(aprPct) || 0) / 1200;
-    const pmt = payment > 0 ? payment : mortgagePayment(P, aprPct, n);
+    const pmt = payment > 0 ? payment : amortizedPayment(P, aprPct, n);
     const rows = [];
     let bal = P;
     for (let k = 1; k <= n && bal > EPS; k++) {
