@@ -837,17 +837,22 @@
                                     <label>Budget row: mortgage payment</label>
                                     <select class="text-input" data-ref="payRow"></select>
                                 </div>
-                                <div class="picker">
-                                    <label>Budget row: PMI</label>
-                                    <select class="text-input" data-ref="pmiRow"></select>
+                                <div class="picker" data-ref="pmiRowWrap">
+                                    ...
+                                    <select data-ref="pmiRow"></select>
                                 </div>
-                                <div class="picker">
+                                <div class="picker" data-ref="homeValueWrap">
                                     <label>Home value (original)</label>
-                                    <div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" data-ref="homeValue" /></div>
+                                    <div class="num-wrap money">
+                                        <input type="number" class="text-input" min="0" step="any" data-ref="homeValue" />
+                                    </div>
                                 </div>
-                                <div class="picker">
+
+                                <div class="picker" data-ref="ltvWrap">
                                     <label>PMI target (% of value)</label>
-                                    <div class="num-wrap pct"><input type="number" class="text-input" min="0" max="100" step="0.1" data-ref="ltv" /></div>
+                                    <div class="num-wrap pct">
+                                        <input type="number" class="text-input" min="0" max="100" step="0.1" data-ref="ltv" />
+                                    </div>
                                 </div>
                             </div>
                         </div>
