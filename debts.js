@@ -492,14 +492,16 @@ function buildDebtRow(it) {
     const { d, s, isMort } = it;
     const tr = cloneEl('tpl-debt-row');
     const r = refs(tr);
-    ['name', 'kind', 'balance', 'apr', 'minPct', 'minFloor', 'promoApr', 'promoStart', 'promoEnd', 'override', 'inBudget'].forEach(k => { r[k].dataset.fk = `${s.id}:${k}`; });
+    ['name', 'kind', 'balance', 'apr',
+        // 'minPct', 'minFloor',
+        'promoApr', 'promoStart', 'promoEnd', 'override', 'inBudget'].forEach(k => { r[k].dataset.fk = `${s.id}:${k}`; });
 
     r.name.value = d.name || '';
     r.kind.value = d.kind || 'card';
     r.balance.value = s.balance ?? 0;
     r.apr.value = s.apr ?? 0;
-    r.minPct.value = d.min_pct ?? 1;
-    r.minFloor.value = d.min_floor ?? 35;
+    // r.minPct.value = d.min_pct ?? 1;
+    // r.minFloor.value = d.min_floor ?? 35;
     r.override.value = s.payment_override ?? '';
     r.override.placeholder = 'auto';
     r.inBudget.checked = !!d.in_budget;
@@ -518,8 +520,8 @@ function buildDebtRow(it) {
 
     r.name.addEventListener('change', () => updateDebt(d.id, { name: r.name.value.trim() || d.name }));
     r.kind.addEventListener('change', () => updateDebt(d.id, { kind: r.kind.value }));
-    r.minPct.addEventListener('change', () => updateDebt(d.id, { min_pct: num(r.minPct.value) }));
-    r.minFloor.addEventListener('change', () => updateDebt(d.id, { min_floor: num(r.minFloor.value) }));
+    // r.minPct.addEventListener('change', () => updateDebt(d.id, { min_pct: num(r.minPct.value) }));
+    // r.minFloor.addEventListener('change', () => updateDebt(d.id, { min_floor: num(r.minFloor.value) }));
     r.inBudget.addEventListener('change', () => updateDebt(d.id, { in_budget: r.inBudget.checked }));
     r.promoApr.addEventListener('change', () => {
         const rate = numOrNull(r.promoApr.value);
