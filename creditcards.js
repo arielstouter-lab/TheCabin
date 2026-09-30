@@ -1,6 +1,7 @@
 import { cloneEl, refs } from './dom.js';
 import { buildCategoryRow } from './category-row.js';
 import { renderSummaryCards } from './summary-card.js';
+import { initDebts, loadDebtData, renderDebts } from './debts.js';
 
 const sb = window.supabaseClient;
 const CATEGORIES_TABLE = 'income_expense_categories';
@@ -415,6 +416,17 @@ function getRentalProfit(propertyName) {
     return getRentalRent(propertyName) - getRentalTotalExpenses(propertyName);
 }
 
+function getBudgetTotals() {
+    const spend = spendRows(), bank = bankSpendRows(), income = incomeRows();
+    const totalCcSpend = spend.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const totalBankSpend = bank.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const totalSpending = totalCcSpend + totalBankSpend;
+    const regularIncome = income.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const rentalProfits = RENTAL_PROPERTIES.reduce((sum, prop) => sum + getRentalProfit(prop), 0);
+    const totalIncome = regularIncome + rentalProfits;
+    return { income, totalCcSpend, totalBankSpend, totalSpending, totalIncome, netBalance: totalIncome - totalSpending };
+}
+
 function render() {
     renderSpendGrid();
     renderBankSpendGrid();
@@ -426,6 +438,7 @@ function render() {
     renderBestCombo();
     renderComparison();
     renderRentals();
+    renderDebts();
 }
 
 // -------------------------------------------------------------------
@@ -505,15 +518,7 @@ function renderBalanceSummary() {
     const container = document.getElementById('balanceSummaryGrid');
     if (!container) return;
 
-    const spend = spendRows(), bank = bankSpendRows(), income = incomeRows();
-    const totalCcSpend = spend.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const totalBankSpend = bank.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const totalSpending = totalCcSpend + totalBankSpend;
-
-    const regularIncome = income.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const rentalProfits = RENTAL_PROPERTIES.reduce((sum, prop) => sum + getRentalProfit(prop), 0);
-    const totalIncome = regularIncome + rentalProfits;
-    const netBalance = totalIncome - totalSpending;
+    const { income, totalCcSpend, totalBankSpend, totalSpending, totalIncome, netBalance } = getBudgetTotals();
 
     const isSurplus = netBalance >= 0;
     const statusClass = isSurplus ? 'surplus' : 'deficit';
@@ -985,7 +990,7 @@ function debounceReload() {
     realtimeDebounceTimer = setTimeout(async () => {
         const activeEl = document.activeElement;
         if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName)) return;
-        await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax()]);
+        await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax(), loadDebtData()]);
         render();
     }, 400);
 }
@@ -995,10 +1000,15 @@ window.addEventListener('beforeunload', () => {
 });
 
 async function loadAll() {
-    await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax()]);
+    await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax(), loadDebtData()]);
     render();
     setupRealtime();
 }
+
+initDebts({
+    getNetBalance: () => getBudgetTotals().netBalance,
+    getBankRows: () => bankSpendRows()
+});
 
 // -------------------------------------------------------------------
 // Wire up UI
@@ -1112,12 +1122,12 @@ if (cardBSelect) cardBSelect.addEventListener('change', renderComparison);
 // -------------------------------------------------------------------
 // Tabs — hash-routed
 // -------------------------------------------------------------------
-const TAB_KEYS = ['budget', 'comparison', 'rental'];
+const TAB_KEYS = ['budget', 'comparison', 'rental', 'debt'];
 const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
 
 function switchTab(tabKey) {
     document.querySelectorAll('#cc-tabs .tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabKey));
-    ['budget', 'comparison', 'rental'].forEach(key => {
+    TAB_KEYS.forEach(key => {
         const pane = document.getElementById(`tab-${key}`);
         if (pane) pane.hidden = key !== tabKey;
     });

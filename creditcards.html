@@ -34,6 +34,9 @@
                 <button type="button" class="tab" data-tab="rental">
                     <span>Rentals</span>
                 </button>
+                <button type="button" class="tab" data-tab="debt">
+                    <span>Debt</span>
+                </button>
             </div>
 
             <!-- Tab 1: Budget -->
@@ -478,6 +481,175 @@
                 </div>
             </div>
 
+            <!-- Tab 4: Debt -->
+            <div id="tab-debt" class="tab-pane" hidden>
+
+                <!-- Outstanding debts (snapshot) -->
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Outstanding Debts</h2>
+                        <span class="card-sub">Balances as of the selected month. Projections start the month after.</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="cc-add-form">
+                            <div class="picker">
+                                <label for="debtMonthSelect">Snapshot</label>
+                                <select id="debtMonthSelect"></select>
+                            </div>
+                            <div class="picker">
+                                <label for="debtNewMonth">New snapshot month</label>
+                                <input type="month" class="text-input" id="debtNewMonth" />
+                            </div>
+                            <button type="button" class="button-inline" id="debtNewSnapshotBtn">Copy forward</button>
+                            <button type="button" class="button-inline button-ghost" id="debtDeleteMonthBtn">Delete month</button>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th class="min-col">Debt</th>
+                                    <th>Type</th>
+                                    <th class="col-num">Balance</th>
+                                    <th class="col-num">APR</th>
+                                    <th>Minimum rule</th>
+                                    <th title="Special rate, its start date, and its expiration date">Promo rate &middot; starts &middot; ends</th>
+                                    <th class="col-num">Payment</th>
+                                    <th class="col-num">Override</th>
+                                    <th class="col-num">Interest / mo</th>
+                                    <th class="col-action" title="Regular payment is already in the Budget">In Budget</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="debtGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="debtGridEmpty" class="empty-state" hidden>No debts yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newDebtName" placeholder="Debt (e.g. Chase Sapphire)" />
+                                <select class="text-input" id="newDebtKind">
+                                    <option value="card">Credit card</option>
+                                    <option value="loan">Loan</option>
+                                    <option value="mortgage">Mortgage</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newDebtBalance" placeholder="Balance" min="0" step="any" />
+                                </div>
+                                <div class="num-wrap pct">
+                                    <input type="number" class="text-input" id="newDebtApr" placeholder="APR" min="0" step="0.01" />
+                                </div>
+                            </div>
+                            <button type="button" class="button-inline" id="addDebtBtn">Add debt</button>
+                        </div>
+                        <p class="form-note">A promo rate replaces the APR from its start month until the month it expires (the regular APR applies in the expiration month). Payment is the calculated minimum (the greater of the floor or the percent of the balance, plus interest) unless you type an override. For loans, enter your fixed payment as the override. Tick <em>In Budget</em> when the regular payment is already one of your Budget expenses, so it isn't subtracted from your available money twice.</p>
+
+                        <div id="debtSummaryGrid" class="summary-grid"></div>
+                    </div>
+                </div>
+
+                <!-- One card per mortgage debt -->
+                <div id="mortgageCards"></div>
+
+                <!-- Money available -->
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Money Available</h2>
+                        <span class="card-sub">Defaults to the Budget's Net Balance; override any month</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="cc-add-form">
+                            <div class="picker">
+                                <label>Default from Budget</label>
+                                <span id="debtNetBalance" class="tax-val">$0.00/mo</span>
+                            </div>
+                            <div class="picker">
+                                <label for="debtStrategySelect">Payoff order</label>
+                                <select id="debtStrategySelect">
+                                    <option value="avalanche">Avalanche (highest APR first)</option>
+                                    <option value="snowball">Snowball (smallest balance first)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th class="min-col">Month</th>
+                                    <th class="col-num min-col">Money available</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="debtOverrideBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="debtOverrideEmpty" class="empty-state" hidden>No overrides &mdash; every month uses the Budget's Net Balance.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="month" class="text-input" id="newOverrideMonth" />
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newOverrideAmount" placeholder="Money available" min="0" step="any" />
+                                </div>
+                            </div>
+                            <button type="button" class="button-inline" id="addOverrideBtn">Set month</button>
+                        </div>
+                        <p class="form-note">An override replaces the default for that month with the total money available for debt (a bonus month might be $5,000; a tight month might be $0). Regular payments that are already in the Budget are covered separately.</p>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Payoff Plan</h2>
+                        <span class="card-sub">Scenarios compared from the selected snapshot</span>
+                    </div>
+                    <div class="card-body">
+                        <p id="debtResultsEmpty" class="empty-state">Add a debt with a balance to see payoff dates.</p>
+                        <div id="debtResultsWrap" hidden>
+                            <div id="debtWarnings"></div>
+
+                            <div class="table-wrap">
+                                <table class="cc-table">
+                                    <thead>
+                                    <tr>
+                                        <th class="min-col">Scenario</th>
+                                        <th>PMI drops</th>
+                                        <th>Consumer debt-free</th>
+                                        <th>Fully debt-free</th>
+                                        <th class="col-num">Interest</th>
+                                        <th class="col-num">PMI paid</th>
+                                        <th class="col-num">Total cost</th>
+                                        <th class="col-num">Saved vs. minimums</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="debtScenarioBody"></tbody>
+                                </table>
+                            </div>
+
+                            <div class="cc-add-form">
+                                <div class="picker">
+                                    <label for="debtPlanSelect">Month-by-month plan</label>
+                                    <select id="debtPlanSelect"></select>
+                                </div>
+                            </div>
+
+                            <div id="debtDatesGrid" class="summary-grid"></div>
+
+                            <div class="table-wrap debt-scroll">
+                                <table class="cc-table">
+                                    <thead id="debtPlanHead"></thead>
+                                    <tbody id="debtPlanBody"></tbody>
+                                </table>
+                            </div>
+                            <p class="form-note">Assumes no new charges on these debts, interest of APR&divide;12 on the balance each month, and that freed-up payments (paid-off debts, PMI ending) roll into the money available. Real issuers use average daily balances, so expect small differences.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ============ Templates ============ -->
             <!-- Shared components (also used by other pages that import
                  category-row.js / summary-card.js) -->
@@ -589,6 +761,124 @@
                     </div>
                 </div>
             </template>
+
+            <template id="tpl-debt-row">
+                <tr>
+                    <td><input type="text" class="text-input" data-ref="name" /></td>
+                    <td>
+                        <select class="text-input" data-ref="kind">
+                            <option value="card">Credit card</option>
+                            <option value="loan">Loan</option>
+                            <option value="mortgage">Mortgage</option>
+                        </select>
+                    </td>
+                    <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" data-ref="balance" /></div></td>
+                    <td class="col-num"><div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.01" data-ref="apr" /></div></td>
+                    <td>
+                        <div class="debt-minrule" data-ref="minRule">
+                            <div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.1" data-ref="minPct" title="Percent of balance" /></div>
+                            <div class="num-wrap money"><input type="number" class="text-input" min="0" step="1" data-ref="minFloor" title="Minimum floor" /></div>
+                        </div>
+                        <span class="form-note" data-ref="minNA" hidden>See mortgage details</span>
+                    </td>
+                    <td>
+                        <div class="debt-promo" data-ref="promoWrap">
+                            <div class="num-wrap pct"><input type="number" class="text-input" min="0" step="0.01" placeholder="Promo" data-ref="promoApr" title="Special rate (0 is fine)" /></div>
+                            <input type="date" class="text-input" data-ref="promoStart" title="Promo starts" />
+                            <input type="date" class="text-input" data-ref="promoEnd" title="Promo expires — the regular APR applies from this month" />
+                        </div>
+                        <span class="form-note" data-ref="promoNA" hidden>&mdash;</span>
+                    </td>
+                    <td class="col-num" data-ref="minPay"></td>
+                    <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" data-ref="override" /></div></td>
+                    <td class="col-num" data-ref="interest"></td>
+                    <td class="col-action"><input type="checkbox" data-ref="inBudget" title="Regular payment is already in the Budget" /></td>
+                    <td class="col-action"><button type="button" class="icon-delete" title="Delete debt" data-ref="delBtn">✕</button></td>
+                </tr>
+            </template>
+
+            <template id="tpl-override-row">
+                <tr>
+                    <td><input type="month" class="text-input" data-ref="month" /></td>
+                    <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" data-ref="amount" /></div></td>
+                    <td class="col-action"><button type="button" class="icon-delete" title="Delete override" data-ref="delBtn">✕</button></td>
+                </tr>
+            </template>
+
+            <template id="tpl-mortgage-card">
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title" data-ref="title"></h2>
+                        <span class="card-sub">Mortgage, PMI and amortization</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <div class="picker">
+                                    <label>Original principal</label>
+                                    <div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" data-ref="principal" /></div>
+                                </div>
+                                <div class="picker">
+                                    <label>Term (months)</label>
+                                    <input type="number" class="text-input" min="1" step="1" placeholder="360" data-ref="term" />
+                                </div>
+                                <div class="picker">
+                                    <label>Origination date</label>
+                                    <input type="date" class="text-input" data-ref="origin" />
+                                </div>
+                                <div class="picker">
+                                    <label>First payment month</label>
+                                    <input type="month" class="text-input" data-ref="firstPay" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <div class="picker">
+                                    <label>Budget row: mortgage payment</label>
+                                    <select class="text-input" data-ref="payRow"></select>
+                                </div>
+                                <div class="picker">
+                                    <label>Budget row: PMI</label>
+                                    <select class="text-input" data-ref="pmiRow"></select>
+                                </div>
+                                <div class="picker">
+                                    <label>Home value (original)</label>
+                                    <div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" data-ref="homeValue" /></div>
+                                </div>
+                                <div class="picker">
+                                    <label>PMI target (% of value)</label>
+                                    <div class="num-wrap pct"><input type="number" class="text-input" min="0" max="100" step="0.1" data-ref="ltv" /></div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="form-note">If you leave the first payment month blank it is assumed to be two months after origination. The schedule uses this snapshot's APR, so it assumes a fixed rate.</p>
+
+                        <div data-ref="summary" class="summary-grid"></div>
+
+                        <details class="debt-schedule">
+                            <summary>Amortization schedule (original terms, no extra payments)</summary>
+                            <div class="table-wrap debt-scroll" data-ref="scheduleWrap">
+                                <table class="cc-table">
+                                    <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Month</th>
+                                        <th class="col-num">Payment</th>
+                                        <th class="col-num">Interest</th>
+                                        <th class="col-num">Principal</th>
+                                        <th class="col-num">Balance</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody data-ref="scheduleBody"></tbody>
+                                </table>
+                            </div>
+                            <p class="empty-state" data-ref="scheduleEmpty" hidden>Enter the principal, term and origination date to see the schedule.</p>
+                        </details>
+                    </div>
+                </div>
+            </template>
+
         </section>
     </main>
 </div>

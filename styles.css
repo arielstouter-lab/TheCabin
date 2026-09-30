@@ -189,10 +189,12 @@ textarea { font: inherit; }
 .form-group input:focus,
 .text-input:focus,
 select:focus,
-input[type=date]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
+input[type=date],
+input[type=month]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
 
 select,
-input[type=date] { padding: 6px 8px; background-color: var(--paper); font-family: inherit; font-size: var(--text-sm); color: var(--ink); box-sizing: border-box; max-width: 100%; transition: border-color 0.15s, box-shadow 0.15s; }
+input[type=date],
+input[type=month] { padding: 6px 8px; background-color: var(--paper); font-family: inherit; font-size: var(--text-sm); color: var(--ink); box-sizing: border-box; max-width: 100%; transition: border-color 0.15s, box-shadow 0.15s; }
 
 select { cursor: pointer; }
 
@@ -552,7 +554,7 @@ select { cursor: pointer; }
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  z-index: -1;          /* behind number/dots, above the cell background */
+  z-index: -1;
 }
 
 .flow-spotting { background: var(--flowlight); opacity: 0.4; }
@@ -920,8 +922,6 @@ body.cal-page {
   .tax-val { font-weight: 600; color: var(--ink); white-space: nowrap; }
 }
 
-/*.rental-tax-op { font-size: var(--text-md); font-weight: 700; color: var(--ink-soft); user-select: none; }*/
-
 .win-a { font-weight: 600; color: var(--primary); }
 
 .win-b { font-weight: 600; color: var(--ochre); }
@@ -968,6 +968,21 @@ body.cal-page {
   .combo-unit { font-size: var(--text-base); color: var(--ink-soft); font-weight: 500; }
   .combo-value-sub { font-size: var(--text-sm); color: var(--ink-soft); font-weight: 500; margin-top: 2px; }
 }
+
+/* --- Debt tab --- */
+.debt-minrule, .debt-promo { display: flex; gap: 6px; }
+.debt-minrule { min-width: 150px; }
+.debt-promo { min-width: 340px; }
+.debt-promo .num-wrap { flex: 0 0 90px; }
+.debt-promo input[type=date] { flex: 1 1 120px; }
+.debt-scroll { max-height: 420px; overflow-y: auto; }
+.debt-scroll thead th { position: sticky; top: 0; background: var(--card); z-index: 1; }
+.debt-row-hl td { background: var(--success-card); }
+.debt-schedule { margin-top: 16px; }
+.debt-schedule summary { cursor: pointer; font-size: var(--text-base); font-weight: 600; color: var(--primary); padding: 6px 0; }
+.button-inline.button-ghost { background: var(--paper); color: var(--primary); }
+.button-inline.button-ghost:hover:not(:disabled) { background: var(--line); border-color: var(--line); }
+.button-inline:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 7. OVERLAYS & PORTALS */
 .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; max-width: 380px; width: calc(100% - 48px); pointer-events: none; }
@@ -1022,7 +1037,8 @@ body.cal-page {
 .lst-priority-toggle,
 .stepper,
 select,
-input[type=date] { border: 1px solid var(--line); border-radius: var(--radius-sm); }
+input[type=date],
+input[type=month] { border: 1px solid var(--line); border-radius: var(--radius-sm); }
 
 /* 9. RESPONSIVE BREAKPOINTS (CONSOLIDATED) */
 @media (max-width: 780px) {
