@@ -542,27 +542,20 @@
                             </div>
                             <button type="button" class="button-inline" id="addDebtBtn">Add debt</button>
                         </div>
-                        <p class="form-note">A promo rate replaces the APR from its start month until the month it expires (the regular APR applies in the expiration month). Payment is the calculated minimum (the greater of the floor or the percent of the balance, plus interest) unless you type an override. For loans, enter your fixed payment as the override. Tick <em>In Budget</em> when the regular payment is already one of your Budget expenses, so it isn't subtracted from your available money twice.</p>
+                        <p class="form-note">Payment is the calculated minimum (1%, minimum of $35) unless you type an override. For loans, enter your fixed payment as the override. Tick <em>In Budget</em> when the regular payment is already one of your Budget expenses, so it isn't subtracted from your available money twice.</p>
 
                         <div id="debtSummaryGrid" class="summary-grid"></div>
                     </div>
                 </div>
 
-                <!-- One card per mortgage debt -->
-                <div id="mortgageCards"></div>
-
                 <!-- Money available -->
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Money Available</h2>
-                        <span class="card-sub">Defaults to the Budget's Net Balance; override any month</span>
+                        <span class="card-sub">This defaults to the Budget's Net Balance; override any month. Copy forward" carries your current selection into the next snapshot.</span>
                     </div>
                     <div class="card-body">
                         <div class="cc-add-form">
-                            <div class="picker">
-                                <label>Default from Budget</label>
-                                <span id="debtNetBalance" class="tax-val">$0.00/mo</span>
-                            </div>
                             <div class="picker">
                                 <label for="debtStrategySelect">Payoff order</label>
                                 <select id="debtStrategySelect">
@@ -573,6 +566,10 @@
                         </div>
 
                         <div class="table-wrap">
+                            <div class="picker">
+                                <label>Default from Budget</label>
+                                <span id="debtNetBalance" class="tax-val">$0.00/mo</span>
+                            </div>
                             <table class="cc-table">
                                 <thead>
                                 <tr>
@@ -586,22 +583,21 @@
 
                         <div class="cc-add-form">
                             <div class="cc-add-form">
-                <div class="picker">
-                    <label id="debtMoneyLabel" for="debtMoneyMode">From this snapshot forward</label>
-                    <select id="debtMoneyMode">
-                        <option value="default">Budget Net Balance (default)</option>
-                        <option value="fixed">Fixed amount</option>
-                    </select>
-                </div>
-                <div class="picker">
-                    <label for="debtMoneyAmount">Amount per month</label>
-                    <div class="num-wrap money">
-                        <input type="number" class="text-input" id="debtMoneyAmount" min="0" step="any" />
-                    </div>
-                </div>
-            </div>
-            <p class="form-note" id="debtMoneyNote"></p>
-            <p class="form-note">The setting is saved with the snapshot and keeps applying to every month after it. "Copy forward" carries it into the next snapshot; change it there to reset it from that month on (back to the Budget default, or to a different amount). Regular payments that are already in the Budget are covered separately.</p>
+                                <div class="picker">
+                                    <label id="debtMoneyLabel" for="debtMoneyMode">From this snapshot forward</label>
+                                    <select id="debtMoneyMode">
+                                        <option value="default">Budget Net Balance (default)</option>
+                                        <option value="fixed">Fixed amount</option>
+                                    </select>
+                                </div>
+                                <div class="picker">
+                                    <label for="debtMoneyAmount">Amount per month</label>
+                                    <div class="num-wrap money">
+                                        <input type="number" class="text-input" id="debtMoneyAmount" min="0" step="any" />
+                                    </div>
+                                </div>
+                            </div>
+                                <p class="form-note" id="debtMoneyNote"></p>
                         </div>
                     </div>
                 </div>
@@ -654,6 +650,11 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- One card per mortgage debt -->
+                <div id="mortgageCards"></div>
+
+
             </div>
 
             <!-- ============ Templates ============ -->

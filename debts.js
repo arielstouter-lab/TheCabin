@@ -394,7 +394,7 @@ function buildModel() {
             const scheduled = balance > 0 ? Math.min(balance + interest, override ?? autoMin) : 0;
 
             if (balance > 0 && scheduled > 0 && scheduled <= interest + 0.005) {
-                warnings.push(`${d.name}: the payment (${fmt$(scheduled)}) doesn't cover the monthly interest (${fmt$(interest)}), so the balance grows unless extra money reaches it.`);
+                warnings.push(`${d.name}: the payment (${fmt$(scheduled)}) doesn't cover the monthly interest (${fmt$(interest)}).`);
             }
 
             // PMI modelling (mortgage only)
