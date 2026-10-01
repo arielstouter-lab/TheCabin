@@ -751,7 +751,7 @@ function renderLoanCards(model) {
 function renderMoney(model) {
     const net = num(deps.getNetBalance());
     const netEl = $('debtNetBalance');
-    if (netEl) netEl.textContent = `${fmt$(net)}/mo`;
+    if (netEl) netEl.textContent = `Budget Net Balance ${fmt$(net)}/mo`;
     const strat = $('debtStrategySelect');
     if (strat) strat.value = settings.strategy;
 
