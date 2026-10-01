@@ -18,14 +18,14 @@ import {
 const sb = window.supabaseClient;
 const DEBTS_TABLE = 'debts';
 const SNAP_TABLE = 'debt_snapshots';
-const OVERRIDE_TABLE = 'debt_extra_overrides';
+const MONEY_TABLE = 'debt_month_money';
 const SETTINGS_TABLE = 'debt_settings';
 
 // ------------------------------------------------------------------ state
 let deps = { getNetBalance: () => 0, getBankRows: () => [] };
 let debtRows = [];
 let snapRows = [];
-let overrideRows = [];
+let moneyRows = [];
 let settings = { strategy: 'avalanche' };
 let selectedMonth = null;
 let planKey = 'pmi';
@@ -91,10 +91,10 @@ async function fetchAll(table, orderCol) {
 }
 
 async function fetchDebtData() {
-    [debtRows, snapRows, overrideRows] = await Promise.all([
+    [debtRows, snapRows, moneyRows] = await Promise.all([
         fetchAll(DEBTS_TABLE, 'created_at'),
         fetchAll(SNAP_TABLE, 'created_at'),
-        fetchAll(OVERRIDE_TABLE, 'month')
+        fetchAll(MONEY_TABLE, 'month')
     ]);
     const { data, error } = await sb.from(SETTINGS_TABLE).select('*').eq('id', 1).maybeSingle();
     if (!error && data) settings = { ...settings, ...data };
@@ -107,7 +107,7 @@ export async function loadDebtData() {
     } catch (err) {
         console.error('Error loading debts:', err);
         status('Could not load debts — have you run debts.sql?');
-        debtRows = []; snapRows = []; overrideRows = [];
+        debtRows = []; snapRows = []; moneyRows = [];
     }
     setupDebtRealtime();
 }
@@ -115,7 +115,7 @@ export async function loadDebtData() {
 function setupDebtRealtime() {
     if (channel || !sb) return;
     channel = sb.channel('debts_changes');
-    [DEBTS_TABLE, SNAP_TABLE, OVERRIDE_TABLE, SETTINGS_TABLE].forEach(table => {
+    [DEBTS_TABLE, SNAP_TABLE, MONEY_TABLE, SETTINGS_TABLE].forEach(table => {
         channel.on('postgres_changes', { event: '*', schema: 'public', table }, debounceReload);
     });
     channel.subscribe();
@@ -179,6 +179,35 @@ function resolveMonth() {
     return selectedMonth;
 }
 
+// ---------------------------------------------------- money available
+// Money available is saved per snapshot month in debt_month_money. A saved
+// amount (or null = Budget Net Balance) applies to every month after that
+// snapshot until a later snapshot saves a different setting.
+function moneyFor(ym) {
+    let hit = null;
+    for (const r of moneyRows) {
+        if (r.month < ym && (!hit || r.month > hit.month)) hit = r;
+    }
+    return hit && hit.amount != null ? num(hit.amount) : null;
+}
+
+async function saveMoney(month, amount) {
+    if (!sb || !month) return;
+    const i = moneyRows.findIndex(r => r.month === month);
+    if (i >= 0) moneyRows[i] = { ...moneyRows[i], amount };
+    else moneyRows.push({ month, amount });
+    renderDebts();
+    try {
+        const { data, error } = await sb.from(MONEY_TABLE).upsert([{ month, amount }], { onConflict: 'month' }).select().single();
+        if (error) throw error;
+        const j = moneyRows.findIndex(r => r.month === month);
+        if (j >= 0) moneyRows[j] = data;
+    } catch (err) {
+        console.error('Could not save money available:', err);
+        status('Could not save money available: ' + (err.message || err));
+    }
+}
+
 // First payment month: explicit, else two months after origination (the usual
 // "closed in March, first payment in May" convention).
 function firstPaymentYm(d) {
@@ -228,6 +257,14 @@ async function createSnapshot(month) {
         const { data, error } = await sb.from(SNAP_TABLE).insert(inserts).select();
         if (error) throw error;
         snapRows.push(...(data || []));
+// Carry the money-available setting forward; it keeps applying until reset
+        try {
+            const carried = moneyFor(addMonths(month, 1));
+            const { data: m, error: mErr } = await sb.from(MONEY_TABLE).upsert([{ month, amount: carried }], { onConflict: 'month' }).select().single();
+            if (!mErr && m) moneyRows = [...moneyRows.filter(r => r.month !== month), m];
+        } catch (err) {
+            console.warn('Could not carry the money setting forward:', err);
+        }        
         selectedMonth = month;
         const input = $('debtNewMonth');
         if (input) input.value = '';
@@ -246,6 +283,10 @@ async function deleteMonth(month) {
         const { error } = await sb.from(SNAP_TABLE).delete().eq('month', month);
         if (error) throw error;
         snapRows = snapRows.filter(s => s.month !== month);
+        
+await sb.from(MONEY_TABLE).delete().eq('month', month);
+        moneyRows = moneyRows.filter(r => r.month !== month);
+        
         if (selectedMonth === month) selectedMonth = null;
         renderDebts();
         status('Deleted snapshot.');
@@ -291,41 +332,6 @@ async function deleteDebt(id, name) {
 }
 
 // ---------------------------------------------------- overrides + settings
-async function addOverride(month, amount) {
-    if (!sb) return;
-    try {
-        const { data, error } = await sb.from(OVERRIDE_TABLE).upsert([{ month, amount }], { onConflict: 'month' }).select().single();
-        if (error) throw error;
-        const i = overrideRows.findIndex(o => o.month === month);
-        if (i >= 0) overrideRows[i] = data; else overrideRows.push(data);
-        renderDebts();
-        status(`Set ${fmtYm(month)} to ${fmt$(amount)}.`);
-    } catch (err) {
-        console.error('Could not save override:', err);
-        status('Could not save override: ' + (err.message || err));
-    }
-}
-
-function updateOverride(id, patch) {
-    const row = overrideRows.find(o => o.id === id);
-    if (row) Object.assign(row, patch);
-    queueRender();
-    return persist(OVERRIDE_TABLE, id, patch, 'Could not update override.');
-}
-
-async function deleteOverride(id) {
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(OVERRIDE_TABLE).delete().eq('id', id);
-        if (error) throw error;
-        overrideRows = overrideRows.filter(o => o.id !== id);
-        renderDebts();
-    } catch (err) {
-        console.error('Could not delete override:', err);
-        status('Could not delete override.');
-    }
-}
-
 async function saveStrategy(strategy) {
     settings.strategy = strategy;
     renderDebts();
@@ -419,7 +425,15 @@ function buildModel() {
             };
         });
 
-    const overrideMap = Object.fromEntries(overrideRows.map(o => [o.month, num(o.amount)]));
+// Expand the per-snapshot money setting into the month-by-month map the engine uses
+    // (months with no fixed amount fall back to the Budget Net Balance).
+    const overrideMap = {};
+    for (let i = 1; i <= MAX_MONTHS; i++) {
+        const ym = addMonths(month, i);
+        const amt = moneyFor(ym);
+        if (amt != null) overrideMap[ym] = amt;
+    }
+    
     const engineDebts = items.map(i => i.engine);
     const base = { debts: engineDebts, monthlyMoney: Math.max(0, netBalance), overrides: overrideMap, startYm: month, strategy: settings.strategy };
 
@@ -436,8 +450,7 @@ function buildModel() {
         });
     }
 
-    if (netBalance <= 0 && items.length) warnings.push('The Budget Net Balance is zero or negative, so there is no extra money to apply. Add a month override below to test a plan.');
-    const plan = scenarios.find(s => s.key === 'plan').result;
+if (netBalance <= 0 && items.length && moneyFor(addMonths(month, 1)) == null) warnings.push('The Budget Net Balance is zero or negative, so there is no extra money to apply. Set a fixed amount under Money Available to test a plan.');    const plan = scenarios.find(s => s.key === 'plan').result;
     if (plan.totalShortfall > 0) warnings.push(`In some months the money available doesn't cover the minimums that aren't already in the Budget (short by ${fmt$(plan.totalShortfall)} in total).`);
 
     if (!scenarios.some(s => s.key === planKey)) planKey = pmiPossible ? 'pmi' : 'plan';
@@ -739,24 +752,36 @@ function renderMoney(model) {
     const strat = $('debtStrategySelect');
     if (strat) strat.value = settings.strategy;
 
-    const body = $('debtOverrideBody');
-    const empty = $('debtOverrideEmpty');
-    if (!body) return;
-    body.replaceChildren();
-    const rows = [...overrideRows].sort((a, b) => a.month.localeCompare(b.month));
-    if (empty) empty.hidden = rows.length > 0;
-    rows.forEach(o => {
-        const tr = cloneEl('tpl-override-row');
-        const r = refs(tr);
-        r.month.dataset.fk = `${o.id}:month`;
-        r.amount.dataset.fk = `${o.id}:amount`;
-        r.month.value = o.month;
-        r.amount.value = o.amount ?? 0;
-        r.month.addEventListener('change', () => { if (isYm(r.month.value)) updateOverride(o.id, { month: r.month.value }); });
-        r.amount.addEventListener('change', () => updateOverride(o.id, { amount: Math.max(0, num(r.amount.value)) }));
-        r.delBtn.addEventListener('click', () => deleteOverride(o.id));
-        body.append(tr);
-    });
+    const mode = $('debtMoneyMode');
+    const amt = $('debtMoneyAmount');
+    const label = $('debtMoneyLabel');
+    const note = $('debtMoneyNote');
+    if (!mode || !amt) return;
+
+    if (!model) {
+        mode.disabled = true;
+        amt.disabled = true;
+        if (label) label.textContent = 'Add a debt to set the money available';
+        if (note) note.textContent = '';
+        return;
+    }
+
+    const own = moneyRows.find(r => r.month === model.month);
+    const eff = moneyFor(addMonths(model.month, 1));
+    mode.disabled = false;
+    amt.disabled = false;
+    mode.value = eff == null ? 'default' : 'fixed';
+    const picker = amt.closest('.picker');
+    if (picker) picker.hidden = eff == null;
+    if (document.activeElement !== amt) amt.value = eff == null ? '' : eff;
+    if (label) label.textContent = `From the ${fmtYm(model.month)} snapshot forward`;
+    if (note) {
+        note.textContent = own
+            ? 'Saved on this snapshot. It applies to every later month until a later snapshot changes it.'
+            : eff == null
+                ? 'Nothing is set yet, so the Budget Net Balance is used.'
+                : 'Inherited from an earlier snapshot. Change it here to reset it from this month on.';
+    }
 }
 
 // ---------------------------------------------------------------- results
@@ -896,18 +921,20 @@ export function initDebts(d) {
         });
     }
 
-    const addOv = $('addOverrideBtn');
-    if (addOv) {
-        const submit = () => {
-            const month = $('newOverrideMonth').value;
-            const amount = numOrNull($('newOverrideAmount').value);
-            if (!isYm(month)) { status('Pick a month for the override.'); return; }
-            if (amount == null || amount < 0) { status('Enter the money available that month (0 is fine).'); return; }
-            addOverride(month, amount);
-            $('newOverrideMonth').value = '';
-            $('newOverrideAmount').value = '';
-        };
-        addOv.addEventListener('click', submit);
-        $('newOverrideAmount')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    const moneyMode = $('debtMoneyMode');
+    const moneyAmount = $('debtMoneyAmount');
+    if (moneyMode && moneyAmount) {
+        moneyMode.addEventListener('change', () => {
+            const month = resolveMonth();
+            if (!month) return;
+            if (moneyMode.value === 'default') saveMoney(month, null);
+            else saveMoney(month, numOrNull(moneyAmount.value) ?? Math.max(0, Math.round(num(deps.getNetBalance()))));
+        });
+        moneyAmount.addEventListener('change', () => {
+            const month = resolveMonth();
+            const amount = numOrNull(moneyAmount.value);
+            if (month && amount != null) saveMoney(month, Math.max(0, amount));
+        });
+        moneyAmount.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); moneyAmount.blur(); } });
     }
 }
