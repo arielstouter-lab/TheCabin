@@ -416,6 +416,7 @@ function buildModel() {
             return {
                 s, d, isMortgage: isMortgage, balance, apr, rateNow, override, interest, autoMin, scheduled, mort,
                 homeValue, ltv, targetBalance, pmiAmount, pmiRowAmount,
+                pmiNow: pmiAmount > 0 && balance > targetBalance + 0.005 ? pmiAmount : 0,
                 engine: {
                     id: d.id, name: d.name, kind: d.kind, balance, apr, promoApr, promoStartYm, promoEndYm,
                     minPct, minFloor, addsInterest,
@@ -525,11 +526,13 @@ function buildDebtRow(it) {
     r.promoEnd.value = d.promo_end ? String(d.promo_end).slice(0, 10) : '';
     r.promoWrap.hidden = isMortgage;
     r.promoNA.hidden = !isMortgage;
-    r.interest.title = it.rateNow !== it.apr ? `Promo rate ${it.rateNow}% applies next month` : '';
     r.minPay.textContent = fmt$(it.scheduled);
     r.minPay.title = it.override ? 'Using your override' : 'Calculated minimum';
-    r.interest.textContent = fmt$(it.interest);
-
+    r.interest.textContent = fmt$(it.interest + it.pmiNow);
+    r.interest.title = it.pmiNow > 0
+        ? `Interest ${fmt$(it.interest)} + PMI ${fmt$(it.pmiNow)}`
+        : (it.rateNow !== it.apr ? `Promo rate ${it.rateNow}% applies next month` : '');
+    
     r.name.addEventListener('change', () => updateDebt(d.id, { name: r.name.value.trim() || d.name }));
     r.kind.addEventListener('change', () => updateDebt(d.id, { kind: r.kind.value }));
     r.inBudget.addEventListener('change', () => updateDebt(d.id, { in_budget: r.inBudget.checked }));
