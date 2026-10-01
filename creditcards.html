@@ -574,24 +574,42 @@
                                     <th class="col-action"></th>
                                 </tr>
                                 </thead>
+                                <tbody>
+                                <tr class="picker">
+                                    <td>
+                                        <label id="debtMoneyLabel" for="debtMoneyMode">From this snapshot forward</label>
+                                        <select id="debtMoneyMode">
+                                            <option id="debtNetBalance" value="default" class="tax-val">$0.00/mo</option>
+                                            <option value="fixed">Fixed amount</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <label for="debtMoneyAmount">Amount per month</label>
+                                        <div class="num-wrap money">
+                                            <input type="number" class="text-input" id="debtMoneyAmount" min="0" step="any" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+
                             </table>
                         </div>
 
                         <div class="cc-add-form">
                             <div class="cc-add-form">
-                                <div class="picker">
-                                    <label id="debtMoneyLabel" for="debtMoneyMode">From this snapshot forward</label>
-                                    <select id="debtMoneyMode">
-                                        <option id="debtNetBalance" value="default" class="tax-val">$0.00/mo</option>
-                                        <option value="fixed">Fixed amount</option>
-                                    </select>
-                                </div>
-                                <div class="picker">
-                                    <label for="debtMoneyAmount">Amount per month</label>
-                                    <div class="num-wrap money">
-                                        <input type="number" class="text-input" id="debtMoneyAmount" min="0" step="any" />
-                                    </div>
-                                </div>
+<!--                                <div class="picker">-->
+<!--                                    <label id="debtMoneyLabel" for="debtMoneyMode">From this snapshot forward</label>-->
+<!--                                    <select id="debtMoneyMode">-->
+<!--                                        <option id="debtNetBalance" value="default" class="tax-val">$0.00/mo</option>-->
+<!--                                        <option value="fixed">Fixed amount</option>-->
+<!--                                    </select>-->
+<!--                                </div>-->
+<!--                                <div class="picker">-->
+<!--                                    <label for="debtMoneyAmount">Amount per month</label>-->
+<!--                                    <div class="num-wrap money">-->
+<!--                                        <input type="number" class="text-input" id="debtMoneyAmount" min="0" step="any" />-->
+<!--                                    </div>-->
+<!--                                </div>-->
                             </div>
                                 <p class="form-note" id="debtMoneyNote"></p>
                         </div>
