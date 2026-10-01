@@ -581,21 +581,28 @@
                                     <th class="col-action"></th>
                                 </tr>
                                 </thead>
-                                <tbody id="debtOverrideBody"></tbody>
                             </table>
                         </div>
-                        <p id="debtOverrideEmpty" class="empty-state" hidden>No overrides &mdash; every month uses the Budget's Net Balance.</p>
 
                         <div class="cc-add-form">
-                            <div class="cc-add-fields">
-                                <input type="month" class="text-input" id="newOverrideMonth" />
-                                <div class="num-wrap money">
-                                    <input type="number" class="text-input" id="newOverrideAmount" placeholder="Money available" min="0" step="any" />
-                                </div>
-                            </div>
-                            <button type="button" class="button-inline" id="addOverrideBtn">Set month</button>
+                            <div class="cc-add-form">
+                <div class="picker">
+                    <label id="debtMoneyLabel" for="debtMoneyMode">From this snapshot forward</label>
+                    <select id="debtMoneyMode">
+                        <option value="default">Budget Net Balance (default)</option>
+                        <option value="fixed">Fixed amount</option>
+                    </select>
+                </div>
+                <div class="picker">
+                    <label for="debtMoneyAmount">Amount per month</label>
+                    <div class="num-wrap money">
+                        <input type="number" class="text-input" id="debtMoneyAmount" min="0" step="any" />
+                    </div>
+                </div>
+            </div>
+            <p class="form-note" id="debtMoneyNote"></p>
+            <p class="form-note">The setting is saved with the snapshot and keeps applying to every month after it. "Copy forward" carries it into the next snapshot; change it there to reset it from that month on (back to the Budget default, or to a different amount). Regular payments that are already in the Budget are covered separately.</p>
                         </div>
-                        <p class="form-note">An override replaces the default for that month with the total money available for debt (a bonus month might be $5,000; a tight month might be $0). Regular payments that are already in the Budget are covered separately.</p>
                     </div>
                 </div>
 
@@ -793,14 +800,6 @@
                     <td class="col-num" data-ref="interest"></td>
                     <td class="col-action"><input type="checkbox" data-ref="inBudget" title="Regular payment is already in the Budget" /></td>
                     <td class="col-action"><button type="button" class="icon-delete" title="Delete debt" data-ref="delBtn">✕</button></td>
-                </tr>
-            </template>
-
-            <template id="tpl-override-row">
-                <tr>
-                    <td><input type="month" class="text-input" data-ref="month" /></td>
-                    <td class="col-num"><div class="num-wrap money"><input type="number" class="text-input" min="0" step="any" data-ref="amount" /></div></td>
-                    <td class="col-action"><button type="button" class="icon-delete" title="Delete override" data-ref="delBtn">✕</button></td>
                 </tr>
             </template>
 
