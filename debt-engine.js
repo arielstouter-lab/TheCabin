@@ -55,7 +55,7 @@ function scheduledPayment(d, balance, interest, rate) {
     if (owed <= EPS) return 0;
     let p;
     if (d.paymentOverride > 0) p = d.paymentOverride;
-    else if (d.kind === 'mortgage' && d.piPayment > 0) p = d.piPayment;
+    else if (d.piPayment > 0) p = d.piPayment;
     else p = minimumPayment({ balance, apr: rate, minPct: d.minPct, minFloor: d.minFloor, addsInterest: d.addsInterest });
     return Math.min(owed, p);
 }
