@@ -1,29 +1,28 @@
 /* 1. DESIGN TOKENS & RESET */
+
+/*primary palette*/
 :root {
   --primary: #37533F;
   --primary-hover: #5C7A67;
-  --danger: #A6432F; --danger-bg: #fef3f2;
-  --sidebar-active: #ffffff;
-  --paper: #EFEBDD; --card: #FBF8EF;
+  --danger: #A6432F;
+  --danger-bg: #fef3f2;
+  --card: #FBF8EF;
   --ink: #24261F;
   --ink-soft: #5B5B4E;
   --ochre: #B8862E;
   --line: #C9C2A8;
-  --subtle-border: rgba(201, 194, 168, 0.4);
-  --success-bg: #f4f8f4;
-  --success-card: #f0f4f0;
-  --warning-bg: #fdfaf3;
-  --priority-bg: #fbf1ee;
-  --accent: #37533F;
-  --font-serif: 'Fraunces', Georgia, serif;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  --success-bg: #f0f4f0;
   --white: #ffffff;
+
+/*universal*/
   --flowlight: #d00018;
   --flowmedium: #82000f;
   --flowheavy: #4e0009;
+  --font-serif: 'Fraunces', Georgia, serif;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
   --radius-sm: 8px;
   --radius-lg: 16px;
-  --weather-bg: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0d1420));
+  --weather-bg: linear-gradient(160deg, var(--primary), color-mix(in srgb, var(--primary) 55%, #0d1420));
   --weather-fg: 246, 245, 241;
   --text-2xs: 10px;
   --text-xs: 11px;
@@ -42,7 +41,7 @@
 * { box-sizing: border-box; }
 
 html,
-body { margin: 0; min-height: 100%; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+body { margin: 0; min-height: 100%; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--card); }
 
 button,
 input,
@@ -65,14 +64,14 @@ textarea { font: inherit; }
 .cl-beam-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .chip {
-  background: var(--paper);
+  background: var(--card);
   color: var(--ink-soft);
   input[type=number] {
     width: var(--chip-w, 2.5ch);
     min-width: 2.5ch;
     field-sizing: content;
     border: 1px solid var(--line);
-    background: var(--paper);
+    background: var(--card);
     font-variant-numeric: tabular-nums;
     font-size: var(--text-base);
     padding: 3px 5px;
@@ -92,19 +91,19 @@ textarea { font: inherit; }
 .chip-danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: var(--paper);
+  color: var(--card);
   input[type=number] {
-    background: var(--paper);
+    background: var(--card);
     color: var(--ink);
     border-color: var(--line);
-    &:focus { outline: none; border-color: var(--paper); }
+    &:focus { outline: none; border-color: var(--card); }
   }
 }
 
 .badge {
   font-weight: 600;
   margin-left: 6px;
-  background: var(--badge-bg, var(--paper));
+  background: var(--badge-bg, var(--card));
   color: var(--badge-fg, var(--ink-soft));
   border-color: var(--badge-fg, var(--line));
   &.a { --badge-bg: color-mix(in srgb, var(--primary) 12%, transparent); --badge-fg: var(--primary); }
@@ -127,9 +126,9 @@ textarea { font: inherit; }
 }
 
 .button-primary,
-.button-inline { background: var(--primary); color: var(--paper); }
+.button-inline { background: var(--primary); color: var(--card); }
 
-.button-ghost { background: var(--paper); color: var(--primary); }
+.button-ghost { background: var(--card); color: var(--primary); }
 
 .button-inline {
   font-family: inherit;
@@ -179,7 +178,7 @@ textarea { font: inherit; }
 .label-row { display: flex; justify-content: space-between; }
 
 .form-group input,
-.text-input { width: 100%; border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none; color: var(--ink); background: var(--paper); transition: border-color 0.15s, box-shadow 0.15s; font-family: inherit; }
+.text-input { width: 100%; border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none; color: var(--ink); background: var(--card); transition: border-color 0.15s, box-shadow 0.15s; font-family: inherit; }
 
 .text-input { flex: 1; min-width: 0; padding: 5px 7px; font-size: var(--text-base); }
 
@@ -194,7 +193,7 @@ input[type=month]:focus { outline: none; border-color: var(--primary); box-shado
 
 select,
 input[type=date],
-input[type=month] { padding: 6px 8px; background-color: var(--paper); font-family: inherit; font-size: var(--text-sm); color: var(--ink); box-sizing: border-box; max-width: 100%; transition: border-color 0.15s, box-shadow 0.15s; }
+input[type=month] { padding: 6px 8px; background-color: var(--card); font-family: inherit; font-size: var(--text-sm); color: var(--ink); box-sizing: border-box; max-width: 100%; transition: border-color 0.15s, box-shadow 0.15s; }
 
 select { cursor: pointer; }
 
@@ -227,7 +226,7 @@ select { cursor: pointer; }
   padding: 2px 8px;
   cursor: pointer;
   line-height: 1.2;
-  &:hover { background: var(--paper); }
+  &:hover { background: var(--card); }
 }
 
 .stepper-val { font-size: var(--text-sm); font-weight: 600; padding: 0 4px; min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -274,7 +273,7 @@ select { cursor: pointer; }
   font-size: var(--text-base);
   font-weight: 500;
   color: var(--ink-soft);
-  background: var(--paper);
+  background: var(--card);
   border: 1px solid var(--line);
   border-bottom: none;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
@@ -321,7 +320,7 @@ select { cursor: pointer; }
 
 .cl-ticket,
 .lst-item,
-.cal-event { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); }
+.cal-event { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
 
 .cal-events-divider {
   border: 0;
@@ -385,7 +384,7 @@ select { cursor: pointer; }
   font-size: var(--text-md);
   font-weight: 500;
   &:hover { color: var(--white); background: rgba(255, 255, 255, 0.07); }
-  &.active { color: var(--sidebar-active); background: rgba(255, 255, 255, 0.1); }
+  &.active { color: var(--white); background: rgba(255, 255, 255, 0.1); }
 }
 
 .nav-icon {
@@ -424,7 +423,7 @@ select { cursor: pointer; }
 .user-info {
   min-width: 0;
   flex: 1;
-  span { display: block; color: var(--paper); font-size: var(--text-sm); }
+  span { display: block; color: var(--card); font-size: var(--text-sm); }
 }
 
 .logout-button {
@@ -432,7 +431,7 @@ select { cursor: pointer; }
   margin-top: auto;
   color: var(--primary-hover);
   font-size: var(--text-xl);
-  &:hover { color: var(--paper); }
+  &:hover { color: var(--card); }
 }
 
 .hidden-icon {
@@ -482,7 +481,7 @@ select { cursor: pointer; }
 /* --- Auth / Login --- */
 .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background:
         radial-gradient(circle at top left, var(--card) 0, transparent 35%),
-        var(--paper); }
+        var(--card); }
 
 .auth-container { width: 100%; max-width: 420px; }
 
@@ -511,7 +510,7 @@ select { cursor: pointer; }
 .cal-nav { display: flex; align-items: center; gap: 10px; }
 
 .cal-nav-btn {
-  background: var(--paper);
+  background: var(--card);
   color: var(--ink);
   width: 30px;
   height: 30px;
@@ -535,7 +534,7 @@ select { cursor: pointer; }
 
 .cal-day {
   min-height: 64px;
-  background: var(--paper);
+  background: var(--card);
   padding: 6px;
   cursor: pointer;
   display: flex;
@@ -727,7 +726,7 @@ body.cal-page {
   }
   &.priority {
     border-color: var(--danger);
-    background: var(--priority-bg);
+    background: var(--danger-bg);
     .lst-item-text { font-weight: 600; color: var(--danger); }
   }
 }
@@ -795,7 +794,7 @@ body.cal-page {
 /* --- Weather Card & Forecast --- */
 .weather-card,
 .wf-list {
-  --weather-bg: linear-gradient(160deg, var(--accent, #37533F), color-mix(in srgb, var(--accent, #37533F) 55%, #0d1420));
+  --weather-bg: linear-gradient(160deg, var(--primary, #37533F), color-mix(in srgb, var(--primary, #37533F) 55%, #0d1420));
   background: var(--weather-bg);
 }
 
@@ -806,7 +805,7 @@ body.cal-page {
   box-sizing: border-box;
   border-radius: var(--radius-lg);
   padding: 28px 26px 22px;
-  color: var(--paper);
+  color: var(--card);
   box-shadow: var(--shadow);
   overflow: hidden;
   transition: background 0.6s ease;
@@ -835,12 +834,12 @@ body.cal-page {
   font-size: var(--text-sm);
   color: rgba(var(--weather-fg), 0.75);
   svg { width: 20px; height: 20px; }
-  b { color: var(--paper); font-weight: 600; font-size: var(--text-base); }
+  b { color: var(--card); font-weight: 600; font-size: var(--text-base); }
 }
 
 .wc-state {
   color: var(--ink-soft);
-  background: var(--paper);
+  background: var(--card);
   font-size: var(--text-md);
   text-align: center;
   padding: 40px 20px;
@@ -898,7 +897,7 @@ body.cal-page {
   border-collapse: collapse;
   font-size: var(--text-base);
   th { font-family: var(--font-serif); font-size: var(--text-sm); font-weight: 600; text-align: left; padding: 8px 10px; color: var(--ink-soft); border-bottom: 1px solid var(--line); white-space: nowrap; }
-  td { padding: 8px 10px; border-bottom: 1px solid var(--subtle-border); vertical-align: middle; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--ink-soft); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   .col-num { text-align: right; }
   .col-action { width: 36px; text-align: center; }
@@ -943,7 +942,7 @@ body.cal-page {
   display: flex;
   flex-direction: column;
   &.best,
-  &.surplus { background: var(--success-card); border-color: var(--primary); }
+  &.surplus { background: var(--success-bg); border-color: var(--primary); }
   &.surplus .value { color: var(--primary); }
   &.deficit {
     background: var(--danger-bg);
@@ -961,7 +960,7 @@ body.cal-page {
 
 .best-combo-card {
   border-color: var(--primary);
-  background: var(--success-card);
+  background: var(--success-bg);
   padding: 14px 18px;
   display: flex;
   align-items: center;
@@ -985,10 +984,10 @@ body.cal-page {
 .debt-promo input[type=date] { flex: 1 1 120px; }
 .debt-scroll { max-height: 420px; overflow-y: auto; }
 .debt-scroll thead th { position: sticky; top: 0; background: var(--card); z-index: 1; }
-.debt-row-hl td { background: var(--success-card); }
+.debt-row-hl td { background: var(--success-bg); }
 .debt-schedule { margin-top: 16px; }
 .debt-schedule summary { cursor: pointer; font-size: var(--text-base); font-weight: 600; color: var(--primary); padding: 6px 0; }
-.button-inline.button-ghost { background: var(--paper); color: var(--primary); }
+.button-inline.button-ghost { background: var(--card); color: var(--primary); }
 .button-inline.button-ghost:hover:not(:disabled) { background: var(--line); border-color: var(--line); }
 .button-inline:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1030,11 +1029,11 @@ body.cal-page {
   &:hover { color: var(--ink); }
 }
 
-.toast-success { --toast-border: var(--primary); --toast-bg: var(--success-bg); --toast-icon: var(--primary); }
+.toast-success { --toast-border: var(--primary); --toast-bg: var(--card); --toast-icon: var(--primary); }
 
 .toast-error { --toast-border: var(--danger); --toast-bg: var(--danger-bg); --toast-icon: var(--danger); color: var(--danger); }
 
-.toast-warning { --toast-border: var(--ochre); --toast-bg: var(--warning-bg); --toast-icon: var(--ochre); }
+.toast-warning { --toast-border: var(--ochre); --toast-bg: var(--danger-bg); --toast-icon: var(--ochre); }
 
 .toast-info { --toast-border: var(--line); --toast-bg: var(--card); }
 
