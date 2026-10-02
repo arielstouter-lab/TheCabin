@@ -1,101 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Lists</title>
+    <title>Settings</title>
     <link rel="stylesheet" href="styles.css">
     <script src="head-loader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
-    <script type="module" src="Lists/lists.js" defer></script>
+    <script type="module" src="settings.js" defer></script>
 </head>
+<body class="app-page">
+<div class="app-shell">
+    <main class="main-content">
+        <a href="app.html" class="brand-link">
+            <div class="brand-mark"></div>
+        </a>
 
-<div class="card settings-card">
-    <div class="card-head">
-        <h2 class="card-title">Appearance</h2>
-    </div>
-
-    <p class="form-note">
-        Choose a color palette for your workspace.
-    </p>
-
-    <div class="theme-list">
-
-        <label class="theme-option">
-            <input
-                    type="radio"
-                    name="theme"
-                    value="default"
-                    checked
-            />
-
-            <div class="theme-preview">
-                <span style="background:#37533F"></span>
-                <span style="background:#5C7A67"></span>
-                <span style="background:#B8862E"></span>
-                <span style="background:#FBF8EF"></span>
+        <div class="card settings-card" style="max-width: 520px; margin: 40px auto;">
+            <div class="card-head">
+                <h2 class="card-title">Appearance</h2>
             </div>
 
-            <div>
-                <strong>Forest</strong>
-                <div class="theme-desc">
-                    Original earthy green palette
-                </div>
+            <p class="form-note">
+                Choose a color palette for your workspace.
+            </p>
+
+            <div class="card-body">
+                <label class="theme-option">
+                    <input type="radio" name="theme" value="default" checked />
+                    <div class="theme-preview">
+                        <span style="background:#37533F"></span>
+                        <span style="background:#5C7A67"></span>
+                        <span style="background:#B8862E"></span>
+                        <span style="background:#FBF8EF"></span>
+                    </div>
+                    <div>
+                        <strong>Forest</strong>
+                        <div class="theme-desc">Original earthy green palette</div>
+                    </div>
+                </label>
+
+                <label class="theme-option">
+                    <input type="radio" name="theme" value="dark" />
+                    <div class="theme-preview">
+                        <span style="background:#6F9A7A"></span>
+                        <span style="background:#22251F"></span>
+                        <span style="background:#D2A14A"></span>
+                        <span style="background:#F3F1E8"></span>
+                    </div>
+                    <div>
+                        <strong>Dark Mode</strong>
+                        <div class="theme-desc">Deep moss and charcoal</div>
+                    </div>
+                </label>
+
+                <label class="theme-option">
+                    <input type="radio" name="theme" value="autumn" />
+                    <div class="theme-preview">
+                        <span style="background:#7A4B2D"></span>
+                        <span style="background:#986445"></span>
+                        <span style="background:#C98A2A"></span>
+                        <span style="background:#FCF5EA"></span>
+                    </div>
+                    <div>
+                        <strong>Autumn</strong>
+                        <div class="theme-desc">Walnut, ochre, and parchment</div>
+                    </div>
+                </label>
             </div>
-        </label>
 
-        <label class="theme-option">
-            <input
-                    type="radio"
-                    name="theme"
-                    value="dark"
-            />
-
-            <div class="theme-preview">
-                <span style="background:#6F9A7A"></span>
-                <span style="background:#22251F"></span>
-                <span style="background:#D2A14A"></span>
-                <span style="background:#F3F1E8"></span>
+            <div class="action-footer">
+                <button class="button button-primary" id="saveThemeBtn">
+                    Save Theme
+                </button>
             </div>
-
-            <div>
-                <strong>Dark Mode</strong>
-                <div class="theme-desc">
-                    Deep moss and charcoal
-                </div>
-            </div>
-        </label>
-
-        <label class="theme-option">
-            <input
-                    type="radio"
-                    name="theme"
-                    value="autumn"
-            />
-
-            <div class="theme-preview">
-                <span style="background:#7A4B2D"></span>
-                <span style="background:#986445"></span>
-                <span style="background:#C98A2A"></span>
-                <span style="background:#FCF5EA"></span>
-            </div>
-
-            <div>
-                <strong>Autumn</strong>
-                <div class="theme-desc">
-                    Walnut, ochre, and parchment
-                </div>
-            </div>
-        </label>
-
-    </div>
-
-    <div class="action-footer">
-        <button
-                class="button button-primary"
-                id="saveThemeBtn"
-        >
-            Save Theme
-        </button>
-    </div>
+        </div>
+    </main>
 </div>
+</body>
+</html>
