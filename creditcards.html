@@ -565,46 +565,35 @@
                             </div>
                         </div>
 
-                        <div class="table-wrap">
-                            <table class="cc-table">
-                                <thead>
-                                <tr>
-                                    <th class="min-col">Month</th>
-                                    <th class="col-num min-col">Money available</th>
-                                    <th class="col-action"></th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr>
-                                    <td colspan="3">
-                                        <div class="money-settings-row">
-                                            <div class="picker">
-                                                <label id="debtMoneyLabel" for="debtMoneyMode">
-                                                    From this snapshot forward
-                                                </label>
-                                                <select id="debtMoneyMode">
-                                                    <option id="debtNetBalance" value="default">$0.00/mo</option>
-                                                    <option value="fixed">Fixed amount</option>
-                                                </select>
-                                            </div>
+                        <div class="cc-add-form">
+                            <div class="picker">
+                                <label id="debtMoneyLabel" for="debtMoneyMode">
+                                    From this snapshot forward
+                                </label>
+                                <select id="debtMoneyMode" class="text-input">
+                                    <option id="debtNetBalance" value="default">
+                                        $0.00/mo
+                                    </option>
+                                    <option value="fixed">
+                                        Fixed amount
+                                    </option>
+                                </select>
+                            </div>
 
-                                            <div class="picker">
-                                                <label for="debtMoneyAmount">
-                                                    Amount per month
-                                                </label>
-                                                <div class="num-wrap money">
-                                                    <input type="number"
-                                                           class="text-input"
-                                                           id="debtMoneyAmount"
-                                                           min="0"
-                                                           step="any">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                </tbody>
-                            </table>
+                            <div class="picker">
+                                <label for="debtMoneyAmount">
+                                    Amount per month
+                                </label>
+                                <div class="num-wrap money">
+                                    <input
+                                            type="number"
+                                            class="text-input"
+                                            id="debtMoneyAmount"
+                                            min="0"
+                                            step="any"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <div class="cc-add-form">
