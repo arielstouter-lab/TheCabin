@@ -235,21 +235,47 @@ async function createSnapshot(month) {
     if (snapshotMonths().includes(month)) { selectedMonth = month; renderDebts(); return; }
     if (!sb) return;
 
+    // Project balances forward from the latest earlier snapshot using the selected plan
+    const priorMonth = snapshotMonths().find(m => m < month);
+    let projection = null;
+    if (priorMonth) {
+        const pm = buildModel(priorMonth);
+        if (pm) {
+            const sc = pm.scenarios.find(x => x.key === planKey) || pm.scenarios.find(x => x.key === 'plan');
+            projection = {
+                label: sc.label,
+                result: sc.result,
+                row: sc.result.rows.find(r => r.ym === month) || null,
+                ids: new Set(pm.engineDebts.map(x => x.id))
+            };
+        }
+    }
+
     const inserts = [];
     debtRows.forEach(d => {
         const mine = snapRows.filter(s => s.debt_id === d.id).sort((a, b) => b.month.localeCompare(a.month));
         const prior = mine.find(s => s.month < month) || mine[0];
         if (!prior) return;
         let balance = num(prior.balance);
-        if (d.kind === 'mortgage' || d.kind === 'loan') {
-            // Carry the balance forward by the scheduled principal for the months that passed
+        if (projection && prior.month === priorMonth && projection.ids.has(d.id) && (projection.row || projection.result.completed)) {
+            // The plan's projected balance for that month (0 once everything is paid off)
+            balance = projection.row ? Math.round((projection.row.balances[d.id] ?? 0) * 100) / 100 : 0;
+        } else if (d.kind === 'mortgage' || d.kind === 'loan') {            // Carry the balance forward by the scheduled principal for the months that passed
             const info = loanInfo(d, num(prior.apr));
             if (info.rows) {
                 const drop = scheduledBalanceAt(info.rows, info.principal, prior.month) - scheduledBalanceAt(info.rows, info.principal, month);
                 balance = Math.max(0, balance - Math.max(0, drop));
             }
         }
-        inserts.push({ debt_id: d.id, month, balance, apr: num(prior.apr), payment_override: prior.payment_override ?? null });
+        // Promos are saved per snapshot: carry forward unless it has already expired
+        const promoEnd = dateToYm(prior.promo_end);
+        const promoLive = prior.promo_apr != null && !(promoEnd && promoEnd <= month);
+        inserts.push({
+            debt_id: d.id, month, balance, apr: num(prior.apr), payment_override: prior.payment_override ?? null,
+            promo_apr: promoLive ? prior.promo_apr : null,
+            promo_start: promoLive ? (prior.promo_start ?? null) : null,
+            promo_end: promoLive ? (prior.promo_end ?? null) : null
+        });
     });
     if (!inserts.length) { status('Add a debt first.'); return; }
 
@@ -269,7 +295,7 @@ async function createSnapshot(month) {
         const input = $('debtNewMonth');
         if (input) input.value = '';
         renderDebts();
-        status(`Started ${fmtYm(month)} snapshot — update the balances.`);
+        status(`Started ${fmtYm(month)} snapshot.${projection ? ` Balances projected from ${fmtYm(priorMonth)} (${projection.label}).` : ''} Update them to match your statements.`);
     } catch (err) {
         console.error('Could not create snapshot:', err);
         status('Could not create snapshot: ' + (err.message || err));
@@ -347,7 +373,7 @@ async function saveStrategy(strategy) {
 // ------------------------------------------------------------------ model
 // Everything derived from the current snapshot + Budget, computed once per render.
 function buildModel() {
-    const month = resolveMonth();
+    const month = forMonth || resolveMonth();
     if (!month) return null;
 
     const bankRows = deps.getBankRows() || [];
@@ -374,9 +400,9 @@ function buildModel() {
             const minPct = 1;
             const minFloor = 35;
             const addsInterest = d.min_adds_interest !== false;
-            const promoApr = !isMortgage ? numOrNull(d.promo_apr) : null;
-            const promoStartYm = dateToYm(d.promo_start);
-            const promoEndYm = dateToYm(d.promo_end);
+            const promoApr = !isMortgage ? numOrNull(s.promo_apr) : null;
+            const promoStartYm = dateToYm(s.promo_start);
+            const promoEndYm = dateToYm(s.promo_end);
             // Rate charged in the first projected month (the month after the snapshot)
             const rateNow = effectiveApr({ apr, promoApr, promoStartYm, promoEndYm }, addMonths(month, 1));
             const interest = (balance * rateNow) / 1200;
@@ -521,9 +547,9 @@ function buildDebtRow(it) {
     r.override.placeholder = 'auto';
     r.inBudget.checked = !!d.in_budget;
     // Promo rate (cards/loans). The start date shows today until one is saved.
-    r.promoApr.value = d.promo_apr ?? '';
-    r.promoStart.value = d.promo_start ? String(d.promo_start).slice(0, 10) : todayIso();
-    r.promoEnd.value = d.promo_end ? String(d.promo_end).slice(0, 10) : '';
+    r.promoApr.value = s.promo_apr ?? '';
+    r.promoStart.value = s.promo_start ? String(s.promo_start).slice(0, 10) : todayIso();
+    r.promoEnd.value = s.promo_end ? String(s.promo_end).slice(0, 10) : '';
     r.promoWrap.hidden = isMortgage;
     r.minPay.textContent = fmt$(it.scheduled);
     r.minPay.title = it.override ? 'Using your override' : 'Calculated minimum';
@@ -535,14 +561,17 @@ function buildDebtRow(it) {
     r.name.addEventListener('change', () => updateDebt(d.id, { name: r.name.value.trim() || d.name }));
     r.kind.addEventListener('change', () => updateDebt(d.id, { kind: r.kind.value }));
     r.inBudget.addEventListener('change', () => updateDebt(d.id, { in_budget: r.inBudget.checked }));
+
+
     r.promoApr.addEventListener('change', () => {
         const rate = numOrNull(r.promoApr.value);
         // Clearing the rate removes the promo; entering one starts it today unless a start date is saved
-        if (rate == null) updateDebt(d.id, { promo_apr: null, promo_start: null, promo_end: null });
-        else updateDebt(d.id, { promo_apr: rate, promo_start: d.promo_start || r.promoStart.value || todayIso() });
+        if (rate == null) updateSnap(s.id, { promo_apr: null, promo_start: null, promo_end: null });
+        else updateSnap(s.id, { promo_apr: rate, promo_start: s.promo_start || r.promoStart.value || todayIso() });
     });
-    r.promoStart.addEventListener('change', () => updateDebt(d.id, { promo_start: r.promoStart.value || null }));
-    r.promoEnd.addEventListener('change', () => updateDebt(d.id, { promo_end: r.promoEnd.value || null }));
+    r.promoStart.addEventListener('change', () => updateSnap(s.id, { promo_start: r.promoStart.value || null }));
+    r.promoEnd.addEventListener('change', () => updateSnap(s.id, { promo_end: r.promoEnd.value || null }));
+
     r.balance.addEventListener('change', () => updateSnap(s.id, { balance: num(r.balance.value) }));
     r.apr.addEventListener('change', () => updateSnap(s.id, { apr: num(r.apr.value) }));
     r.override.addEventListener('change', () => updateSnap(s.id, { payment_override: numOrNull(r.override.value) }));

@@ -493,6 +493,8 @@ select { cursor: pointer; }
 
 .content { max-width: none; padding: 20px 40px; }
 
+input[type="checkbox"] { margin-top: 2px; cursor: pointer; }
+
 /* 6. PAGE-SPECIFIC MODULES */
 /* --- Auth / Login --- */
 .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background:
@@ -754,7 +756,6 @@ body.cal-page {
   flex: 1;
   min-width: 0;
   cursor: pointer;
-  input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--primary); }
 }
 
 .lst-item-row {
