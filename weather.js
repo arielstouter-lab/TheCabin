@@ -4,8 +4,16 @@ const WC_STORAGE_KEY = "wc-unit"; // "c" or "f"
 // Open-Meteo returns WMO codes: https://open-meteo.com/en/docs
 function codeInfo(code, isDay){
     const map = {
-        0:  { label:"Clear sky",        icon: isDay?"sun":"moon",        accent: "var(--wx-clear)" },
-        1:  { label:"Mostly clear",     icon: isDay?"sun-cloud":"moon-cloud", accent: "var(--wx-clear)" },
+        0:  {
+            label:"Clear sky",
+            icon: isDay?"sun":"moon",
+            accent: "var(--wx-clear)"
+        },
+        1:  {
+            label:"Mostly clear",
+            icon: isDay?"sun-cloud":"moon-cloud",
+            accent: "var(--wx-clear)"
+        },
         2:  { label:"Partly cloudy",    icon: isDay?"sun-cloud":"moon-cloud", accent: "var(--wx-partly)" },
         3:  { label:"Overcast",         icon:"cloud",                    accent:"var(--wx-overcast)" },
         45: { label:"Fog",              icon:"fog",                      accent:"var(--wx-fog)" },

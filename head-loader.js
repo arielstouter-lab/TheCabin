@@ -1,19 +1,5 @@
 (function() {
 const THEMES = {
-    default: {
-        primary: "#37533F",
-        primaryHover: "#5C7A67",
-        danger: "#A6432F",
-        dangerBg: "#fef3f2",
-        card: "#FBF8EF",
-        ink: "#24261F",
-        inkSoft: "#5B5B4E",
-        ochre: "#B8862E",
-        line: "#C9C2A8",
-        successBg: "#f0f4f0",
-        white: "#ffffff"
-    },
-
     dark: {
         primary: "#37533F",
         primaryHover: "#88B092",
@@ -66,29 +52,56 @@ const THEMES = {
     }
 };
 
-function applyTheme(theme) {
-    const root = document.documentElement;
+// head-loader.js
+    function applyTheme(theme) {
+        if (!theme) return;
+        const root = document.documentElement;
 
-    root.style.setProperty("--primary", theme.primary);
-    root.style.setProperty("--primary-hover", theme.primaryHover);
-    root.style.setProperty("--danger", theme.danger);
-    root.style.setProperty("--danger-bg", theme.dangerBg);
-    root.style.setProperty("--card", theme.card);
-    root.style.setProperty("--ink", theme.ink);
-    root.style.setProperty("--ink-soft", theme.inkSoft);
-    root.style.setProperty("--ochre", theme.ochre);
-    root.style.setProperty("--line", theme.line);
-    root.style.setProperty("--success-bg", theme.successBg);
-    root.style.setProperty("--white", theme.white);
-    root.style.setProperty("--wx-clear", theme.wxClear);
-    root.style.setProperty("--wx-partly", theme.wxPartly);
-    root.style.setProperty("--wx-overcast", theme.wxOvercast);
-    root.style.setProperty("--wx-fog", theme.wxFog);
-    root.style.setProperty("--wx-drizzle", theme.wxDrizzle);
-    root.style.setProperty("--wx-rain", theme.wxRain);
-    root.style.setProperty("--wx-heavy-rain", theme.wxHeavyRain);
-    root.style.setProperty("--wx-snow", theme.wxSnow);
-}
+        const baseProps = {
+            "--primary": theme.primary,
+            "--primary-hover": theme.primaryHover,
+            "--danger": theme.danger,
+            "--danger-bg": theme.dangerBg,
+            "--card": theme.card,
+            "--ink": theme.ink,
+            "--ink-soft": theme.inkSoft,
+            "--ochre": theme.ochre,
+            "--line": theme.line,
+            "--success-bg": theme.successBg,
+            "--white": theme.white
+        };
+
+        const weatherProps = {
+            "--wx-clear": theme.wxClear,
+            "--wx-partly": theme.wxPartly,
+            "--wx-overcast": theme.wxOvercast,
+            "--wx-fog": theme.wxFog,
+            "--wx-drizzle": theme.wxDrizzle,
+            "--wx-rain": theme.wxRain,
+            "--wx-heavy-rain": theme.wxHeavyRain,
+            "--wx-light-snow": theme.wxLightSnow,
+            "--wx-snow": theme.wxSnow,
+            "--wx-showers": theme.wxShowers,
+            "--wx-violent-showers": theme.wxViolentShowers,
+            "--wx-thunderstorm": theme.wxThunderstorm,
+            "--wx-severe-storm": theme.wxSevereStorm,
+            "--wx-unsettled": theme.wxUnsettled
+        };
+
+        // Apply base theme tokens
+        Object.entries(baseProps).forEach(([prop, val]) => {
+            if (val !== undefined) root.style.setProperty(prop, val);
+        });
+
+        // Apply weather tokens or clean up inline overrides so styles.css defaults take over
+        Object.entries(weatherProps).forEach(([prop, val]) => {
+            if (val !== undefined) {
+                root.style.setProperty(prop, val);
+            } else {
+                root.style.removeProperty(prop);
+            }
+        });
+    }
 
 // Expose for settings.js and other scripts
 window.THEMES = THEMES;
