@@ -493,7 +493,7 @@ select { cursor: pointer; }
 
 .content { max-width: none; padding: 20px 40px; }
 
-input[type="checkbox"] { margin-top: 2px; cursor: pointer; }
+input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--primary); }
 
 /* 6. PAGE-SPECIFIC MODULES */
 /* --- Auth / Login --- */
