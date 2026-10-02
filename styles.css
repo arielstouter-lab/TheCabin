@@ -288,7 +288,7 @@ select { cursor: pointer; }
   font-family: inherit;
   font-size: var(--text-base);
   font-weight: 500;
-  color: var(--ink-soft);
+  color: var(--primary);
   background: var(--card);
   border: 1px solid var(--line);
   border-bottom: none;
@@ -299,7 +299,7 @@ select { cursor: pointer; }
   bottom: -1px;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   &:hover { background: var(--card); color: var(--ink); }
-  &.active { background: var(--card); color: var(--primary); font-weight: 600; border-color: var(--line); border-bottom: 1px solid var(--card); z-index: 2; }
+  &.active { background: var(--card); color: var(--ochre); font-weight: 600; border-color: var(--line); border-bottom: 1px solid var(--card); z-index: 2; }
 }
 
 /* Drag & Drop System */
