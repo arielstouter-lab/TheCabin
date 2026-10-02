@@ -884,7 +884,7 @@ body.cal-page {
 
 .weather-page { max-width: 520px; margin: 0 auto; padding: 10px 20px 60px; }
 
-.wf-list { margin-top: 20px; border-radius: var(--radius-lg); overflow: hidden; color: rgba(var(--weather-fg), 0.85); background: none; }
+.wf-list { margin-top: 20px; border-radius: var(--radius-lg); overflow: hidden; color: rgba(var(--weather-fg), 0.85); }
 
 .wf-row {
   display: grid;
@@ -893,10 +893,7 @@ body.cal-page {
   gap: 12px;
   padding: 12px 16px;
   font-size: var(--text-md);
-  background: linear-gradient(90deg,
-  var(--accent, #37533F),
-  color-mix(in srgb, var(--accent, #37533F) 55%, #0d1420));
-  &:not(:last-child) { border-bottom: 1px solid rgba(var(--weather-fg), 0.18); }
+  &:not(:last-child) { border-bottom: 1px solid var(--line); }
 }
 
 .wf-day { font-weight: 600; }
