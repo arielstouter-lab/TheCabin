@@ -884,7 +884,13 @@ body.cal-page {
 
 .weather-page { max-width: 520px; margin: 0 auto; padding: 10px 20px 60px; }
 
-.wf-list { margin-top: 20px; border-radius: var(--radius-lg); overflow: hidden; color: rgba(var(--weather-fg), 0.85); }
+.wf-list {
+  margin-top: 20px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  color: rgba(var(--weather-fg), 0.85);
+  background: var(--wf-overlay, none), var(--weather-bg);
+}
 
 .wf-row {
   display: grid;

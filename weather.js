@@ -194,7 +194,10 @@ function showWeatherCardState(msg, isError, showRetry){
     const root = document.getElementById("weatherCard");
     root.style.removeProperty("--accent");
     const container = document.getElementById("weekForecast");
-    if (container) container.style.removeProperty("--weather-bg");
+    if (container) {
+        container.style.removeProperty("--accent");
+        container.style.removeProperty("--wf-overlay");
+    }
     root.innerHTML = `<div class="wc-state${isError ? ' error':''}">${msg}${
         showRetry ? '<div><button class="wc-retry" id="wcRetry">Try again</button></div>' : ''
     }</div>`;
@@ -207,13 +210,17 @@ function renderWeekForecast(raw){
     const container = document.getElementById("weekForecast");
     if (!container) return; // e.g. app.html has no week list — nothing to do
 
+    // base: current conditions color (feeds --weather-bg in the CSS)
+    const currentInfo = codeInfo(raw.current.weather_code, raw.current.is_day);
+    container.style.setProperty("--accent", currentInfo.accent);
+
     // one color stop per day, centered on that day's row
     const accents = raw.daily.weather_code.map(code => codeInfo(code, true).accent);
     const n = accents.length;
     const stops = accents.map((a, i) =>
-        `color-mix(in srgb, ${a} 75%, #0d1420) ${((i + 0.5) / n * 100).toFixed(1)}%`
+        `color-mix(in srgb, ${a} 45%, transparent) ${((i + 0.5) / n * 100).toFixed(1)}%`
     ).join(", ");
-    container.style.setProperty("--weather-bg", `linear-gradient(180deg, ${stops})`);
+    container.style.setProperty("--wf-overlay", `linear-gradient(180deg, ${stops})`);
 
     container.innerHTML = raw.daily.time.map((t, i) => {
         const date = new Date(t);
