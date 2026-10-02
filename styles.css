@@ -1071,6 +1071,8 @@ input[type=month] { border: 1px solid var(--line); border-radius: var(--radius-s
   .note-cell { white-space: nowrap; }
   .best-combo-card { flex-direction: column; align-items: flex-start; gap: 12px; }
   .best-combo-card .combo-value-wrap { text-align: left; width: 100%; display: flex; flex-direction: column; align-items: flex-start; }
+  .tabs-container { flex-wrap: wrap; }
+  .tabs-container .tab-label { overflow: hidden; text-overflow: ellipsis; }
   .toast-container { bottom: 16px; right: 16px; left: 16px; width: auto; max-width: none; }
   /* Minimum column width for tables */
   .min-col {
