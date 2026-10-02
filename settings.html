@@ -7,7 +7,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js" defer></script>
     <script src="app.js" defer></script>
-    <script type="module" src="settings.js" defer></script>
+    <!-- Standard deferred execution ensures the DOM is ready when script runs -->
+    <script src="settings.js" defer></script>
 </head>
 <body class="app-page">
 <div class="app-shell">
@@ -27,7 +28,7 @@
 
             <div class="card-body">
                 <label class="theme-option">
-                    <input type="radio" name="theme" value="default" checked />
+                    <input type="radio" name="theme" value="default" />
                     <div class="theme-preview">
                         <span style="background:#37533F"></span>
                         <span style="background:#5C7A67"></span>
@@ -43,7 +44,7 @@
                 <label class="theme-option">
                     <input type="radio" name="theme" value="dark" />
                     <div class="theme-preview">
-                        <span style="background:#6F9A7A"></span>
+                        <span style="background:#37533F"></span>
                         <span style="background:#22251F"></span>
                         <span style="background:#D2A14A"></span>
                         <span style="background:#F3F1E8"></span>
@@ -67,12 +68,20 @@
                         <div class="theme-desc">Walnut, ochre, and parchment</div>
                     </div>
                 </label>
-            </div>
 
-            <div class="action-footer">
-                <button class="button button-primary" id="saveThemeBtn">
-                    Save Theme
-                </button>
+                <label class="theme-option">
+                    <input type="radio" name="theme" value="autumn_evening" />
+                    <div class="theme-preview">
+                        <span style="background:#8B4F2D"></span>
+                        <span style="background:#2E241C"></span>
+                        <span style="background:#f3e9d3"></span>
+                        <span style="background:#6B4A6E"></span>
+                    </div>
+                    <div>
+                        <strong>Autumn Evening</strong>
+                        <div class="theme-desc">Walnut, brown, and purple</div>
+                    </div>
+                </label>
             </div>
         </div>
     </main>
