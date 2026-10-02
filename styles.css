@@ -849,7 +849,15 @@ body.cal-page {
 
 .wc-retry { margin-top: 10px; background: none; color: var(--ink); font-size: var(--text-base); padding: 6px 14px; cursor: pointer; }
 
-.wc-meta { display: flex; justify-content: flex-end; gap: 16px; margin-top: 12px; font-size: var(--text-base); color: rgba(var(--weather-fg), 0.85); }
+.wc-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: var(--text-base);
+  color: rgba(var(--weather-fg), 0.85);
+}
 
 .wc-meta-item {
   display: flex;

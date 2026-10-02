@@ -779,7 +779,7 @@ function renderMoney(model) {
     if (label) label.textContent = `From the ${fmtYm(model.month)} snapshot forward`;
     if (note) {
         note.textContent = own
-            ? 'Saved on this snapshot. It applies to every later month until a later snapshot changes it.'
+            ? 'Saved on this snapshot. It applies to every subsequent month until a snapshot changes it.'
             : eff == null
                 ? 'Nothing is set yet, so the Budget Net Balance is used.'
                 : 'Inherited from an earlier snapshot. Change it here to reset it from this month on.';
