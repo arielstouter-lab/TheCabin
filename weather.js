@@ -218,7 +218,7 @@ function renderWeekForecast(raw){
     const accents = raw.daily.weather_code.map(code => codeInfo(code, true).accent);
     const n = accents.length;
     const stops = accents.map((a, i) =>
-        `color-mix(in srgb, ${a} 45%, transparent) ${((i + 0.5) / n * 100).toFixed(1)}%`
+        `color-mix(in srgb, ${a} 30%, transparent) ${((i + 0.5) / n * 100).toFixed(1)}%`
     ).join(", ");
     container.style.setProperty("--wf-overlay", `linear-gradient(180deg, ${stops})`);
 
