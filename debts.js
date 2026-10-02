@@ -290,7 +290,8 @@ async function createSnapshot(month) {
             if (!mErr && m) moneyRows = [...moneyRows.filter(r => r.month !== month), m];
         } catch (err) {
             console.warn('Could not carry the money setting forward:', err);
-        }        
+            console.warn('Could not carry the money setting forward:', err);
+        }
         selectedMonth = month;
         const input = $('debtNewMonth');
         if (input) input.value = '';
@@ -372,7 +373,7 @@ async function saveStrategy(strategy) {
 
 // ------------------------------------------------------------------ model
 // Everything derived from the current snapshot + Budget, computed once per render.
-function buildModel() {
+function buildModel(forMonth) {
     const month = forMonth || resolveMonth();
     if (!month) return null;
 
