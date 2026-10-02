@@ -169,7 +169,7 @@ function renderWeatherCard(raw, place){
     <div class="wc-strip">
       ${hourly.map(h => {
         const hi = codeInfo(h.code, h.isDay);
-        return `<div class="wc-hour">
+        return `<div class="wc-hour" style="--accent:${hi.accent}">
           <span>${h.label}</span>
           ${weatherIcon(hi.icon)}
           <b>${fmtTemp(h.temp, wcUnit)}°</b>
@@ -216,7 +216,7 @@ function renderWeekForecast(raw){
         const moon = getMoonPhase(date);
         const dayLabel = i === 0 ? "Today" : date.toLocaleDateString([], { weekday: "short" });
         return `
-      <div class="wf-row">
+      <div class="wf-row" style="--accent:${info.accent}">
         <span class="wf-day">${dayLabel}</span>
         <span class="wf-icon">${weatherIcon(info.icon)}</span>
         <span class="wf-condition">${info.label}</span>
