@@ -525,7 +525,6 @@ function buildDebtRow(it) {
     r.promoStart.value = d.promo_start ? String(d.promo_start).slice(0, 10) : todayIso();
     r.promoEnd.value = d.promo_end ? String(d.promo_end).slice(0, 10) : '';
     r.promoWrap.hidden = isMortgage;
-    r.promoNA.hidden = !isMortgage;
     r.minPay.textContent = fmt$(it.scheduled);
     r.minPay.title = it.override ? 'Using your override' : 'Calculated minimum';
     r.interest.textContent = fmt$(it.interest + it.pmiNow);
