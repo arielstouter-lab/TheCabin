@@ -4,29 +4,29 @@ const WC_STORAGE_KEY = "wc-unit"; // "c" or "f"
 // Open-Meteo returns WMO codes: https://open-meteo.com/en/docs
 function codeInfo(code, isDay){
     const map = {
-        0:  { label:"Clear sky",        icon: isDay?"sun":"moon",        accent:"#3f7fb3" },
-        1:  { label:"Mostly clear",     icon: isDay?"sun-cloud":"moon-cloud", accent:"#3f7fb3" },
-        2:  { label:"Partly cloudy",    icon: isDay?"sun-cloud":"moon-cloud", accent:"#4a7a94" },
-        3:  { label:"Overcast",         icon:"cloud",                    accent:"#5b6a78" },
-        45: { label:"Fog",              icon:"fog",                      accent:"#6b7580" },
-        48: { label:"Icy fog",          icon:"fog",                      accent:"#6b7580" },
-        51: { label:"Light drizzle",    icon:"drizzle",                  accent:"#4b7089" },
-        53: { label:"Drizzle",          icon:"drizzle",                  accent:"#456a86" },
-        55: { label:"Dense drizzle",    icon:"drizzle",                  accent:"#3f6480" },
-        61: { label:"Light rain",       icon:"rain",                     accent:"#3f6480" },
-        63: { label:"Rain",             icon:"rain",                     accent:"#375c78" },
-        65: { label:"Heavy rain",       icon:"rain",                     accent:"#2f4f68" },
-        71: { label:"Light snow",       icon:"snow",                     accent:"#6a7c96" },
-        73: { label:"Snow",             icon:"snow",                     accent:"#62748e" },
-        75: { label:"Heavy snow",       icon:"snow",                     accent:"#586a84" },
-        80: { label:"Rain showers",     icon:"rain",                     accent:"#3a6280" },
-        81: { label:"Rain showers",     icon:"rain",                     accent:"#345c7a" },
-        82: { label:"Violent showers",  icon:"rain",                     accent:"#2c4f6b" },
-        95: { label:"Thunderstorm",     icon:"storm",                    accent:"#3a3f60" },
-        96: { label:"Thunderstorm",     icon:"storm",                    accent:"#343957" },
-        99: { label:"Severe storm",     icon:"storm",                    accent:"#2e3350" },
+        0:  { label:"Clear sky",        icon: isDay?"sun":"moon",        accent: "var(--wx-clear)" },
+        1:  { label:"Mostly clear",     icon: isDay?"sun-cloud":"moon-cloud", accent: "var(--wx-clear)" },
+        2:  { label:"Partly cloudy",    icon: isDay?"sun-cloud":"moon-cloud", accent: "var(--wx-partly)" },
+        3:  { label:"Overcast",         icon:"cloud",                    accent:"var(--wx-overcast)" },
+        45: { label:"Fog",              icon:"fog",                      accent:"var(--wx-fog)" },
+        48: { label:"Icy fog",          icon:"fog",                      accent:"var(--wx-fog)" },
+        51: { label:"Light drizzle",    icon:"drizzle",                  accent:"var(--wx-drizzle)" },
+        53: { label:"Drizzle",          icon:"drizzle",                  accent:"var(--wx-drizzle)" },
+        55: { label:"Dense drizzle",    icon:"drizzle",                  accent:"var(--wx-drizzle)" },
+        61: { label:"Light rain",       icon:"rain",                     accent:"var(--wx-rain)" },
+        63: { label:"Rain",             icon:"rain",                     accent:"var(--wx-rain)" },
+        65: { label:"Heavy rain",       icon:"rain",                     accent:"var(--wx-heavy-rain)" },
+        71: { label:"Light snow",       icon:"snow",                     accent:"var(--wx-light-snow)" },
+        73: { label:"Snow",             icon:"snow",                     accent:"var(--wx-snow)" },
+        75: { label:"Heavy snow",       icon:"snow",                     accent:"var(--wx-snow)" },
+        80: { label:"Rain showers",     icon:"rain",                     accent:"var(--wx-showers)" },
+        81: { label:"Rain showers",     icon:"rain",                     accent:"var(--wx-showers)" },
+        82: { label:"Violent showers",  icon:"rain",                     accent:"var(--wx-violent-showers)" },
+        95: { label:"Thunderstorm",     icon:"storm",                    accent:"var(--wx-thunderstorm)" },
+        96: { label:"Thunderstorm",     icon:"storm",                    accent:"var(--wx-thunderstorm)" },
+        99: { label:"Severe storm",     icon:"storm",                    accent:"var(--wx-severe-storm)" },
     };
-    return map[code] || { label:"Unsettled", icon:"cloud", accent:"#4a5a6b" };
+    return map[code] || { label:"Unsettled", icon:"cloud", accent:"var(--wx-unsettled)" };
 }
 
 // ---- condition icons (line-style, no external icon library) ------

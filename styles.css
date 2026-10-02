@@ -14,6 +14,22 @@
   --success-bg: #f0f4f0;
   --white: #ffffff;
 
+/*weather*/
+    --wx-clear: #3f7fb3;
+    --wx-partly: #4a7a94;
+    --wx-overcast: #5b6a78;
+    --wx-fog: #6b7580;
+    --wx-drizzle: #456a86;
+    --wx-rain: #375c78;
+    --wx-heavy-rain: #2f4f68;
+    --wx-light-snow: #6a7c96;
+    --wx-snow: #62748e;
+    --wx-showers: #3a6280;
+    --wx-violent-showers: #2c4f6b;
+    --wx-thunderstorm: #3a3f60;
+    --wx-severe-storm: #2e3350;
+    --wx-unsettled: #4a5a6b;
+
 /*universal*/
   --flowlight: #d00018;
   --flowmedium: #82000f;

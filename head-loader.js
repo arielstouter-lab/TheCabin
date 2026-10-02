@@ -25,7 +25,16 @@ const THEMES = {
         ochre: "#D2A14A",
         line: "#44483D",
         successBg: "#233128",
-        white: "#161914"
+        white: "#161914",
+        wxClear: "#3C8A8C",
+        wxPartly: "#4D8F92",
+        wxOvercast: "#5A6F73",
+        wxFog: "#708488",
+        wxDrizzle: "#43757C",
+        wxRain: "#35666D",
+        wxHeavyRain: "#274C53",
+        wxSnow: "#7D969B",
+
     },
 
     autumn: {
@@ -71,6 +80,14 @@ function applyTheme(theme) {
     root.style.setProperty("--line", theme.line);
     root.style.setProperty("--success-bg", theme.successBg);
     root.style.setProperty("--white", theme.white);
+    root.style.setProperty("--wx-clear", theme.wxClear);
+    root.style.setProperty("--wx-partly", theme.wxPartly);
+    root.style.setProperty("--wx-overcast", theme.wxOvercast);
+    root.style.setProperty("--wx-fog", theme.wxFog);
+    root.style.setProperty("--wx-drizzle", theme.wxDrizzle);
+    root.style.setProperty("--wx-rain", theme.wxRain);
+    root.style.setProperty("--wx-heavy-rain", theme.wxHeavyRain);
+    root.style.setProperty("--wx-snow", theme.wxSnow);
 }
 
 // Expose for settings.js and other scripts
