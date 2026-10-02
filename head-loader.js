@@ -14,6 +14,7 @@ const THEMES = {
         line: "#44483D",
         successBg: "#233128",
         white: "#161914",
+
         wxClear: "#3C8A8C",
         wxPartly: "#4D8F92",
         wxOvercast: "#5A6F73",
@@ -41,7 +42,23 @@ const THEMES = {
         ochre: "#C98A2A",
         line: "#D8C8B2",
         successBg: "#F2F0E1",
-        white: "#FFFFFF"
+        white: "#FFFFFF",
+
+        wxClear: "#D89A2B",              // golden maple
+        wxPartly: "#C87B32",             // amber leaf
+        wxOvercast: "#8A684C",           // dried oak leaf
+        wxFog: "#A08B79",                // misty tan
+        wxDrizzle: "#A15C38",            // light rust
+        wxRain: "#8B4F2D",               // autumn evening primary
+        wxHeavyRain: "#6E3C26",          // wet bark
+        wxLightSnow: "#D7C8B1",          // frosted leaf
+        wxSnow: "#BFB0A0",               // late-autumn frost
+        wxShowers: "#A85A2F",            // burnt orange
+        wxViolentShowers: "#7A3F27",     // dark copper
+        wxThunderstorm: "#5C3E63",       // plum twilight
+        wxSevereThunderstorm: "#402847", // eggplant storm
+        wxUnsettled: "#7A5A80"           // autumn dusk purple
+
     },
 
     autumn_evening: {
@@ -56,20 +73,21 @@ const THEMES = {
         line: "#6B4A6E",
         successBg: "#EEF1E8",
         white: "#FFFCF8",
-        wxClear: "#3C8A8C",
-        wxPartly: "#4D8F92",
-        wxOvercast: "#5A6F73",
-        wxFog: "#708488",
-        wxDrizzle: "#43757C",
-        wxRain: "#35666D",
-        wxHeavyRain: "#274C53",
-        wxLightSnow: "#7D969B",
-        wxSnow: "#7D969B",
-        wxShowers: "#43757C",
-        wxViolentShowers: "#274C53",
-        wxThunderstorm: "#292f45",
-        wxSevereThunderstorm: "#292f45",
 
+        wxClear: "#E0A83A",
+        wxPartly: "#CA7D3C",
+        wxOvercast: "#7B6354",
+        wxFog: "#96897B",
+        wxDrizzle: "#98583C",
+        wxRain: "#7B432E",
+        wxHeavyRain: "#5F3224",
+        wxLightSnow: "#D9CEBF",
+        wxSnow: "#C8B8A8",
+        wxShowers: "#9F562D",
+        wxViolentShowers: "#713626",
+        wxThunderstorm: "#56385F",
+        wxSevereThunderstorm: "#38203F",
+        wxUnsettled: "#6A4B74"
     }
 };
 
