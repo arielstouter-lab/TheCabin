@@ -1,5 +1,7 @@
 (function() {
 const THEMES = {
+    default: {},
+
     dark: {
         primary: "#37533F",
         primaryHover: "#88B092",
@@ -19,7 +21,12 @@ const THEMES = {
         wxDrizzle: "#43757C",
         wxRain: "#35666D",
         wxHeavyRain: "#274C53",
+        wxLightSnow: "#7D969B",
         wxSnow: "#7D969B",
+        wxShowers: "#43757C",
+        wxViolentShowers: "#274C53",
+        wxThunderstorm: "#292f45",
+        wxSevereThunderstorm: "#292f45",
 
     },
 
@@ -49,52 +56,61 @@ const THEMES = {
         line: "#6B4A6E",
         successBg: "#EEF1E8",
         white: "#FFFCF8",
+        wxClear: "#3C8A8C",
+        wxPartly: "#4D8F92",
+        wxOvercast: "#5A6F73",
+        wxFog: "#708488",
+        wxDrizzle: "#43757C",
+        wxRain: "#35666D",
+        wxHeavyRain: "#274C53",
+        wxLightSnow: "#7D969B",
+        wxSnow: "#7D969B",
+        wxShowers: "#43757C",
+        wxViolentShowers: "#274C53",
+        wxThunderstorm: "#292f45",
+        wxSevereThunderstorm: "#292f45",
+
     }
 };
 
 // head-loader.js
     function applyTheme(theme) {
-        if (!theme) return;
         const root = document.documentElement;
+        const activeTheme = theme || {};
 
-        const baseProps = {
-            "--primary": theme.primary,
-            "--primary-hover": theme.primaryHover,
-            "--danger": theme.danger,
-            "--danger-bg": theme.dangerBg,
-            "--card": theme.card,
-            "--ink": theme.ink,
-            "--ink-soft": theme.inkSoft,
-            "--ochre": theme.ochre,
-            "--line": theme.line,
-            "--success-bg": theme.successBg,
-            "--white": theme.white
+        const allProps = {
+            // Base tokens
+            "--primary": activeTheme.primary,
+            "--primary-hover": activeTheme.primaryHover,
+            "--danger": activeTheme.danger,
+            "--danger-bg": activeTheme.dangerBg,
+            "--card": activeTheme.card,
+            "--ink": activeTheme.ink,
+            "--ink-soft": activeTheme.inkSoft,
+            "--ochre": activeTheme.ochre,
+            "--line": activeTheme.line,
+            "--success-bg": activeTheme.successBg,
+            "--white": activeTheme.white,
+
+            // Weather tokens
+            "--wx-clear": activeTheme.wxClear,
+            "--wx-partly": activeTheme.wxPartly,
+            "--wx-overcast": activeTheme.wxOvercast,
+            "--wx-fog": activeTheme.wxFog,
+            "--wx-drizzle": activeTheme.wxDrizzle,
+            "--wx-rain": activeTheme.wxRain,
+            "--wx-heavy-rain": activeTheme.wxHeavyRain,
+            "--wx-light-snow": activeTheme.wxLightSnow,
+            "--wx-snow": activeTheme.wxSnow,
+            "--wx-showers": activeTheme.wxShowers,
+            "--wx-violent-showers": activeTheme.wxViolentShowers,
+            "--wx-thunderstorm": activeTheme.wxThunderstorm,
+            "--wx-severe-storm": activeTheme.wxSevereThunderstorm,
+            "--wx-unsettled": activeTheme.wxUnsettled
         };
 
-        const weatherProps = {
-            "--wx-clear": theme.wxClear,
-            "--wx-partly": theme.wxPartly,
-            "--wx-overcast": theme.wxOvercast,
-            "--wx-fog": theme.wxFog,
-            "--wx-drizzle": theme.wxDrizzle,
-            "--wx-rain": theme.wxRain,
-            "--wx-heavy-rain": theme.wxHeavyRain,
-            "--wx-light-snow": theme.wxLightSnow,
-            "--wx-snow": theme.wxSnow,
-            "--wx-showers": theme.wxShowers,
-            "--wx-violent-showers": theme.wxViolentShowers,
-            "--wx-thunderstorm": theme.wxThunderstorm,
-            "--wx-severe-storm": theme.wxSevereStorm,
-            "--wx-unsettled": theme.wxUnsettled
-        };
-
-        // Apply base theme tokens
-        Object.entries(baseProps).forEach(([prop, val]) => {
-            if (val !== undefined) root.style.setProperty(prop, val);
-        });
-
-        // Apply weather tokens or clean up inline overrides so styles.css defaults take over
-        Object.entries(weatherProps).forEach(([prop, val]) => {
+        // Apply defined overrides; remove undefined ones so styles.css defaults take over
+        Object.entries(allProps).forEach(([prop, val]) => {
             if (val !== undefined) {
                 root.style.setProperty(prop, val);
             } else {
@@ -102,6 +118,7 @@ const THEMES = {
             }
         });
     }
+
 
 // Expose for settings.js and other scripts
 window.THEMES = THEMES;
