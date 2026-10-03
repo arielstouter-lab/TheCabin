@@ -1,6 +1,8 @@
 // State, persistence, realtime and helpers shared by every panel.
 // Nothing in here touches the DOM except through setStatus / the render callback.
 
+import { getPendingOp } from '../sync.js';
+
 export const sb = window.supabaseClient;
 export const PERMANENT_TABS = ['Groceries', 'Pantry', 'Recipes'];
 
@@ -152,6 +154,37 @@ async function ensurePermanentSections(){
     }
 }
 
+// Merges freshly-loaded server items with anything still pending in the
+// offline write queue, so a reload (or a realtime nudge from someone
+// else's change) can never silently discard a not-yet-synced local edit.
+// Only items with a queued op are special-cased — everything else just
+// takes the server's value, same as before.
+function mergeItemsWithPendingWrites(serverItems){
+    const previousById = {};
+    Object.values(state.itemsBySection).flat().forEach(item => {
+        previousById[item.id] = item;
+    });
+
+    const next = {};
+    serverItems.forEach(item => {
+        const op = getPendingOp('household_list_items', item.id);
+        if(op && op.type === 'delete') return; // deleted locally, not yet synced — don't resurrect
+        const finalItem = (op && op.type === 'update' && previousById[item.id]) ? previousById[item.id] : item;
+        (next[finalItem.section_id] ||= []).push(finalItem);
+    });
+
+    // Items added while offline (pending insert) won't be in server data yet.
+    const serverIds = new Set(serverItems.map(i => i.id));
+    Object.values(previousById).forEach(item => {
+        const op = getPendingOp('household_list_items', item.id);
+        if(op && op.type === 'insert' && !serverIds.has(item.id)){
+            (next[item.section_id] ||= []).push(item);
+        }
+    });
+
+    return next;
+}
+
 export async function loadAll(options = {}){
     const silent = !!(options && options.silent);
 
@@ -196,10 +229,7 @@ export async function loadAll(options = {}){
         state.groceryAisles = aisleResult.data || [];
         state.groceryItemMemory = memoryResult.data || [];
 
-        state.itemsBySection = {};
-        (itemResult.data || []).forEach(item => {
-            (state.itemsBySection[item.section_id] ||= []).push(item);
-        });
+        state.itemsBySection = mergeItemsWithPendingWrites(itemResult.data || []);
         await ensurePermanentSections();
         saveToLocalCache();
     } catch(e){
