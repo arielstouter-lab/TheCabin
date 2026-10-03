@@ -1,6 +1,8 @@
 // Groceries and user-created tabs share this panel. The only differences:
 //  - Groceries sorts by aisle, remembers aisles per item, and links to "Manage groceries"
 //  - Custom tabs use manual sort order and can be deleted
+//  - Groceries writes go through the offline sync queue (writeOrQueue); custom
+//    tabs still write directly, since offline support is scoped to Groceries for now.
 
 import {
     state, sb, isGroceries, isPermanent,
@@ -9,6 +11,7 @@ import {
     saveToLocalCache, requestRender
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
+import { writeOrQueue, nowStamp } from '../sync.js';
 
 function makeChip(text, extraClass){
     const chip = cloneEl('tpl-chip');
@@ -19,11 +22,19 @@ function makeChip(text, extraClass){
 
 // ---- Row actions ---------------------------------------------------------
 
-async function toggleChecked(id, checked){
-    updateItemLocally(id, { checked });
+async function toggleChecked(sec, id, checked){
+    const grocery = isGroceries(sec);
+    const patch = grocery ? { checked, updated_at: nowStamp() } : { checked };
+    updateItemLocally(id, patch);
     requestRender();
+
+    if(grocery){
+        await writeOrQueue(sb, { table: 'household_list_items', type: 'update', id, payload: patch });
+        return;
+    }
+
     try{
-        const { error } = await sb.from('household_list_items').update({ checked }).eq('id', id);
+        const { error } = await sb.from('household_list_items').update(patch).eq('id', id);
         if(error) throw error;
     } catch(err){
         console.error(err);
@@ -31,9 +42,15 @@ async function toggleChecked(id, checked){
     }
 }
 
-async function deleteItem(id){
+async function deleteItem(sec, id){
     removeItemLocally(id);
     requestRender();
+
+    if(isGroceries(sec)){
+        await writeOrQueue(sb, { table: 'household_list_items', type: 'delete', id });
+        return;
+    }
+
     try{
         const { error } = await sb.from('household_list_items').delete().eq('id', id);
         if(error) throw error;
@@ -63,7 +80,8 @@ async function deleteSection(sec){
 
 // ---- Row + panel builders ------------------------------------------------
 
-function buildItem(item, index, grocery){
+function buildItem(item, index, sec){
+    const grocery = isGroceries(sec);
     const row = cloneEl('tpl-list-item');
     const r = refs(row);
 
@@ -90,8 +108,8 @@ function buildItem(item, index, grocery){
     if(chips.length) r.meta.append(...chips);
     else r.meta.remove();
 
-    r.checkbox.addEventListener('change', () => toggleChecked(item.id, r.checkbox.checked));
-    r.del.addEventListener('click', () => deleteItem(item.id));
+    r.checkbox.addEventListener('change', () => toggleChecked(sec, item.id, r.checkbox.checked));
+    r.del.addEventListener('click', () => deleteItem(sec, item.id));
     return row;
 }
 
@@ -102,7 +120,7 @@ async function addItem(sec, r, grocery){
     const existing = state.itemsBySection[sec.id] || [];
     const maxSort = existing.reduce((max, i) => Math.max(max, i.sort_order || 0), 0);
 
-    const payload = {
+    const basePayload = {
         section_id: sec.id,
         text,
         assigned_to: r.newPerson.value || null,
@@ -113,8 +131,30 @@ async function addItem(sec, r, grocery){
         aisle_id: grocery ? aisleIdForItemText(text) : null
     };
 
+    if(grocery){
+        // Create the row locally with a client-generated id so it shows up
+        // immediately even offline; the same id is sent with the queued
+        // insert, so the eventual server row lines up with this one rather
+        // than creating a duplicate when the queue flushes.
+        const id = crypto.randomUUID();
+        const updated_at = nowStamp();
+        const localItem = { id, ...basePayload, updated_at, created_at: updated_at };
+
+        (state.itemsBySection[sec.id] ||= []).push(localItem);
+        saveToLocalCache();
+        requestRender();
+        const next = document.querySelector('#lst-panel [data-ref="newText"]');
+        if(next) next.focus();
+
+        await writeOrQueue(sb, {
+            table: 'household_list_items', type: 'insert', id,
+            payload: { id, ...basePayload, updated_at }
+        });
+        return;
+    }
+
     try{
-        const data = await insertListItemWithRetry(payload);
+        const data = await insertListItemWithRetry(basePayload);
         (state.itemsBySection[sec.id] ||= []).push(data);
         saveToLocalCache();
         requestRender();
@@ -134,6 +174,11 @@ async function clearCheckedItems(sec){
     state.itemsBySection[sec.id] = (state.itemsBySection[sec.id] || []).filter(i => !i.checked);
     saveToLocalCache();
     requestRender();
+
+    if(isGroceries(sec)){
+        await Promise.all(ids.map(id => writeOrQueue(sb, { table: 'household_list_items', type: 'delete', id })));
+        return;
+    }
 
     try{
         const { error } = await sb.from('household_list_items').delete().in('id', ids);
@@ -171,7 +216,7 @@ export function renderListPanel(sec){
     const source = state.itemsBySection[sec.id] || [];
     const items = grocery ? sortGroceryItems(source) : sortItems(source);
     if(items.length){
-        r.items.append(...items.map((item, index) => buildItem(item, index, grocery)));
+        r.items.append(...items.map((item, index) => buildItem(item, index, sec)));
     } else {
         r.items.append(emptyState('Nothing here yet.'));
     }
@@ -195,6 +240,9 @@ export function renderListPanel(sec){
 }
 
 // ---- Drag-and-drop reordering -------------------------------------------
+// Not yet routed through the offline queue (it's a single bulk RPC call,
+// not a per-row write) — reordering while offline will revert, same as
+// any other network failure, same as before this pass.
 
 export async function reorderItems(sectionId, fromIndex, toIndex){
     if(isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
