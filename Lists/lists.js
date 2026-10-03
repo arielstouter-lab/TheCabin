@@ -9,6 +9,7 @@ import { cloneEl, refs, emptyState } from '../dom.js';
 import { renderListPanel, reorderItems } from './lists-panel.js';
 import { renderPantryPanel } from './lists-pantry.js';
 import { renderRecipesPanel } from './lists-recipes.js';
+import { initSync } from '../sync.js';
 
 let activeSlug = null;
 
@@ -92,6 +93,12 @@ window.initDragAndDrop(panelEl, {
 });
 
 window.addEventListener('beforeunload', stopRealtime);
+
+// Grocery writes that fail (or happen while offline) are queued and retried
+// automatically on reconnect; this surfaces how many are still waiting.
+initSync(sb, {
+    onChange: n => setStatus(n ? `${n} change${n === 1 ? '' : 's'} pending sync…` : '')
+});
 
 if(window.initAppPage){
     window.initAppPage(loadAll);
