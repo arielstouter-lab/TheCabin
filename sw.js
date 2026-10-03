@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thecabin-v3';
+const CACHE_NAME = 'thecabin-v4';
 const STATIC_ASSETS = [
   './',
   'index.html',
@@ -15,6 +15,7 @@ const STATIC_ASSETS = [
   'chores.js',
   'creditcards.js',
   'dom.js',
+  'sync.js',
   'category-row.js',
   'summary-card.js',
   'lists/lists.js',
