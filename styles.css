@@ -430,7 +430,7 @@ select { cursor: pointer; }
   filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.9));
 }
 
-.nav-item .nav-label {
+.nav-label {
   color: var(--nav-label);
 }
 
