@@ -873,8 +873,8 @@ body.cal-page {
 }
 
 .wc-state {
-  color: var(--ink-soft);
-  background: var(--card);
+  color: var(--line);
+  background: var(--primary);
   font-size: var(--text-md);
   text-align: center;
   padding: 40px 20px;
