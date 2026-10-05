@@ -748,6 +748,11 @@ body.cal-page {
 
 /* --- Lists & Pantry --- */
 .lst-items { flex: 1; }
+&.summary {
+  margin-bottom: 20px;
+  color: var(--ink-soft);
+}
+
 
 .lst-item {
   padding: 9px 10px;
@@ -764,10 +769,6 @@ body.cal-page {
     border-color: var(--danger);
     background: var(--danger-bg);
     .lst-item-text { font-weight: 600; color: var(--danger); }
-  }
-  &.summary {
-    margin-bottom: 20px;
-    color: var(--ink-soft);
   }
 }
 
