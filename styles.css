@@ -39,7 +39,7 @@
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
   --radius-sm: 8px;
   --radius-lg: 16px;
-  --weather-bg: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #0d1420));
+  --weather-bg: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--gradient-shade)));
   --weather-fg: 246, 245, 241;
   --text-2xs: 10px;
   --text-xs: 11px;
