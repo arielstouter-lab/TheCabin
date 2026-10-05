@@ -4,10 +4,11 @@ import { renderSummaryCards } from './summary-card.js';
 import { initDebts, loadDebtData, renderDebts } from './debts.js';
 
 const sb = window.supabaseClient;
-const CATEGORIES_TABLE = 'income_expense_categories';
-const CARDS_TABLE = 'credit_cards';
-const REWARDS_TABLE = 'card_rewards';
-const TAX_TABLE = 'income_tax';
+const TABLES = window.TABLES;
+const CATEGORIES_TABLE = TABLES.CATEGORIES;
+const CARDS_TABLE = TABLES.CREDIT_CARDS;
+const REWARDS_TABLE = TABLES.CARD_REWARDS;
+const TAX_TABLE = TABLES.INCOME_TAX;
 
 const COL_CAT_ID = 'id';
 const COL_CAT_CATEGORY = 'category';

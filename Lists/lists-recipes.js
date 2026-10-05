@@ -2,7 +2,7 @@
 // and an editable URL field with a small "open link" anchor kept in sync.
 // Field edits go through the offline sync queue.
 
-import { state, sb, saveToLocalCache, requestRender, addIngredientsToGroceries } from './lists-state.js';
+import { state, sb, TABLES, saveToLocalCache, requestRender, addIngredientsToGroceries } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState, focusAtEnd } from '../dom.js';
 import { writeOrQueue, nowStamp } from '../sync.js';
 
@@ -23,7 +23,7 @@ async function saveRecipeField(recipe, field, value){
     recipe.updated_at = updated_at;
     saveToLocalCache();
     await writeOrQueue(sb, {
-        table: 'household_recipes', type: 'update', id: recipe.id,
+        table: TABLES.RECIPES, type: 'update', id: recipe.id,
         payload: { [field]: value, updated_at }
     });
 }

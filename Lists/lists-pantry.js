@@ -3,7 +3,7 @@
 // Writes go through the offline sync queue, same as the Groceries/custom-tab panel.
 
 import {
-    state, sb, insertListItemWithRetry, saveToLocalCache, requestRender,
+    state, sb, TABLES, insertListItemWithRetry, saveToLocalCache, requestRender,
     addIngredientsToGroceries, updateItemLocally, removeItemLocally
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
@@ -12,7 +12,7 @@ import { writeOrQueue, nowStamp } from '../sync.js';
 async function deleteItem(id){
     removeItemLocally(id);
     requestRender();
-    await writeOrQueue(sb, { table: 'household_list_items', type: 'delete', id });
+    await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'delete', id });
 }
 
 async function setQuantity(id, qty){
@@ -20,7 +20,7 @@ async function setQuantity(id, qty){
     const updated = updateItemLocally(id, patch);
     requestRender();
     if(updated){
-        await writeOrQueue(sb, { table: 'household_list_items', type: 'update', id, payload: patch });
+        await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'update', id, payload: patch });
     }
 }
 
@@ -136,7 +136,7 @@ export function renderPantryPanel(sec){
         if(next) next.focus();
 
         await writeOrQueue(sb, {
-            table: 'household_list_items', type: 'insert', id,
+            table: TABLES.LIST_ITEMS, type: 'insert', id,
             payload: { id, ...basePayload, updated_at }
         });
     }

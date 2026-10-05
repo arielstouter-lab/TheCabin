@@ -1,6 +1,7 @@
 (function(){
   const DEFAULT_DISLIKE = 5;
   const sb = window.supabaseClient;
+  const TABLES = window.TABLES;
 
   let state = null;
   const pendingSaves = {};
@@ -42,10 +43,10 @@
   async function load(){
     try{
       const [{data: people}, {data: chores}, {data: dislikes}, {data: assignments}] = await Promise.all([
-        sb.from('household_people').select('*').order('created_at'),
-        sb.from('household_chores').select('*').order('created_at'),
-        sb.from('chore_dislikes').select('*'),
-        sb.from('chore_assignments').select('*')
+        sb.from(TABLES.PEOPLE).select('*').order('created_at'),
+        sb.from(TABLES.CHORES).select('*').order('created_at'),
+        sb.from(TABLES.CHORE_DISLIKES).select('*'),
+        sb.from(TABLES.CHORE_ASSIGNMENTS).select('*')
       ]);
 
       const chorelist = (chores || []).map(c => ({
@@ -321,7 +322,7 @@
       refreshChoreBadge(chore.id);
       refreshPeopleTotalsAndTickets();
       debounceSave(`chore-fields-${chore.id}`, () =>
-              sb.from('household_chores').update({
+              sb.from(TABLES.CHORES).update({
                 name: chore.name, times_per_week: chore.timesPerWeek, minutes: chore.minutes
               }).eq('id', chore.id)
       );
@@ -338,7 +339,7 @@
       refreshChoreBadge(choreId);
       refreshPeopleTotalsAndTickets();
       debounceSave(`dislike-${choreId}-${personId}`, () =>
-              sb.from('chore_dislikes').upsert({chore_id: choreId, person_id: personId, dislike: val})
+              sb.from(TABLES.CHORE_DISLIKES).upsert({chore_id: choreId, person_id: personId, dislike: val})
       );
     }
 
@@ -351,7 +352,7 @@
       refreshChoreBadge(choreId);
       refreshPeopleTotalsAndTickets();
       debounceSave(`split-${choreId}-${personId}`, () =>
-              sb.from('chore_assignments').upsert({chore_id: choreId, person_id: personId, pct})
+              sb.from(TABLES.CHORE_ASSIGNMENTS).upsert({chore_id: choreId, person_id: personId, pct})
       );
     }
 
@@ -363,7 +364,7 @@
       renderChores();
       renderPeople();
       debounceSave(`person-name-${p.id}`, () =>
-              sb.from('household_people').update({name: p.name}).eq('id', p.id)
+              sb.from(TABLES.PEOPLE).update({name: p.name}).eq('id', p.id)
       );
     }
   });
@@ -377,7 +378,7 @@
       delete state.assignments[id];
       render();
       try{
-        await sb.from('household_chores').delete().eq('id', id);
+        await sb.from(TABLES.CHORES).delete().eq('id', id);
       } catch(err){ setStatus('Could not delete chore.'); }
     }
 
@@ -391,7 +392,7 @@
       });
       render();
       try{
-        await sb.from('household_people').delete().eq('id', id);
+        await sb.from(TABLES.PEOPLE).delete().eq('id', id);
       } catch(err){ setStatus('Could not delete person.'); }
     }
 
@@ -401,7 +402,7 @@
       if(!name) return;
 
       try{
-        const {data, error} = await sb.from('household_chores')
+        const {data, error} = await sb.from(TABLES.CHORES)
                 .insert({name, times_per_week: 1, minutes: 15})
                 .select()
                 .single();
@@ -411,13 +412,13 @@
         const dislike = {};
         state.people.forEach(p => dislike[p.id] = DEFAULT_DISLIKE);
         if(state.people.length){
-          await sb.from('chore_dislikes').upsert(
+          await sb.from(TABLES.CHORE_DISLIKES).upsert(
                   state.people.map(p => ({chore_id: id, person_id: p.id, dislike: DEFAULT_DISLIKE}))
           );
         }
         const firstPerson = state.people[0];
         if(firstPerson){
-          await sb.from('chore_assignments').upsert({chore_id: id, person_id: firstPerson.id, pct: 100});
+          await sb.from(TABLES.CHORE_ASSIGNMENTS).upsert({chore_id: id, person_id: firstPerson.id, pct: 100});
         }
 
         state.chores.push({id, name, timesPerWeek: 1, minutes: 15, dislike});
@@ -435,7 +436,7 @@
       if(!name) return;
 
       try{
-        const {data, error} = await sb.from('household_people')
+        const {data, error} = await sb.from(TABLES.PEOPLE)
                 .insert({name})
                 .select()
                 .single();
@@ -443,7 +444,7 @@
         const id = data.id;
 
         if(state.chores.length){
-          await sb.from('chore_dislikes').upsert(
+          await sb.from(TABLES.CHORE_DISLIKES).upsert(
                   state.chores.map(c => ({chore_id: c.id, person_id: id, dislike: DEFAULT_DISLIKE}))
           );
         }
@@ -476,9 +477,9 @@
       try{
         const choreIds = state.chores.map(c => c.id);
         if(choreIds.length){
-          await sb.from('chore_assignments').delete().in('chore_id', choreIds);
+          await sb.from(TABLES.CHORE_ASSIGNMENTS).delete().in('chore_id', choreIds);
           if(first){
-            await sb.from('chore_assignments').insert(
+            await sb.from(TABLES.CHORE_ASSIGNMENTS).insert(
                     choreIds.map(cid => ({chore_id: cid, person_id: first.id, pct: 100}))
             );
           }
@@ -502,10 +503,10 @@
   function setupRealtime(){
     if(realtimeChannel || !sb) return;
     realtimeChannel = sb.channel('chores-realtime-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'household_people' }, () => debounceReload())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'household_chores' }, () => debounceReload())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chore_dislikes' }, () => debounceReload())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chore_assignments' }, () => debounceReload())
+      .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.PEOPLE }, () => debounceReload())
+      .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.CHORES }, () => debounceReload())
+      .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.CHORE_DISLIKES }, () => debounceReload())
+      .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.CHORE_ASSIGNMENTS }, () => debounceReload())
       .subscribe();
   }
 

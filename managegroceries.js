@@ -1,5 +1,6 @@
 (function(){
     const sb = window.supabaseClient;
+    const TABLES = window.TABLES;
 
     let groceries = null;
     let groceryItems = [];
@@ -23,9 +24,9 @@
     async function loadAll(){
         try{
             const [sectionResult, aisleResult, memoryResult] = await Promise.all([
-                sb.from('household_list_sections').select('*'),
-                sb.from('household_grocery_aisles').select('*').order('sort_order'),
-                sb.from('household_grocery_item_memory').select('*')
+                sb.from(TABLES.LIST_SECTIONS).select('*'),
+                sb.from(TABLES.GROCERY_AISLES).select('*').order('sort_order'),
+                sb.from(TABLES.GROCERY_ITEM_MEMORY).select('*')
             ]);
 
             const loadErrors = [sectionResult.error, aisleResult.error, memoryResult.error].filter(Boolean);
@@ -47,7 +48,7 @@
             itemMemory = memoryResult.data || [];
 
             if(groceries){
-                const itemResult = await sb.from('household_list_items')
+                const itemResult = await sb.from(TABLES.LIST_ITEMS)
                     .select('*')
                     .eq('section_id', groceries.id);
                 if(itemResult.error){
@@ -90,7 +91,7 @@
         if(!trimmed) return;
         const maxSort = aisles.reduce((max, a) => Math.max(max, a.sort_order || 0), 0);
         try{
-            const {data, error} = await sb.from('household_grocery_aisles')
+            const {data, error} = await sb.from(TABLES.GROCERY_AISLES)
                 .insert({ name: trimmed, sort_order: maxSort + 1 })
                 .select()
                 .single();
@@ -110,7 +111,7 @@
         if(!aisle || aisle.name === trimmed) return;
         aisle.name = trimmed;
         try{
-            const {error} = await sb.from('household_grocery_aisles').update({name: trimmed}).eq('id', id);
+            const {error} = await sb.from(TABLES.GROCERY_AISLES).update({name: trimmed}).eq('id', id);
             if(error) throw error;
             render();
         } catch(e){
@@ -133,10 +134,10 @@
 
         try{
             await Promise.all([
-                sb.from('household_list_items').update({aisle_id: null}).eq('aisle_id', id),
-                sb.from('household_grocery_item_memory').update({aisle_id: null}).eq('aisle_id', id)
+                sb.from(TABLES.LIST_ITEMS).update({aisle_id: null}).eq('aisle_id', id),
+                sb.from(TABLES.GROCERY_ITEM_MEMORY).update({aisle_id: null}).eq('aisle_id', id)
             ]);
-            const {error} = await sb.from('household_grocery_aisles').delete().eq('id', id);
+            const {error} = await sb.from(TABLES.GROCERY_AISLES).delete().eq('id', id);
             if(error) throw error;
         } catch(e){
             console.error('Could not delete aisle:', e);
@@ -165,7 +166,7 @@
         const saveToken = ++reorderSaveToken;
         try{
             await Promise.all(ordered.map(aisle =>
-                sb.from('household_grocery_aisles').update({sort_order: aisle.sort_order}).eq('id', aisle.id)
+                sb.from(TABLES.GROCERY_AISLES).update({sort_order: aisle.sort_order}).eq('id', aisle.id)
             ));
         } catch(e){
             console.error('Could not save aisle order:', e);
@@ -205,12 +206,12 @@
         const nowIso = new Date().toISOString();
         try{
             if(existingMemory){
-                const {error} = await sb.from('household_grocery_item_memory')
+                const {error} = await sb.from(TABLES.GROCERY_ITEM_MEMORY)
                     .update({aisle_id: aisleId || null, updated_at: nowIso})
                     .eq('item_key', key);
                 if(error) throw error;
             } else {
-                const {data, error} = await sb.from('household_grocery_item_memory')
+                const {data, error} = await sb.from(TABLES.GROCERY_ITEM_MEMORY)
                     .insert({item_key: key, aisle_id: aisleId || null, updated_at: nowIso})
                     .select()
                     .single();
@@ -220,7 +221,7 @@
 
             const matchingIds = groceryItems.filter(i => window.groceryKey(i.text) === key).map(i => i.id);
             if(matchingIds.length){
-                const {error: itemsErr} = await sb.from('household_list_items')
+                const {error: itemsErr} = await sb.from(TABLES.LIST_ITEMS)
                     .update({aisle_id: aisleId || null})
                     .in('id', matchingIds);
                 if(itemsErr) throw itemsErr;
@@ -240,7 +241,7 @@
         itemMemory = itemMemory.filter(m => m.item_key !== itemKey);
         render();
         try{
-            const {error} = await sb.from('household_grocery_item_memory').delete().eq('item_key', itemKey);
+            const {error} = await sb.from(TABLES.GROCERY_ITEM_MEMORY).delete().eq('item_key', itemKey);
             if(error) throw error;
         } catch(e){
             console.error('Could not remove item mapping:', e);
@@ -400,9 +401,9 @@
     function setupRealtime(){
         if(realtimeChannel || !sb) return;
         realtimeChannel = sb.channel('manage-groceries-realtime-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_grocery_aisles' }, () => debounceReload())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_grocery_item_memory' }, () => debounceReload())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_list_items' }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.GROCERY_AISLES }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.GROCERY_ITEM_MEMORY }, () => debounceReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.LIST_ITEMS }, () => debounceReload())
             .subscribe();
     }
 

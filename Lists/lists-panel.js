@@ -5,7 +5,7 @@
 //    tabs still write directly, since offline support is scoped to Groceries for now.
 
 import {
-    state, sb, isGroceries, isPermanent,
+    state, sb, TABLES, RPC, isGroceries, isPermanent,
     sortItems, sortGroceryItems, aisleIdForItemText, insertListItemWithRetry,
     personName, dueClass, removeItemLocally, updateItemLocally,
     saveToLocalCache, requestRender
@@ -29,12 +29,12 @@ async function toggleChecked(sec, id, checked){
     requestRender();
 
     if(grocery){
-        await writeOrQueue(sb, { table: 'household_list_items', type: 'update', id, payload: patch });
+        await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'update', id, payload: patch });
         return;
     }
 
     try{
-        const { error } = await sb.from('household_list_items').update(patch).eq('id', id);
+        const { error } = await sb.from(TABLES.LIST_ITEMS).update(patch).eq('id', id);
         if(error) throw error;
     } catch(err){
         console.error(err);
@@ -47,12 +47,12 @@ async function deleteItem(sec, id){
     requestRender();
 
     if(isGroceries(sec)){
-        await writeOrQueue(sb, { table: 'household_list_items', type: 'delete', id });
+        await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'delete', id });
         return;
     }
 
     try{
-        const { error } = await sb.from('household_list_items').delete().eq('id', id);
+        const { error } = await sb.from(TABLES.LIST_ITEMS).delete().eq('id', id);
         if(error) throw error;
     } catch(err){
         console.error(err);
@@ -70,7 +70,7 @@ async function deleteSection(sec){
     requestRender();
 
     try{
-        const { error } = await sb.from('household_list_sections').delete().eq('id', sec.id);
+        const { error } = await sb.from(TABLES.LIST_SECTIONS).delete().eq('id', sec.id);
         if(error) throw error;
     } catch(err){
         console.error(err);
@@ -149,7 +149,7 @@ async function addItem(sec, r, grocery){
         if(next) next.focus();
 
         await writeOrQueue(sb, {
-            table: 'household_list_items', type: 'insert', id,
+            table: TABLES.LIST_ITEMS, type: 'insert', id,
             payload: { id, ...basePayload, updated_at }
         });
         return;
@@ -178,12 +178,12 @@ async function clearCheckedItems(sec){
     requestRender();
 
     if(isGroceries(sec)){
-        await Promise.all(ids.map(id => writeOrQueue(sb, { table: 'household_list_items', type: 'delete', id })));
+        await Promise.all(ids.map(id => writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'delete', id })));
         return;
     }
 
     try{
-        const { error } = await sb.from('household_list_items').delete().in('id', ids);
+        const { error } = await sb.from(TABLES.LIST_ITEMS).delete().in('id', ids);
         if(error) throw error;
     } catch(err){
         console.error(err);
@@ -268,7 +268,7 @@ export function buildTagsControls(container, sec){
             const enabled = toggle.checked;
 
             const { error } = await sb
-                .from('household_list_sections')
+                .from(TABLES.LIST_SECTIONS)
                 .update({ tags_enabled: enabled })
                 .eq('id', sec.id);
 
@@ -324,7 +324,7 @@ export async function reorderItems(sectionId, fromIndex, toIndex){
 
     const token = ++reorderSaveToken;
     try{
-        const { error } = await sb.rpc('update_list_item_order', {
+        const { error } = await sb.rpc(RPC.UPDATE_LIST_ITEM_ORDER, {
             item_orders: orderedItems.map(item => ({ id: item.id, sort_order: item.sort_order }))
         });
         if(error) throw error;

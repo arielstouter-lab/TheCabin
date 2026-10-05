@@ -2,7 +2,7 @@
 // markup and behavior to lists-panel.js / lists-pantry.js / lists-recipes.js.
 
 import {
-    state, sb, loadAll, orderedSections, sectionSlug, findSectionBySlug,
+    state, sb, TABLES, loadAll, orderedSections, sectionSlug, findSectionBySlug,
     isPantry, isRecipes, isGroceries, PERMANENT_TABS, onStateChange, stopRealtime
 } from './lists-state.js';
 import { cloneEl, refs, emptyState } from '../dom.js';
@@ -70,7 +70,7 @@ document.getElementById('lst-add-section').addEventListener('click', async () =>
         return;
     }
     try{
-        const { data, error } = await sb.from('household_list_sections').insert({ name }).select().single();
+        const { data, error } = await sb.from(TABLES.LIST_SECTIONS).insert({ name }).select().single();
         if(error || !data){ setStatus('Could not add tab.'); return; }
         state.sections.push(data);
         state.itemsBySection[data.id] = [];

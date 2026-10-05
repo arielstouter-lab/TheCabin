@@ -106,7 +106,7 @@ function fmtTemp(c, unit){
 // ---- location (Supabase, authenticated users only) -----------------
 async function fetchLocation(){
     const { data, error } = await window.supabaseClient
-        .from('weather_location')
+        .from(window.TABLES.WEATHER_LOCATION)
         .select('lat, lon, label')
         .single();
     if (error) throw error;

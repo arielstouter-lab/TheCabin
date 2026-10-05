@@ -134,7 +134,7 @@ function setupLogin() {
     const {
       data: email,
       error: lookupError
-    } = await supabaseClient.rpc("get_email_for_username", {
+    } = await supabaseClient.rpc(window.RPC.GET_EMAIL_FOR_USERNAME, {
       input_username: username
     });
 

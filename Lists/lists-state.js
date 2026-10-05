@@ -3,17 +3,19 @@
 
 import { getPendingOp } from '../sync.js';
 
+export const TABLES = window.TABLES;
+export const RPC = window.RPC;
 export const sb = window.supabaseClient;
 export const PERMANENT_TABS = ['Groceries', 'Pantry', 'Recipes'];
 
 const CACHE_KEY = 'thecabin_cached_lists';
 const INSERT_RETRY_DELAY_MS = 800;
 const REALTIME_TABLES = [
-    'household_list_items',
-    'household_list_sections',
-    'household_recipes',
-    'household_grocery_aisles',
-    'household_grocery_item_memory'
+    TABLES.LIST_ITEMS,
+    TABLES.LIST_SECTIONS,
+    TABLES.RECIPES,
+    TABLES.GROCERY_AISLES,
+    TABLES.GROCERY_ITEM_MEMORY
 ];
 
 export const state = {
@@ -143,7 +145,7 @@ async function ensurePermanentSections(){
     for(const name of PERMANENT_TABS){
         if(existingNames.includes(name)) continue;
         try{
-            const {data, error} = await sb.from('household_list_sections').insert({name}).select().single();
+            const {data, error} = await sb.from(TABLES.LIST_SECTIONS).insert({name}).select().single();
             if(!error && data){
                 state.sections.push(data);
                 state.itemsBySection[data.id] = [];
@@ -167,7 +169,7 @@ function mergeItemsWithPendingWrites(serverItems){
 
     const next = {};
     serverItems.forEach(item => {
-        const op = getPendingOp('household_list_items', item.id);
+        const op = getPendingOp(TABLES.LIST_ITEMS, item.id);
         if(op && op.type === 'delete') return; // deleted locally, not yet synced — don't resurrect
         const finalItem = (op && op.type === 'update' && previousById[item.id]) ? previousById[item.id] : item;
         (next[finalItem.section_id] ||= []).push(finalItem);
@@ -176,7 +178,7 @@ function mergeItemsWithPendingWrites(serverItems){
     // Items added while offline (pending insert) won't be in server data yet.
     const serverIds = new Set(serverItems.map(i => i.id));
     Object.values(previousById).forEach(item => {
-        const op = getPendingOp('household_list_items', item.id);
+        const op = getPendingOp(TABLES.LIST_ITEMS, item.id);
         if(op && op.type === 'insert' && !serverIds.has(item.id)){
             (next[item.section_id] ||= []).push(item);
         }
@@ -193,7 +195,7 @@ function mergeRecipesWithPendingWrites(serverRecipes){
     state.recipes.forEach(r => { previousById[r.id] = r; });
 
     return serverRecipes.map(r => {
-        const op = getPendingOp('household_recipes', r.id);
+        const op = getPendingOp(TABLES.RECIPES, r.id);
         return (op && op.type === 'update' && previousById[r.id]) ? previousById[r.id] : r;
     });
 }
@@ -214,12 +216,12 @@ export async function loadAll(options = {}){
             aisleResult,
             memoryResult
         ] = await Promise.all([
-            sb.from('household_people').select('*').order('created_at'),
-            sb.from('household_list_sections').select('*').order('created_at'),
-            sb.from('household_list_items').select('*').order('created_at'),
-            sb.from('household_recipes').select('*').order('name'),
-            sb.from('household_grocery_aisles').select('*').order('sort_order'),
-            sb.from('household_grocery_item_memory').select('*')
+            sb.from(TABLES.PEOPLE).select('*').order('created_at'),
+            sb.from(TABLES.LIST_SECTIONS).select('*').order('created_at'),
+            sb.from(TABLES.LIST_ITEMS).select('*').order('created_at'),
+            sb.from(TABLES.RECIPES).select('*').order('name'),
+            sb.from(TABLES.GROCERY_AISLES).select('*').order('sort_order'),
+            sb.from(TABLES.GROCERY_ITEM_MEMORY).select('*')
         ]);
 
         const loadErrors = [
@@ -292,14 +294,14 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // blips). Rethrows if the retry fails so the caller can show a status message.
 export async function insertListItemWithRetry(payload){
     try{
-        const {data, error} = await sb.from('household_list_items').insert(payload).select().single();
+        const {data, error} = await sb.from(TABLES.LIST_ITEMS).insert(payload).select().single();
         if(error) throw error;
         return data;
     } catch(firstErr){
         console.warn('Insert failed, retrying in', INSERT_RETRY_DELAY_MS, 'ms:', firstErr, payload);
         await sleep(INSERT_RETRY_DELAY_MS);
         try{
-            const {data, error} = await sb.from('household_list_items').insert(payload).select().single();
+            const {data, error} = await sb.from(TABLES.LIST_ITEMS).insert(payload).select().single();
             if(error) throw error;
             return data;
         } catch(secondErr){
@@ -415,7 +417,7 @@ export async function addIngredientsToGroceries(ingredientList){
             aisle_id: aisleIdForItemText(text),
             sort_order: null
         }));
-        const {data, error} = await sb.from('household_list_items').insert(rows).select();
+        const {data, error} = await sb.from(TABLES.LIST_ITEMS).insert(rows).select();
         if(error || !data){ setStatus('Could not add to groceries.'); return; }
         (state.itemsBySection[groceries.id] ||= []).push(...data);
         saveToLocalCache();

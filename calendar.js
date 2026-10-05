@@ -2,6 +2,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
 
 (function(){
     const sb = window.supabaseClient;
+    const TABLES = window.TABLES;
     const todayStr = window.todayStr;
     const updateSeason = window.updateSeason || function(){};
 
@@ -79,7 +80,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
 
         const next = {};
         serverEvents.forEach(ev => {
-            const op = getPendingOp('household_events', ev.id);
+            const op = getPendingOp(TABLES.EVENTS, ev.id);
             if(op && op.type === 'delete') return; // deleted locally, not yet synced
             const finalEv = (op && op.type === 'update' && previousById[ev.id]) ? previousById[ev.id] : ev;
             (next[finalEv.event_date] ||= []).push(finalEv);
@@ -87,7 +88,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
 
         const serverIds = new Set(serverEvents.map(ev => ev.id));
         Object.values(previousById).forEach(ev => {
-            const op = getPendingOp('household_events', ev.id);
+            const op = getPendingOp(TABLES.EVENTS, ev.id);
             if(op && op.type === 'insert' && !serverIds.has(ev.id)){
                 (next[ev.event_date] ||= []).push(ev);
             }
@@ -106,7 +107,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
         }
 
         try{
-            const { data, error } = await sb.from('household_events')
+            const { data, error } = await sb.from(TABLES.EVENTS)
                 .select('*')
                 .gte('event_date', first)
                 .lte('event_date', last)
@@ -127,7 +128,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
         const select = $('cal-event-layer');
         if(!select) return;
         try{
-            const { data, error } = await sb.from('household_events').select('layer');
+            const { data, error } = await sb.from(TABLES.EVENTS).select('layer');
             if(error) throw error;
 
             const layers = [...new Set((data || []).map(row => row.layer).filter(Boolean))].sort();
@@ -142,7 +143,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
 
     async function loadHistory(layer){
         try{
-            const { data, error } = await sb.from('household_events')
+            const { data, error } = await sb.from(TABLES.EVENTS)
                 .select('event_date')
                 .eq('layer', layer)
                 .order('event_date', { ascending: true });
@@ -279,7 +280,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
 
         await Promise.all(defaults.map(ev =>
             writeOrQueue(sb, {
-                table: 'household_events', type: 'update', id: ev.id,
+                table: TABLES.EVENTS, type: 'update', id: ev.id,
                 payload: { sort_order: ev.sort_order, updated_at }
             })
         ));
@@ -397,7 +398,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
     function setupRealtime(){
         if(realtimeChannel || !sb) return;
         realtimeChannel = sb.channel('calendar-realtime-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'household_events' }, () => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.EVENTS }, () => {
                 clearTimeout(realtimeDebounceTimer);
                 realtimeDebounceTimer = setTimeout(refreshAll, 300);
             })
@@ -457,7 +458,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
         render();
 
         await writeOrQueue(sb, {
-            table: 'household_events', type: 'insert', id,
+            table: TABLES.EVENTS, type: 'insert', id,
             payload: { id, ...basePayload, updated_at }
         });
     });
@@ -476,7 +477,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
         saveToLocalCache();
         render();
 
-        await writeOrQueue(sb, { table: 'household_events', type: 'delete', id });
+        await writeOrQueue(sb, { table: TABLES.EVENTS, type: 'delete', id });
     });
 
     window.addEventListener('beforeunload', () => {

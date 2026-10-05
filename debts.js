@@ -16,10 +16,11 @@ import {
 } from './debt-engine.js';
 
 const sb = window.supabaseClient;
-const DEBTS_TABLE = 'debts';
-const SNAP_TABLE = 'debt_snapshots';
-const MONEY_TABLE = 'debt_month_money';
-const SETTINGS_TABLE = 'debt_settings';
+const TABLES = window.TABLES;
+const DEBTS_TABLE = TABLES.DEBTS;
+const SNAP_TABLE = TABLES.DEBT_SNAPSHOTS;
+const MONEY_TABLE = TABLES.DEBT_MONTH_MONEY;
+const SETTINGS_TABLE = TABLES.DEBT_SETTINGS;
 
 // ------------------------------------------------------------------ state
 let deps = { getNetBalance: () => 0, getBankRows: () => [] };
