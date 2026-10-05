@@ -749,7 +749,7 @@ body.cal-page {
 /* --- Lists & Pantry --- */
 .lst-items { flex: 1; }
 
-.summary {
+.lst-items summary {
   margin-bottom: 20px;
   color: var(--ink-soft);
 }
