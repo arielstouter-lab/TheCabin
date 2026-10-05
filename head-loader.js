@@ -14,6 +14,7 @@ const THEMES = {
         line: "#44483D",
         successBg: "#233128",
         white: "#161914",
+        gradientShade: "#0d1420",
 
         wxClear: "#3C8A8C",
         wxPartly: "#4D8F92",
@@ -46,21 +47,22 @@ const THEMES = {
         line: "#D8C8B2",
         successBg: "#F2F0E1",
         white: "#FFFFFF",
+        gradientShade: "#986445",
 
-        wxClear: "#D89A2B",              // golden maple
-        wxPartly: "#C87B32",             // amber leaf
-        wxOvercast: "#8A684C",           // dried oak leaf
-        wxFog: "#A08B79",                // misty tan
-        wxDrizzle: "#A15C38",            // light rust
-        wxRain: "#8B4F2D",               // autumn evening primary
-        wxHeavyRain: "#6E3C26",          // wet bark
-        wxLightSnow: "#D7C8B1",          // frosted leaf
-        wxSnow: "#BFB0A0",               // late-autumn frost
-        wxShowers: "#A85A2F",            // burnt orange
-        wxViolentShowers: "#7A3F27",     // dark copper
-        wxThunderstorm: "#5C3E63",       // plum twilight
-        wxSevereThunderstorm: "#402847", // eggplant storm
-        wxUnsettled: "#7A5A80"           // autumn dusk purple
+        wxClear: "#D89A2B",
+        wxPartly: "#C87B32",
+        wxOvercast: "#8A684C",
+        wxFog: "#A08B79",
+        wxDrizzle: "#A15C38",
+        wxRain: "#8B4F2D",
+        wxHeavyRain: "#55372a",
+        wxLightSnow: "#D7C8B1",
+        wxSnow: "#BFB0A0",
+        wxShowers: "#A85A2F",
+        wxViolentShowers: "#7A3F27",
+        wxThunderstorm: "#5C3E63",
+        wxSevereThunderstorm: "#402847",
+        wxUnsettled: "#7A5A80",
 
     },
 
@@ -76,6 +78,7 @@ const THEMES = {
         line: "#6B4A6E",
         successBg: "#EEF1E8",
         white: "#FFFCF8",
+        gradientShade: "#0d1420",
 
         wxClear: "#E0A83A",
         wxPartly: "#CA7D3C",
@@ -114,6 +117,7 @@ const THEMES = {
             "--line": activeTheme.line,
             "--success-bg": activeTheme.successBg,
             "--white": activeTheme.white,
+            "--gradientShade": activeTheme.gradientShade,
 
             // Weather tokens
             "--wx-clear": activeTheme.wxClear,

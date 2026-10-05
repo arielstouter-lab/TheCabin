@@ -13,6 +13,7 @@
   --line: #C9C2A8;
   --success-bg: #f0f4f0;
   --white: #ffffff;
+  --gradientShade: #5C7A67;
 
 /*weather*/
     --wx-clear: #3f7fb3;
@@ -382,7 +383,7 @@ select { cursor: pointer; }
   position: sticky;
   top: 0;
   padding: 22px 14px;
-  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, #0d1420));
+  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradientShade)));
   color: var(--line); }
 
 .sidebar-brand {
