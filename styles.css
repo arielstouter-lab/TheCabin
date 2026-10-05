@@ -765,6 +765,10 @@ body.cal-page {
     background: var(--danger-bg);
     .lst-item-text { font-weight: 600; color: var(--danger); }
   }
+  &.summary {
+    margin-bottom: 20px;
+    color: var(--ink-soft);
+  }
 }
 
 .lst-check-label {
