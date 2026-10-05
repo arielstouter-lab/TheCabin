@@ -4,8 +4,7 @@ const THEMES = {
 
     dark: {
         primary: "#37533F",
-        primaryHover: "#738f83",
-//        primaryHover: "#88B092",
+        primaryHover: "#7ea594",
         danger: "#D26A56",
         dangerBg: "#3A201A",
         card: "#22251F",
