@@ -500,10 +500,13 @@ select { cursor: pointer; }
   display: flex;
   align-items: center;
   padding: 20px 40px;
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradientShade)));
+  background: var(--card);
   h1 { margin: 0 0 3px; font-size: var(--text-5xl); font-family: var(--font-serif), serif; letter-spacing: -0.3px; }
   p { margin: 0; color: var(--ink-soft); font-size: var(--text-base); }
+}
+
+.topbar .gradient {
+  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradientShade)));
 }
 
 .content { max-width: none; padding: 20px 40px; }
@@ -826,7 +829,7 @@ body.cal-page {
 /* --- Weather Card & Forecast --- */
 .weather-card,
 .wf-list {
-  --weather-bg: linear-gradient(160deg, var(--accent, #37533F), color-mix(in srgb, var(--accent, #37533F) 55%, #0d1420));
+  --weather-bg: linear-gradient(160deg, var(--accent, var(--primary)), color-mix(in srgb, var(--accent, var(--primary)) 55%, #0d1420));
   background: var(--weather-bg);
 }
 
