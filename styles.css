@@ -829,7 +829,7 @@ body.cal-page {
 /* --- Weather Card & Forecast --- */
 .weather-card,
 .wf-list {
-  --weather-bg: linear-gradient(160deg, var(--accent, var(--primary)), color-mix(in srgb, var(--accent, var(--primary)) 55%, #0d1420));
+  --weather-bg: linear-gradient(160deg, var(--accent, var(--primary)), color-mix(in srgb, var(--accent, var(--primary)) 55%, var(--gradient-shade)));
   background: var(--weather-bg);
 }
 
