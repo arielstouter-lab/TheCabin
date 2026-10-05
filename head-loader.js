@@ -117,7 +117,7 @@ const THEMES = {
             "--line": activeTheme.line,
             "--success-bg": activeTheme.successBg,
             "--white": activeTheme.white,
-            "--gradientShade": activeTheme.gradientShade,
+            "--gradient-shade": activeTheme.gradientShade,
 
             // Weather tokens
             "--wx-clear": activeTheme.wxClear,

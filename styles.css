@@ -13,7 +13,7 @@
   --line: #C9C2A8;
   --success-bg: #f0f4f0;
   --white: #ffffff;
-  --gradientShade: #687147;
+  --gradient-shade: #687147;
 
 /*weather*/
     --wx-clear: #3f7fb3;
@@ -383,7 +383,7 @@ select { cursor: pointer; }
   position: sticky;
   top: 0;
   padding: 22px 14px;
-  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradientShade)));
+  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradient-shade)));
   color: var(--line); }
 
 .sidebar-brand {
@@ -505,8 +505,8 @@ select { cursor: pointer; }
   p { margin: 0; color: var(--ink-soft); font-size: var(--text-base); }
 }
 
-.topbar .gradient {
-  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradientShade)));
+.gradient {
+  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradient-shade)));
 }
 
 .content { max-width: none; padding: 20px 40px; }
