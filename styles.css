@@ -748,11 +748,11 @@ body.cal-page {
 
 /* --- Lists & Pantry --- */
 .lst-items { flex: 1; }
-&.summary {
+
+.summary {
   margin-bottom: 20px;
   color: var(--ink-soft);
 }
-
 
 .lst-item {
   padding: 9px 10px;
