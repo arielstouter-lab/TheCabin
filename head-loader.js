@@ -90,7 +90,9 @@ const THEMES = {
         wxViolentShowers: "#713626",
         wxThunderstorm: "#56385F",
         wxSevereThunderstorm: "#38203F",
-        wxUnsettled: "#6A4B74"
+        wxUnsettled: "#6A4B74",
+
+        navLabel: "#88778A"
     }
 };
 
