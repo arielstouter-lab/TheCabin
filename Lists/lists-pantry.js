@@ -6,7 +6,7 @@ import {
     addIngredientsToGroceries, updateItemLocally, removeItemLocally
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
-import { buildTagsControls } from './lists-state.js';
+import { buildTagsControls } from './lists-panel.js';
 
 async function deleteItem(id){
     removeItemLocally(id);

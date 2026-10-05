@@ -12,7 +12,6 @@ import {
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
 import { writeOrQueue, nowStamp } from '../sync.js';
-import { buildTagsControls } from './lists-state.js';
 
 function makeChip(text, extraClass){
     const chip = cloneEl('tpl-chip');
@@ -293,6 +292,54 @@ export function renderListPanel(sec){
 
     return frag;
 }
+
+//Manage toggle function
+export function buildTagsControls(sec){
+    const wrap = document.createDocumentFragment();
+
+    const toggleWrap = cloneEl('tpl-tags-toggle');
+    const toggle = refs(toggleWrap).toggle;
+
+    toggle.checked = !!sec.tags_enabled;
+
+    toggle.addEventListener('change', async () => {
+        try{
+            const enabled = toggle.checked;
+
+            const { error } = await sb
+                .from('household_list_sections')
+                .update({ tags_enabled: enabled })
+                .eq('id', sec.id);
+
+            if(error) throw error;
+
+            sec.tags_enabled = enabled;
+            requestRender();
+        }catch(err){
+            console.error(err);
+            setStatus('Could not save tags setting.');
+        }
+    });
+
+    wrap.append(toggleWrap);
+
+    if(sec.tags_enabled){
+        const manageBtn = cloneEl('tpl-manage-link');
+
+        manageBtn.href =
+            `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
+
+        manageBtn.textContent =
+            sec.name === 'Groceries'
+                ? 'Manage Groceries'
+                : 'Manage Tags';
+
+        wrap.append(manageBtn);
+    }
+
+    return wrap;
+}
+
 
 // ---- Drag-and-drop reordering -------------------------------------------
 // Not yet routed through the offline queue (it's a single bulk RPC call,

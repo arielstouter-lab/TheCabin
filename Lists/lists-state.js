@@ -154,53 +154,6 @@ async function ensurePermanentSections(){
     }
 }
 
-//Manage toggle function
-export function buildTagsControls(sec){
-    const wrap = document.createDocumentFragment();
-
-    const toggleWrap = cloneEl('tpl-tags-toggle');
-    const toggle = refs(toggleWrap).toggle;
-
-    toggle.checked = !!sec.tags_enabled;
-
-    toggle.addEventListener('change', async () => {
-        try{
-            const enabled = toggle.checked;
-
-            const { error } = await sb
-                .from('household_list_sections')
-                .update({ tags_enabled: enabled })
-                .eq('id', sec.id);
-
-            if(error) throw error;
-
-            sec.tags_enabled = enabled;
-            requestRender();
-        }catch(err){
-            console.error(err);
-            setStatus('Could not save tags setting.');
-        }
-    });
-
-    wrap.append(toggleWrap);
-
-    if(sec.tags_enabled){
-        const manageBtn = cloneEl('tpl-manage-link');
-
-        manageBtn.href =
-            `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
-
-        manageBtn.textContent =
-            sec.name === 'Groceries'
-                ? 'Manage Groceries'
-                : 'Manage Tags';
-
-        wrap.append(manageBtn);
-    }
-
-    return wrap;
-}
-
 // Merges freshly-loaded server items with anything still pending in the
 // offline write queue, so a reload (or a realtime nudge from someone
 // else's change) can never silently discard a not-yet-synced local edit.
