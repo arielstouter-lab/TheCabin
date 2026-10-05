@@ -13,7 +13,7 @@
   --line: #C9C2A8;
   --success-bg: #f0f4f0;
   --white: #ffffff;
-  --gradientShade: #5C7A67;
+  --gradientShade: #687147;
 
 /*weather*/
     --wx-clear: #3f7fb3;
@@ -501,7 +501,7 @@ select { cursor: pointer; }
   align-items: center;
   padding: 20px 40px;
   border-bottom: 1px solid var(--line);
-  background: var(--card);
+  background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradientShade)));
   h1 { margin: 0 0 3px; font-size: var(--text-5xl); font-family: var(--font-serif), serif; letter-spacing: -0.3px; }
   p { margin: 0; color: var(--ink-soft); font-size: var(--text-base); }
 }

@@ -47,7 +47,7 @@ const THEMES = {
         line: "#D8C8B2",
         successBg: "#F2F0E1",
         white: "#FFFFFF",
-        gradientShade: "#986445",
+        gradientShade: "#768796",
 
         wxClear: "#D89A2B",
         wxPartly: "#C87B32",
