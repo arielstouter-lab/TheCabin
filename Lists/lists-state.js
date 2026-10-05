@@ -185,6 +185,19 @@ function mergeItemsWithPendingWrites(serverItems){
     return next;
 }
 
+// Same idea as mergeItemsWithPendingWrites, for the flat recipes array.
+// Recipes are only ever edited in place here (notes/url), never inserted
+// or deleted from this app, so there's no pending-insert case to handle.
+function mergeRecipesWithPendingWrites(serverRecipes){
+    const previousById = {};
+    state.recipes.forEach(r => { previousById[r.id] = r; });
+
+    return serverRecipes.map(r => {
+        const op = getPendingOp('household_recipes', r.id);
+        return (op && op.type === 'update' && previousById[r.id]) ? previousById[r.id] : r;
+    });
+}
+
 export async function loadAll(options = {}){
     const silent = !!(options && options.silent);
 
@@ -225,7 +238,7 @@ export async function loadAll(options = {}){
 
         state.people = peopleResult.data || [];
         state.sections = sectionResult.data || [];
-        state.recipes = recipeResult.data || [];
+        state.recipes = mergeRecipesWithPendingWrites(recipeResult.data || []);
         state.groceryAisles = aisleResult.data || [];
         state.groceryItemMemory = memoryResult.data || [];
 

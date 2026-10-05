@@ -1,35 +1,26 @@
 // Pantry panel: simple list with per-item quantity steppers and
 // an "Add to groceries" shortcut. No manual reordering or priority/date fields.
+// Writes go through the offline sync queue, same as the Groceries/custom-tab panel.
 
 import {
     state, sb, insertListItemWithRetry, saveToLocalCache, requestRender,
     addIngredientsToGroceries, updateItemLocally, removeItemLocally
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
+import { writeOrQueue, nowStamp } from '../sync.js';
 
 async function deleteItem(id){
     removeItemLocally(id);
     requestRender();
-    try{
-        const { error } = await sb.from('household_list_items').delete().eq('id', id);
-        if(error) throw error;
-    } catch(err){
-        console.error(err);
-        setStatus('Could not remove item.');
-    }
+    await writeOrQueue(sb, { table: 'household_list_items', type: 'delete', id });
 }
 
 async function setQuantity(id, qty){
-    const updated = updateItemLocally(id, { quantity: qty });
+    const patch = { quantity: qty, updated_at: nowStamp() };
+    const updated = updateItemLocally(id, patch);
     requestRender();
     if(updated){
-        try{
-            const { error } = await sb.from('household_list_items').update({ quantity: updated.quantity }).eq('id', id);
-            if(error) throw error;
-        } catch(err){
-            console.error(err);
-            setStatus('Could not update quantity.');
-        }
+        await writeOrQueue(sb, { table: 'household_list_items', type: 'update', id, payload: patch });
     }
 }
 
@@ -132,17 +123,22 @@ export function renderPantryPanel(sec){
     async function addNewItem(){
         const text = r.newText.value.trim();
         if(!text) return;
-        const payload = { section_id: sec.id, text, quantity: newQty, checked: false };
-        try{
-            const data = await insertListItemWithRetry(payload);
-            (state.itemsBySection[sec.id] ||= []).push(data);
-            saveToLocalCache();
-            requestRender();
-            const next = document.querySelector('#lst-panel [data-ref="newText"]');
-            if(next) next.focus();
-        } catch(e){
-            setStatus('Could not add pantry item.');
-        }
+
+        const id = crypto.randomUUID();
+        const updated_at = nowStamp();
+        const basePayload = { section_id: sec.id, text, quantity: newQty, checked: false };
+        const localItem = { id, ...basePayload, updated_at, created_at: updated_at };
+
+        (state.itemsBySection[sec.id] ||= []).push(localItem);
+        saveToLocalCache();
+        requestRender();
+        const next = document.querySelector('#lst-panel [data-ref="newText"]');
+        if(next) next.focus();
+
+        await writeOrQueue(sb, {
+            table: 'household_list_items', type: 'insert', id,
+            payload: { id, ...basePayload, updated_at }
+        });
     }
 
     r.addBtn.addEventListener('click', addNewItem);

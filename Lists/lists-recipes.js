@@ -1,8 +1,10 @@
 // Recipes panel: searchable card list. Each card has an editable notes field
 // and an editable URL field with a small "open link" anchor kept in sync.
+// Field edits go through the offline sync queue.
 
 import { state, sb, saveToLocalCache, requestRender, addIngredientsToGroceries } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState, focusAtEnd } from '../dom.js';
+import { writeOrQueue, nowStamp } from '../sync.js';
 
 let recipeSearchQuery = '';
 
@@ -16,15 +18,14 @@ function normalizeUrl(raw){
 
 async function saveRecipeField(recipe, field, value){
     if((recipe[field] || '') === value) return;
+    const updated_at = nowStamp();
     recipe[field] = value;
+    recipe.updated_at = updated_at;
     saveToLocalCache();
-    try{
-        const { error } = await sb.from('household_recipes').update({ [field]: value }).eq('id', recipe.id);
-        if(error) throw error;
-    } catch(err){
-        console.error(err);
-        setStatus(`Could not update ${field}.`);
-    }
+    await writeOrQueue(sb, {
+        table: 'household_recipes', type: 'update', id: recipe.id,
+        payload: { [field]: value, updated_at }
+    });
 }
 
 function buildIngredientRow(text){

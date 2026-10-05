@@ -1,3 +1,5 @@
+import { writeOrQueue, nowStamp, getPendingOp, initSync } from './sync.js';
+
 (function(){
     const sb = window.supabaseClient;
     const todayStr = window.todayStr;
@@ -9,6 +11,7 @@
     const FLOW_KEYS = ['spotting', 'light', 'medium', 'heavy']; // match your moon event titles
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const LAYER_PANELS = { moon: 'moon-panel', o: 'o-panel' };  // layer -> stats panel id
+    const CACHE_KEY = 'thecabin_cached_calendar';
 
     // ---------- state ----------
     const histories = { o: [], moon: [] };        // every event_date per layer, ascending
@@ -37,10 +40,71 @@
         renderEventsPanel();
     }
 
+    // ---------- local cache -----------------------------------------------
+    // Lets the currently-viewed month render instantly offline, before (or
+    // instead of) the network fetch. Only used if it matches the month
+    // we're about to show, so switching months doesn't flash stale data.
+
+    function saveToLocalCache(){
+        try{
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+                eventsByDate, histories, viewYear, viewMonth, timestamp: Date.now()
+            }));
+        } catch(e){}
+    }
+
+    function loadFromLocalCache(){
+        try{
+            const raw = localStorage.getItem(CACHE_KEY);
+            if(!raw) return false;
+            const data = JSON.parse(raw);
+            if(!data || data.viewYear !== viewYear || data.viewMonth !== viewMonth) return false;
+            eventsByDate = data.eventsByDate || {};
+            if(data.histories){
+                histories.o = data.histories.o || [];
+                histories.moon = data.histories.moon || [];
+            }
+            return true;
+        } catch(e){
+            return false;
+        }
+    }
+
+    // Merges freshly-loaded server events with anything still pending in the
+    // offline write queue, so a reload can't silently discard a not-yet-synced
+    // local add/edit/delete. Same approach as the Lists page.
+    function mergeEventsWithPendingWrites(serverEvents){
+        const previousById = {};
+        Object.values(eventsByDate).flat().forEach(ev => { previousById[ev.id] = ev; });
+
+        const next = {};
+        serverEvents.forEach(ev => {
+            const op = getPendingOp('household_events', ev.id);
+            if(op && op.type === 'delete') return; // deleted locally, not yet synced
+            const finalEv = (op && op.type === 'update' && previousById[ev.id]) ? previousById[ev.id] : ev;
+            (next[finalEv.event_date] ||= []).push(finalEv);
+        });
+
+        const serverIds = new Set(serverEvents.map(ev => ev.id));
+        Object.values(previousById).forEach(ev => {
+            const op = getPendingOp('household_events', ev.id);
+            if(op && op.type === 'insert' && !serverIds.has(ev.id)){
+                (next[ev.event_date] ||= []).push(ev);
+            }
+        });
+
+        return next;
+    }
+
     // ---------- data loading ----------
     async function loadMonth(){
         const first = toDateStr(new Date(viewYear, viewMonth, 1));
         const last = toDateStr(new Date(viewYear, viewMonth + 1, 0));
+
+        if(loadFromLocalCache()){
+            render();
+        }
+
         try{
             const { data, error } = await sb.from('household_events')
                 .select('*')
@@ -48,14 +112,13 @@
                 .lte('event_date', last)
                 .order('sort_order', { ascending: true });
             if(error) throw error;
-            eventsByDate = {};
-            (data || []).forEach(ev => {
-                (eventsByDate[ev.event_date] ||= []).push(ev);
-            });
+            eventsByDate = mergeEventsWithPendingWrites(data || []);
+            saveToLocalCache();
         } catch(err){
             console.error('Failed to load events:', err);
-            setStatus('Could not load events.');
-            eventsByDate = {};
+            if(!Object.keys(eventsByDate).length){
+                setStatus('Could not load events.');
+            }
         }
         render();
     }
@@ -193,6 +256,9 @@
         empty.classList.toggle('hidden', evs.length > 0);
     }
 
+    // Each row's sort_order update is queued independently (last-write-wins
+    // per row), rather than one bulk call — local order is trusted and
+    // never reverted; if offline, it just sits queued until it syncs.
     async function reorderEvents(fromIndex, toIndex){
         if(isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
 
@@ -203,22 +269,20 @@
         const slots = defaults.map(ev => ev.sort_order);
         const [moved] = defaults.splice(fromIndex, 1);
         defaults.splice(toIndex, 0, moved);
-        defaults.forEach((ev, i) => { ev.sort_order = slots[i]; });
+
+        const updated_at = nowStamp();
+        defaults.forEach((ev, i) => { ev.sort_order = slots[i]; ev.updated_at = updated_at; });
 
         eventsByDate[selectedDate].sort((a, b) => a.sort_order - b.sort_order);
+        saveToLocalCache();
         renderEventsPanel();
 
-        try{
-            const results = await Promise.all(defaults.map(ev =>
-                sb.from('household_events').update({ sort_order: ev.sort_order }).eq('id', ev.id)
-            ));
-            const failed = results.find(r => r.error);
-            if(failed) throw failed.error;
-        } catch(err){
-            console.error('Failed to save event order:', err);
-            setStatus('Could not save event order.');
-            loadMonth();   // resync from the db
-        }
+        await Promise.all(defaults.map(ev =>
+            writeOrQueue(sb, {
+                table: 'household_events', type: 'update', id: ev.id,
+                payload: { sort_order: ev.sort_order, updated_at }
+            })
+        ));
     }
 
     function selectDate(dateStr){
@@ -379,19 +443,23 @@
         const events = eventsByDate[selectedDate] || [];
         const sort_order = Math.max(0, events.length, ...events.map(ev => Number(ev.sort_order) || 0)) + 1;
 
-        try{
-            const { data, error } = await sb.from('household_events')
-                .insert({ event_date: selectedDate, title, sort_order, layer })
-                .select()
-                .single();
-            if(error) throw error;
-            (eventsByDate[selectedDate] ||= []).push(data);
-            input.value = '';
-            render();
-        } catch(err){
-            console.error('Failed to add event:', err);
-            setStatus('Could not add event.');
-        }
+        // Client-generated id so the event shows up immediately even offline;
+        // the same id ships with the queued insert, so the eventual server
+        // row lines up with this one instead of creating a duplicate.
+        const id = crypto.randomUUID();
+        const updated_at = nowStamp();
+        const basePayload = { event_date: selectedDate, title, sort_order, layer };
+        const localEvent = { id, ...basePayload, updated_at };
+
+        (eventsByDate[selectedDate] ||= []).push(localEvent);
+        saveToLocalCache();
+        input.value = '';
+        render();
+
+        await writeOrQueue(sb, {
+            table: 'household_events', type: 'insert', id,
+            payload: { id, ...basePayload, updated_at }
+        });
     });
 
     $('cal-new-event').addEventListener('keydown', e => {
@@ -403,20 +471,22 @@
         if(!btn) return;
 
         const id = btn.dataset.delEvent;
-        try{
-            const { error } = await sb.from('household_events').delete().eq('id', id);
-            if(error) throw error;
-            eventsByDate[selectedDate] = (eventsByDate[selectedDate] || [])
-                .filter(ev => String(ev.id) !== id);
-            render();
-        } catch(err){
-            console.error('Failed to remove event:', err);
-            setStatus('Could not remove event.');
-        }
+        eventsByDate[selectedDate] = (eventsByDate[selectedDate] || [])
+            .filter(ev => String(ev.id) !== id);
+        saveToLocalCache();
+        render();
+
+        await writeOrQueue(sb, { table: 'household_events', type: 'delete', id });
     });
 
     window.addEventListener('beforeunload', () => {
         if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
+    });
+
+    // Event writes that fail (or happen while offline) are queued and
+    // retried automatically on reconnect.
+    initSync(sb, {
+        onChange: n => setStatus(n ? `${n} change${n === 1 ? '' : 's'} pending sync…` : '')
     });
 
     // ---------- init ----------
