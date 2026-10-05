@@ -1,10 +1,9 @@
 // Recipes panel: searchable card list. Each card has an editable notes field
 // and an editable URL field with a small "open link" anchor kept in sync.
-// Field edits go through the offline sync queue.
+// Field edits route through unified state action helpers with offline sync.
 
-import { state, sb, TABLES, saveToLocalCache, requestRender, addIngredientsToGroceries } from './lists-state.js';
+import { state, addIngredientsToGroceries, saveRecipeField } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState, focusAtEnd } from '../dom.js';
-import { writeOrQueue, nowStamp } from '../sync.js';
 
 let recipeSearchQuery = '';
 
@@ -14,18 +13,6 @@ function normalizeUrl(raw){
     const v = (raw || '').trim();
     if(!v) return '';
     return /^https?:\/\//i.test(v) ? v : 'https://' + v;
-}
-
-async function saveRecipeField(recipe, field, value){
-    if((recipe[field] || '') === value) return;
-    const updated_at = nowStamp();
-    recipe[field] = value;
-    recipe.updated_at = updated_at;
-    saveToLocalCache();
-    await writeOrQueue(sb, {
-        table: TABLES.RECIPES, type: 'update', id: recipe.id,
-        payload: { [field]: value, updated_at }
-    });
 }
 
 function buildIngredientRow(text){
@@ -80,13 +67,9 @@ function buildRecipeCard(recipe){
     return card;
 }
 
-export function renderRecipesPanel(sec){
-    const frag = cloneFragment('tpl-recipes-panel');
-    const r = refs(frag);
-    r.title.textContent = sec.name;
-    r.search.value = recipeSearchQuery;
-
-    const q = recipeSearchQuery.trim().toLowerCase();
+function renderRecipeList(listEl, query){
+    listEl.replaceChildren();
+    const q = (query || '').trim().toLowerCase();
     const filtered = state.recipes.filter(recipe => {
         if(!q) return true;
         const nameMatch = (recipe.name || '').toLowerCase().includes(q);
@@ -95,21 +78,23 @@ export function renderRecipesPanel(sec){
     });
 
     if(filtered.length){
-        r.list.append(...filtered.map(buildRecipeCard));
+        listEl.append(...filtered.map(buildRecipeCard));
     } else {
-        r.list.append(emptyState(recipeSearchQuery ? 'No recipes match your search.' : 'No recipes found.'));
+        listEl.append(emptyState(q ? 'No recipes match your search.' : 'No recipes found.'));
     }
+}
+
+export function renderRecipesPanel(sec){
+    const frag = cloneFragment('tpl-recipes-panel');
+    const r = refs(frag);
+    r.title.textContent = sec.name;
+    r.search.value = recipeSearchQuery;
+
+    renderRecipeList(r.list, recipeSearchQuery);
 
     r.search.addEventListener('input', () => {
         recipeSearchQuery = r.search.value;
-        requestRender();
-        // Panel was rebuilt by requestRender — restore focus and cursor position
-        // on the new search input.
-        const el = document.querySelector('#lst-panel [data-ref="search"]');
-        if(el){
-            el.focus();
-            el.setSelectionRange(el.value.length, el.value.length);
-        }
+        renderRecipeList(r.list, recipeSearchQuery);
     });
 
     return frag;

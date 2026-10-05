@@ -1,7 +1,7 @@
 // State, persistence, realtime and helpers shared by every panel.
 // Nothing in here touches the DOM except through setStatus / the render callback.
 
-import { getPendingOp } from '../sync.js';
+import { writeOrQueue, getPendingOp, nowStamp } from '../sync.js';
 
 export const TABLES = window.TABLES;
 export const RPC = window.RPC;
@@ -258,7 +258,7 @@ export async function loadAll(options = {}){
     setupRealtime();
 }
 
-// ---- Local item helpers --------------------------------------------------
+// ---- Local state mutations ------------------------------------------------
 
 export function findItemById(id){
     for(const secId of Object.keys(state.itemsBySection)){
@@ -268,10 +268,15 @@ export function findItemById(id){
     return null;
 }
 
+export function addItemLocally(item){
+    (state.itemsBySection[item.section_id] ||= []).push(item);
+    saveToLocalCache();
+}
+
 export function updateItemLocally(id, patch){
     let updated = null;
     Object.keys(state.itemsBySection).forEach(secId => {
-        state.itemsBySection[secId] = state.itemsBySection[secId].map(item => {
+        state.itemsBySection[secId] = (state.itemsBySection[secId] || []).map(item => {
             if(item.id !== id) return item;
             updated = { ...item, ...patch };
             return updated;
@@ -283,32 +288,130 @@ export function updateItemLocally(id, patch){
 
 export function removeItemLocally(id){
     Object.keys(state.itemsBySection).forEach(secId => {
-        state.itemsBySection[secId] = state.itemsBySection[secId].filter(i => i.id !== id);
+        state.itemsBySection[secId] = (state.itemsBySection[secId] || []).filter(i => i.id !== id);
     });
     saveToLocalCache();
 }
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+export function removeItemsLocally(ids){
+    if(!ids || !ids.length) return;
+    const idSet = new Set(ids);
+    Object.keys(state.itemsBySection).forEach(secId => {
+        state.itemsBySection[secId] = (state.itemsBySection[secId] || []).filter(i => !idSet.has(i.id));
+    });
+    saveToLocalCache();
+}
 
-// Inserts one list item, retrying once after a short delay (transient network
-// blips). Rethrows if the retry fails so the caller can show a status message.
-export async function insertListItemWithRetry(payload){
-    try{
-        const {data, error} = await sb.from(TABLES.LIST_ITEMS).insert(payload).select().single();
-        if(error) throw error;
-        return data;
-    } catch(firstErr){
-        console.warn('Insert failed, retrying in', INSERT_RETRY_DELAY_MS, 'ms:', firstErr, payload);
-        await sleep(INSERT_RETRY_DELAY_MS);
-        try{
-            const {data, error} = await sb.from(TABLES.LIST_ITEMS).insert(payload).select().single();
-            if(error) throw error;
-            return data;
-        } catch(secondErr){
-            console.error('Insert failed after retry. Payload:', payload, 'Error:', secondErr);
-            throw secondErr;
-        }
+export function addSectionLocally(sec){
+    state.sections.push(sec);
+    state.itemsBySection[sec.id] = [];
+    saveToLocalCache();
+}
+
+export function updateSectionLocally(secId, patch){
+    const sec = state.sections.find(s => s.id === secId);
+    if(sec) Object.assign(sec, patch);
+    saveToLocalCache();
+}
+
+export function removeSectionLocally(secId){
+    state.sections = state.sections.filter(s => s.id !== secId);
+    delete state.itemsBySection[secId];
+    saveToLocalCache();
+}
+
+// ---- Data mutations & offline sync actions -------------------------------
+
+export async function createListItem(basePayload){
+    const id = basePayload.id || crypto.randomUUID();
+    const updated_at = nowStamp();
+    const item = {
+        id,
+        ...basePayload,
+        created_at: basePayload.created_at || updated_at,
+        updated_at
+    };
+    addItemLocally(item);
+    await writeOrQueue(sb, {
+        table: TABLES.LIST_ITEMS,
+        type: 'insert',
+        id,
+        payload: item
+    });
+    return item;
+}
+
+export async function updateListItem(id, patch){
+    const updated_at = nowStamp();
+    const payload = { ...patch, updated_at };
+    const updated = updateItemLocally(id, payload);
+    if(updated){
+        await writeOrQueue(sb, {
+            table: TABLES.LIST_ITEMS,
+            type: 'update',
+            id,
+            payload
+        });
     }
+    return updated;
+}
+
+export async function deleteListItem(id){
+    removeItemLocally(id);
+    await writeOrQueue(sb, {
+        table: TABLES.LIST_ITEMS,
+        type: 'delete',
+        id
+    });
+}
+
+export async function deleteListItems(ids){
+    if(!ids || !ids.length) return;
+    removeItemsLocally(ids);
+    await Promise.all(ids.map(id => writeOrQueue(sb, {
+        table: TABLES.LIST_ITEMS,
+        type: 'delete',
+        id
+    })));
+}
+
+export async function createSection(name){
+    if(PERMANENT_TABS.includes(name)){
+        throw new Error(`"${name}" already exists.`);
+    }
+    const { data, error } = await sb.from(TABLES.LIST_SECTIONS).insert({ name }).select().single();
+    if(error || !data) throw error || new Error('Could not add tab.');
+    addSectionLocally(data);
+    return data;
+}
+
+export async function deleteSection(secId){
+    removeSectionLocally(secId);
+    const { error } = await sb.from(TABLES.LIST_SECTIONS).delete().eq('id', secId);
+    if(error) throw error;
+}
+
+export async function updateSectionTagsEnabled(secId, enabled){
+    updateSectionLocally(secId, { tags_enabled: enabled });
+    const { error } = await sb
+        .from(TABLES.LIST_SECTIONS)
+        .update({ tags_enabled: enabled })
+        .eq('id', secId);
+    if(error) throw error;
+}
+
+export async function saveRecipeField(recipe, field, value){
+    if((recipe[field] || '') === value) return;
+    const updated_at = nowStamp();
+    recipe[field] = value;
+    recipe.updated_at = updated_at;
+    saveToLocalCache();
+    await writeOrQueue(sb, {
+        table: TABLES.RECIPES,
+        type: 'update',
+        id: recipe.id,
+        payload: { [field]: value, updated_at }
+    });
 }
 
 // ---- Sorting -------------------------------------------------------------
@@ -398,10 +501,10 @@ export async function addIngredientsToGroceries(ingredientList){
 
     const existingGroceryTexts = (state.itemsBySection[groceries.id] || [])
         .filter(i => !i.checked)
-        .map(i => i.text.trim().toLowerCase());
+        .map(i => (i.text || '').trim().toLowerCase());
 
     const toInsert = ingredientList
-        .map(ing => ing.trim())
+        .map(ing => (ing || '').trim())
         .filter(ing => ing && !existingGroceryTexts.includes(ing.toLowerCase()));
 
     if(toInsert.length === 0){
@@ -410,17 +513,13 @@ export async function addIngredientsToGroceries(ingredientList){
     }
 
     try{
-        const rows = toInsert.map(text => ({
+        await Promise.all(toInsert.map(text => createListItem({
             section_id: groceries.id,
             text,
             checked: false,
             aisle_id: aisleIdForItemText(text),
             sort_order: null
-        }));
-        const {data, error} = await sb.from(TABLES.LIST_ITEMS).insert(rows).select();
-        if(error || !data){ setStatus('Could not add to groceries.'); return; }
-        (state.itemsBySection[groceries.id] ||= []).push(...data);
-        saveToLocalCache();
+        })));
         setStatus(toInsert.length === 1 ? 'Added to groceries.' : `Added ${toInsert.length} item(s) to groceries.`);
         requestRender();
     } catch(e){

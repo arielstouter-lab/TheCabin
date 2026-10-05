@@ -2,8 +2,8 @@
 // markup and behavior to lists-panel.js / lists-pantry.js / lists-recipes.js.
 
 import {
-    state, sb, TABLES, loadAll, orderedSections, sectionSlug, findSectionBySlug,
-    isPantry, isRecipes, isGroceries, PERMANENT_TABS, onStateChange, stopRealtime
+    state, sb, loadAll, orderedSections, sectionSlug, findSectionBySlug,
+    isPantry, isRecipes, isGroceries, createSection, onStateChange, stopRealtime
 } from './lists-state.js';
 import { cloneEl, refs, emptyState } from '../dom.js';
 import { renderListPanel, reorderItems } from './lists-panel.js';
@@ -65,19 +65,12 @@ document.getElementById('lst-add-section').addEventListener('click', async () =>
     const input = document.getElementById('lst-new-section-name');
     const name = input.value.trim();
     if(!name) return;
-    if(PERMANENT_TABS.includes(name)){
-        setStatus(`"${name}" already exists.`);
-        return;
-    }
     try{
-        const { data, error } = await sb.from(TABLES.LIST_SECTIONS).insert({ name }).select().single();
-        if(error || !data){ setStatus('Could not add tab.'); return; }
-        state.sections.push(data);
-        state.itemsBySection[data.id] = [];
+        const data = await createSection(name);
         input.value = '';
         location.hash = sectionSlug(data); // custom tabs are keyed by id, not name
     } catch(e){
-        setStatus('Could not add tab.');
+        setStatus(e.message || 'Could not add tab.');
     }
 });
 

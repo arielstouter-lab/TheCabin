@@ -1,17 +1,16 @@
 // Groceries and user-created tabs share this panel. The only differences:
 //  - Groceries sorts by aisle, remembers aisles per item, and links to "Manage groceries"
 //  - Custom tabs use manual sort order and can be deleted
-//  - Groceries writes go through the offline sync queue (writeOrQueue); custom
-//    tabs still write directly, since offline support is scoped to Groceries for now.
+//  - All mutations route through unified state action helpers with offline sync.
 
 import {
     state, sb, TABLES, RPC, isGroceries, isPermanent,
-    sortItems, sortGroceryItems, aisleIdForItemText, insertListItemWithRetry,
-    personName, dueClass, removeItemLocally, updateItemLocally,
-    saveToLocalCache, requestRender
+    sortItems, sortGroceryItems, aisleIdForItemText,
+    createListItem, updateListItem, deleteListItem, deleteListItems,
+    deleteSection, updateSectionTagsEnabled,
+    personName, dueClass, saveToLocalCache, requestRender
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
-import { writeOrQueue, nowStamp } from '../sync.js';
 
 function makeChip(text, extraClass){
     const chip = cloneEl('tpl-chip');
@@ -23,55 +22,22 @@ function makeChip(text, extraClass){
 // ---- Row actions ---------------------------------------------------------
 
 async function toggleChecked(sec, id, checked){
-    const grocery = isGroceries(sec);
-    const patch = grocery ? { checked, updated_at: nowStamp() } : { checked };
-    updateItemLocally(id, patch);
+    await updateListItem(id, { checked });
     requestRender();
-
-    if(grocery){
-        await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'update', id, payload: patch });
-        return;
-    }
-
-    try{
-        const { error } = await sb.from(TABLES.LIST_ITEMS).update(patch).eq('id', id);
-        if(error) throw error;
-    } catch(err){
-        console.error(err);
-        setStatus('Could not update item.');
-    }
 }
 
 async function deleteItem(sec, id){
-    removeItemLocally(id);
+    await deleteListItem(id);
     requestRender();
-
-    if(isGroceries(sec)){
-        await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'delete', id });
-        return;
-    }
-
-    try{
-        const { error } = await sb.from(TABLES.LIST_ITEMS).delete().eq('id', id);
-        if(error) throw error;
-    } catch(err){
-        console.error(err);
-        setStatus('Could not delete item.');
-    }
 }
 
-async function deleteSection(sec){
+async function handleDeleteSection(sec){
     if(!confirm('Remove this tab and its items?')) return;
 
-    state.sections = state.sections.filter(s => s.id !== sec.id);
-    delete state.itemsBySection[sec.id];
-    saveToLocalCache();
     location.hash = 'groceries';
-    requestRender();
-
     try{
-        const { error } = await sb.from(TABLES.LIST_SECTIONS).delete().eq('id', sec.id);
-        if(error) throw error;
+        await deleteSection(sec.id);
+        requestRender();
     } catch(err){
         console.error(err);
         setStatus('Could not delete tab.');
@@ -133,38 +99,10 @@ async function addItem(sec, r, grocery){
             : null
     };
 
-    if(grocery){
-        // Create the row locally with a client-generated id so it shows up
-        // immediately even offline; the same id is sent with the queued
-        // insert, so the eventual server row lines up with this one rather
-        // than creating a duplicate when the queue flushes.
-        const id = crypto.randomUUID();
-        const updated_at = nowStamp();
-        const localItem = { id, ...basePayload, updated_at, created_at: updated_at };
-
-        (state.itemsBySection[sec.id] ||= []).push(localItem);
-        saveToLocalCache();
-        requestRender();
-        const next = document.querySelector('#lst-panel [data-ref="newText"]');
-        if(next) next.focus();
-
-        await writeOrQueue(sb, {
-            table: TABLES.LIST_ITEMS, type: 'insert', id,
-            payload: { id, ...basePayload, updated_at }
-        });
-        return;
-    }
-
-    try{
-        const data = await insertListItemWithRetry(basePayload);
-        (state.itemsBySection[sec.id] ||= []).push(data);
-        saveToLocalCache();
-        requestRender();
-        const next = document.querySelector('#lst-panel [data-ref="newText"]');
-        if(next) next.focus();
-    } catch(e){
-        setStatus('Could not add item.');
-    }
+    await createListItem(basePayload);
+    requestRender();
+    const next = document.querySelector('#lst-panel [data-ref="newText"]');
+    if(next) next.focus();
 }
 
 async function clearCheckedItems(sec){
@@ -173,22 +111,8 @@ async function clearCheckedItems(sec){
     if(!confirm(`Remove ${checked.length} checked item${checked.length === 1 ? '' : 's'}?`)) return;
 
     const ids = checked.map(i => i.id);
-    state.itemsBySection[sec.id] = (state.itemsBySection[sec.id] || []).filter(i => !i.checked);
-    saveToLocalCache();
+    await deleteListItems(ids);
     requestRender();
-
-    if(isGroceries(sec)){
-        await Promise.all(ids.map(id => writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'delete', id })));
-        return;
-    }
-
-    try{
-        const { error } = await sb.from(TABLES.LIST_ITEMS).delete().in('id', ids);
-        if(error) throw error;
-    } catch(err){
-        console.error(err);
-        setStatus('Could not clear checked items.');
-    }
 }
 
 // Returns a DocumentFragment; main.js puts it in the panel.
@@ -211,7 +135,7 @@ export function renderListPanel(sec){
 
     if(!isPermanent(sec)){
         const delBtn = cloneEl('tpl-delete-tab');
-        delBtn.addEventListener('click', () => deleteSection(sec));
+        delBtn.addEventListener('click', () => handleDeleteSection(sec));
         r.head.append(delBtn);
     }
 
@@ -266,15 +190,7 @@ export function buildTagsControls(container, sec){
     toggle.addEventListener('change', async () => {
         try{
             const enabled = toggle.checked;
-
-            const { error } = await sb
-                .from(TABLES.LIST_SECTIONS)
-                .update({ tags_enabled: enabled })
-                .eq('id', sec.id);
-
-            if(error) throw error;
-
-            sec.tags_enabled = enabled;
+            await updateSectionTagsEnabled(sec.id, enabled);
             requestRender();
         }catch(err){
             console.error(err);

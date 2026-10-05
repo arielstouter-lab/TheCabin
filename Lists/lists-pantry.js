@@ -1,27 +1,21 @@
 // Pantry panel: simple list with per-item quantity steppers and
 // an "Add to groceries" shortcut. No manual reordering or priority/date fields.
-// Writes go through the offline sync queue, same as the Groceries/custom-tab panel.
+// Mutations route through unified state action helpers with offline sync.
 
 import {
-    state, sb, TABLES, insertListItemWithRetry, saveToLocalCache, requestRender,
-    addIngredientsToGroceries, updateItemLocally, removeItemLocally
+    state, createListItem, updateListItem, deleteListItem,
+    requestRender, addIngredientsToGroceries
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
-import { writeOrQueue, nowStamp } from '../sync.js';
 
 async function deleteItem(id){
-    removeItemLocally(id);
+    await deleteListItem(id);
     requestRender();
-    await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'delete', id });
 }
 
 async function setQuantity(id, qty){
-    const patch = { quantity: qty, updated_at: nowStamp() };
-    const updated = updateItemLocally(id, patch);
+    await updateListItem(id, { quantity: qty });
     requestRender();
-    if(updated){
-        await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'update', id, payload: patch });
-    }
 }
 
 function buildPantryItem(item){
@@ -71,8 +65,18 @@ export function renderPantryPanel(sec){
     if(!items.length){
         r.items.append(emptyState('Nothing in the pantry yet.'));
     } else {
-        grouped.forEach((groupItems, aisleId) => {
+        const sortedGroups = Array.from(grouped.entries()).sort(([aisleIdA], [aisleIdB]) => {
+            const aisleA = aisleIdA === 'unassigned' ? null : state.groceryAisles.find(a => a.id === aisleIdA);
+            const aisleB = aisleIdB === 'unassigned' ? null : state.groceryAisles.find(a => a.id === aisleIdB);
+            const sortA = aisleA ? (aisleA.sort_order ?? 9999) : 9999;
+            const sortB = aisleB ? (aisleB.sort_order ?? 9999) : 9999;
+            if(sortA !== sortB) return sortA - sortB;
+            const nameA = aisleA ? aisleA.name : 'Unassigned';
+            const nameB = aisleB ? aisleB.name : 'Unassigned';
+            return nameA.localeCompare(nameB);
+        });
 
+        sortedGroups.forEach(([aisleId, groupItems]) => {
             const details = document.createElement('details');
             details.open = true;
 
@@ -124,21 +128,15 @@ export function renderPantryPanel(sec){
         const text = r.newText.value.trim();
         if(!text) return;
 
-        const id = crypto.randomUUID();
-        const updated_at = nowStamp();
-        const basePayload = { section_id: sec.id, text, quantity: newQty, checked: false };
-        const localItem = { id, ...basePayload, updated_at, created_at: updated_at };
-
-        (state.itemsBySection[sec.id] ||= []).push(localItem);
-        saveToLocalCache();
+        await createListItem({
+            section_id: sec.id,
+            text,
+            quantity: newQty,
+            checked: false
+        });
         requestRender();
         const next = document.querySelector('#lst-panel [data-ref="newText"]');
         if(next) next.focus();
-
-        await writeOrQueue(sb, {
-            table: TABLES.LIST_ITEMS, type: 'insert', id,
-            payload: { id, ...basePayload, updated_at }
-        });
     }
 
     r.addBtn.addEventListener('click', addNewItem);
