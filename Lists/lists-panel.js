@@ -200,8 +200,6 @@ export function renderListPanel(sec){
 
     r.title.textContent = sec.name;
 
-    buildTagsControls(r.head, sec);
-
     const hasChecked = (state.itemsBySection[sec.id] || []).some(i => i.checked);
     if(hasChecked){
         const clearBtn = cloneEl('tpl-clear-checked');
@@ -209,60 +207,12 @@ export function renderListPanel(sec){
         r.head.append(clearBtn);
     }
 
-    if(grocery){
-        const manageBtn = cloneEl('tpl-manage-link');
+    buildTagsControls(r.head, sec);
 
-        manageBtn.href =
-            `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
-
-        r.head.append(manageBtn);
-    } else {
-        // Tags toggle
-        const toggleWrap = document.createElement('label');
-        toggleWrap.className = 'tags-toggle';
-
-        const toggle = document.createElement('input');
-        toggle.type = 'checkbox';
-        toggle.checked = !!sec.tags_enabled;
-
-        toggle.addEventListener('change', async () => {
-            try{
-                const enabled = toggle.checked;
-
-                const { error } = await sb
-                    .from('household_list_sections')
-                    .update({ tags_enabled: enabled })
-                    .eq('id', sec.id);
-
-                if(error) throw error;
-
-                sec.tags_enabled = enabled;
-                requestRender();
-            }catch(err){
-                console.error(err);
-                setStatus('Could not save tags setting.');
-            }
-        });
-
-        toggleWrap.append(toggle, document.createTextNode(' Tags'));
-        r.head.append(toggleWrap);
-
-        if(sec.tags_enabled){
-            const manageBtn = cloneEl('tpl-manage-link');
-
-            manageBtn.href =
-                `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
-
-            manageBtn.textContent = 'Manage Tags';
-
-            r.head.append(manageBtn);
-        }
-
-        if(!isPermanent(sec)){
-            const delBtn = cloneEl('tpl-delete-tab');
-            delBtn.addEventListener('click', () => deleteSection(sec));
-            r.head.append(delBtn);
-        }
+    if(!isPermanent(sec)){
+        const delBtn = cloneEl('tpl-delete-tab');
+        delBtn.addEventListener('click', () => deleteSection(sec));
+        r.head.append(delBtn);
     }
 
     const source = state.itemsBySection[sec.id] || [];
@@ -294,8 +244,19 @@ export function renderListPanel(sec){
 }
 
 //Manage toggle function
-export function buildTagsControls(sec){
-    const wrap = document.createDocumentFragment();
+export function buildTagsControls(container, sec){
+    if(!sec && container){
+        sec = container;
+        container = null;
+    }
+    const wrap = container || document.createDocumentFragment();
+
+    if(isGroceries(sec)){
+        const manageBtn = cloneEl('tpl-manage-link');
+        manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
+        wrap.append(manageBtn);
+        return wrap;
+    }
 
     const toggleWrap = cloneEl('tpl-tags-toggle');
     const toggle = refs(toggleWrap).toggle;
@@ -325,15 +286,7 @@ export function buildTagsControls(sec){
 
     if(sec.tags_enabled){
         const manageBtn = cloneEl('tpl-manage-link');
-
-        manageBtn.href =
-            `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
-
-        manageBtn.textContent =
-            sec.name === 'Groceries'
-                ? 'Manage Groceries'
-                : 'Manage Tags';
-
+        manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
         wrap.append(manageBtn);
     }
 

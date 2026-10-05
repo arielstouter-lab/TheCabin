@@ -42,13 +42,14 @@
                 sections.find(s => s.id === sectionId)
                 || sections.find(s => s.name === 'Groceries')
                 || null;
+            groceries = activeSection;
             aisles = aisleResult.data || [];
             itemMemory = memoryResult.data || [];
 
             if(groceries){
                 const itemResult = await sb.from('household_list_items')
                     .select('*')
-                    .eq('section_id', activeSection.id);
+                    .eq('section_id', groceries.id);
                 if(itemResult.error){
                     console.error('Could not load grocery items:', itemResult.error);
                     groceryItems = [];
