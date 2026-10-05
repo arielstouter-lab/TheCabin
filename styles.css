@@ -869,7 +869,7 @@ body.cal-page {
   font-size: var(--text-sm);
   color: rgba(var(--weather-fg), 0.75);
   svg { width: 20px; height: 20px; }
-  b { color: var(--card); font-weight: 600; font-size: var(--text-base); }
+  b { font-weight: 600; font-size: var(--text-base); }
 }
 
 .wc-state {
