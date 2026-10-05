@@ -65,6 +65,14 @@ async function trySend(sb, op) {
         } else if (op.type === 'delete') {
             const { error } = await sb.from(op.table).delete().eq(op.idColumn || 'id', op.id);
             if (error) throw error;
+        } else if (op.type === 'rpc') {
+            // For calls with no single-row identity (e.g. a bulk reorder) —
+            // no conflict check here, it just retries until it succeeds.
+            // Each queued rpc op should carry a full, self-contained snapshot
+            // of what it wants to set, so replay order doesn't matter beyond
+            // "last one wins", same as the rest of this module.
+            const { error } = await sb.rpc(op.fn, op.args);
+            if (error) throw error;
         }
         return true;
     } catch (err) {

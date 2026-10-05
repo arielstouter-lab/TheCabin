@@ -29,6 +29,9 @@ const THEMES = {
         wxThunderstorm: "#292f45",
         wxSevereThunderstorm: "#292f45",
 
+        /*Special one off colors*/
+        navLabel: "#B8B5A8",
+
     },
 
     autumn: {
@@ -124,7 +127,10 @@ const THEMES = {
             "--wx-violent-showers": activeTheme.wxViolentShowers,
             "--wx-thunderstorm": activeTheme.wxThunderstorm,
             "--wx-severe-storm": activeTheme.wxSevereThunderstorm,
-            "--wx-unsettled": activeTheme.wxUnsettled
+            "--wx-unsettled": activeTheme.wxUnsettled,
+
+            // One offs
+            "--nav-label": activeTheme.navLabel,
         };
 
         // Apply defined overrides; remove undefined ones so styles.css defaults take over

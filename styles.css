@@ -430,6 +430,10 @@ select { cursor: pointer; }
   filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.9));
 }
 
+.nav-item .nav-label {
+  color: var(--nav-label);
+}
+
 .sidebar-bottom { margin-top: auto; }
 
 .user-card { display: flex; align-items: center; gap: 9px; padding: 10px 8px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
