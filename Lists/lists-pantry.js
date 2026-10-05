@@ -6,7 +6,6 @@ import {
     addIngredientsToGroceries, updateItemLocally, removeItemLocally
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
-import { buildTagsControls } from './lists-panel.js';
 
 async function deleteItem(id){
     removeItemLocally(id);
@@ -55,16 +54,68 @@ export function renderPantryPanel(sec){
     const r = refs(frag);
     r.title.textContent = sec.name;
 
-    buildTagsControls(r.head, sec);
+    const manageBtn = cloneEl('tpl-manage-link');
 
-    const items = [...(state.itemsBySection[sec.id] || [])]
-        .sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+    manageBtn.href =
+        `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
 
-    if(items.length){
-        r.items.append(...items.map(buildPantryItem));
-    } else {
+    manageBtn.textContent = 'Manage Tags';
+
+    r.head.append(manageBtn);
+
+    const items = [...(state.itemsBySection[sec.id] || [])];
+
+    const grouped = new Map();
+
+    items.forEach(item => {
+        const aisleId = item.aisle_id || 'unassigned';
+
+        if(!grouped.has(aisleId)){
+            grouped.set(aisleId, []);
+        }
+
+        grouped.get(aisleId).push(item);
+    });
+
+    if(!items.length){
         r.items.append(emptyState('Nothing in the pantry yet.'));
+    } else {
+        grouped.forEach((groupItems, aisleId) => {
+
+            const details = document.createElement('details');
+            details.open = true;
+
+            const summary = document.createElement('summary');
+
+            let sectionName = 'Unassigned';
+
+            if(aisleId !== 'unassigned'){
+                const aisle = state.groceryAisles.find(
+                    a => a.id === aisleId
+                );
+
+                if(aisle){
+                    sectionName = aisle.name;
+                }
+            }
+
+            summary.textContent =
+                `${sectionName} (${groupItems.length})`;
+
+            details.append(summary);
+
+            groupItems
+                .sort((a,b) =>
+                    a.created_at < b.created_at ? -1 : 1
+                )
+                .forEach(item => {
+                    details.append(buildPantryItem(item));
+                });
+
+            r.items.append(details);
+        });
     }
+
 
     // The "new item" quantity stepper is local UI state, not saved until Add is clicked.
     let newQty = 1;
