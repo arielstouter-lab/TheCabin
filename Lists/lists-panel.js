@@ -101,7 +101,7 @@ function buildItem(item, index, sec){
     if(item.priority) chips.push(makeChip('High priority', 'priority-chip'));
     if(item.assigned_to && personName(item.assigned_to)) chips.push(makeChip(personName(item.assigned_to)));
     if(item.due_date) chips.push(makeChip(item.due_date, dueClass(item.due_date)));
-    if(grocery && item.aisle_id){
+    if((grocery || sec.tags_enabled) && item.aisle_id){
         const aisle = state.groceryAisles.find(a => a.id === item.aisle_id);
         if(aisle) chips.push(makeChip(aisle.name, 'aisle-chip'));
     }
@@ -128,7 +128,9 @@ async function addItem(sec, r, grocery){
         priority: r.newPriority.checked,
         checked: false,
         sort_order: grocery ? null : maxSort + 1,
-        aisle_id: grocery ? aisleIdForItemText(text) : null
+        aisle_id: (grocery || sec.tags_enabled)
+            ? aisleIdForItemText(text)
+            : null
     };
 
     if(grocery){
@@ -192,6 +194,7 @@ async function clearCheckedItems(sec){
 // Returns a DocumentFragment; main.js puts it in the panel.
 export function renderListPanel(sec){
     const grocery = isGroceries(sec);
+    const tagged = grocery || sec.tags_enabled;
     const frag = cloneFragment('tpl-list-panel');
     const r = refs(frag);
 
@@ -206,15 +209,52 @@ export function renderListPanel(sec){
 
     if(grocery){
         r.head.append(cloneEl('tpl-manage-link'));
+    } else {
+        // Tags toggle
+        const toggleWrap = document.createElement('label');
+        toggleWrap.className = 'tags-toggle';
 
-    } else if(!isPermanent(sec)){
-        const delBtn = cloneEl('tpl-delete-tab');
-        delBtn.addEventListener('click', () => deleteSection(sec));
-        r.head.append(delBtn);
+        const toggle = document.createElement('input');
+        toggle.type = 'checkbox';
+        toggle.checked = !!sec.tags_enabled;
+
+        toggle.addEventListener('change', async () => {
+            try{
+                const enabled = toggle.checked;
+
+                const { error } = await sb
+                    .from('household_list_sections')
+                    .update({ tags_enabled: enabled })
+                    .eq('id', sec.id);
+
+                if(error) throw error;
+
+                sec.tags_enabled = enabled;
+                requestRender();
+            }catch(err){
+                console.error(err);
+                setStatus('Could not save tags setting.');
+            }
+        });
+
+        toggleWrap.append(toggle, document.createTextNode(' Tags'));
+        r.head.append(toggleWrap);
+
+        if(sec.tags_enabled){
+            r.head.append(cloneEl('tpl-manage-link'));
+        }
+
+        if(!isPermanent(sec)){
+            const delBtn = cloneEl('tpl-delete-tab');
+            delBtn.addEventListener('click', () => deleteSection(sec));
+            r.head.append(delBtn);
+        }
     }
 
     const source = state.itemsBySection[sec.id] || [];
-    const items = grocery ? sortGroceryItems(source) : sortItems(source);
+    const items = tagged
+        ? sortGroceryItems(source)
+        : sortItems(source);
     if(items.length){
         r.items.append(...items.map((item, index) => buildItem(item, index, sec)));
     } else {
