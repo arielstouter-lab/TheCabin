@@ -6,6 +6,7 @@ import {
     addIngredientsToGroceries, updateItemLocally, removeItemLocally
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
+import { buildTagsControls } from './lists-state.js';
 
 async function deleteItem(id){
     removeItemLocally(id);
@@ -53,6 +54,8 @@ export function renderPantryPanel(sec){
     const frag = cloneFragment('tpl-pantry-panel');
     const r = refs(frag);
     r.title.textContent = sec.name;
+
+    buildTagsControls(r.head, sec);
 
     const items = [...(state.itemsBySection[sec.id] || [])]
         .sort((a, b) => a.created_at < b.created_at ? -1 : 1);

@@ -12,6 +12,7 @@ import {
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
 import { writeOrQueue, nowStamp } from '../sync.js';
+import { buildTagsControls } from './lists-state.js';
 
 function makeChip(text, extraClass){
     const chip = cloneEl('tpl-chip');
@@ -200,6 +201,8 @@ export function renderListPanel(sec){
 
     r.title.textContent = sec.name;
 
+    buildTagsControls(r.head, sec);
+
     const hasChecked = (state.itemsBySection[sec.id] || []).some(i => i.checked);
     if(hasChecked){
         const clearBtn = cloneEl('tpl-clear-checked');
@@ -208,7 +211,12 @@ export function renderListPanel(sec){
     }
 
     if(grocery){
-        r.head.append(cloneEl('tpl-manage-link'));
+        const manageBtn = cloneEl('tpl-manage-link');
+
+        manageBtn.href =
+            `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
+
+        r.head.append(manageBtn);
     } else {
         // Tags toggle
         const toggleWrap = document.createElement('label');
@@ -241,7 +249,14 @@ export function renderListPanel(sec){
         r.head.append(toggleWrap);
 
         if(sec.tags_enabled){
-            r.head.append(cloneEl('tpl-manage-link'));
+            const manageBtn = cloneEl('tpl-manage-link');
+
+            manageBtn.href =
+                `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
+
+            manageBtn.textContent = 'Manage Tags';
+
+            r.head.append(manageBtn);
         }
 
         if(!isPermanent(sec)){

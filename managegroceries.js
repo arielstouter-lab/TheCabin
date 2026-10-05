@@ -35,14 +35,20 @@
             }
 
             const sections = sectionResult.data || [];
-            groceries = sections.find(s => s.name === 'Groceries') || null;
+            const params = new URLSearchParams(location.search);
+            const sectionId = params.get('section');
+
+            const activeSection =
+                sections.find(s => s.id === sectionId)
+                || sections.find(s => s.name === 'Groceries')
+                || null;
             aisles = aisleResult.data || [];
             itemMemory = memoryResult.data || [];
 
             if(groceries){
                 const itemResult = await sb.from('household_list_items')
                     .select('*')
-                    .eq('section_id', groceries.id);
+                    .eq('section_id', activeSection.id);
                 if(itemResult.error){
                     console.error('Could not load grocery items:', itemResult.error);
                     groceryItems = [];
