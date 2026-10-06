@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js" defer></script>
   <script src="app.js" defer></script>
-  <script src="chores.js" defer></script>
+  <script type="module" src="chores.js"></script>
 </head>
 
 <body class="app-page">
@@ -30,7 +30,7 @@
         <p>Weekly points per person -- gold line markes the even split</p>
       </div>
 
-      <div class="cl-grid">
+      <div class="split-grid">
         <div class="card">
           <div class="card-head">
             <h2 class="card-title">Chores</h2>
@@ -71,6 +71,86 @@
       <p class="cl-note">Shared with everyone who's logged in — anyone in the household can add, edit, or rebalance chores, and everyone sees the same ledger.</p>
     </section>
 
+    <!-- ============ Templates ============ -->
+    <template id="tpl-empty">
+      <p class="empty-state" data-ref="text"></p>
+    </template>
+
+    <template id="tpl-cl-beam-row">
+      <div class="cl-beam-row">
+        <div class="cl-beam-name" data-ref="name"></div>
+        <div class="cl-beam-track">
+          <div class="cl-beam-fill" data-ref="fill"></div>
+          <div class="cl-beam-target" data-ref="target"></div>
+        </div>
+        <div class="cl-beam-pts" data-ref="pts"></div>
+      </div>
+    </template>
+
+    <template id="tpl-cl-dislike-chip">
+      <div class="chip chip--w36 chip-danger" data-ref="chip">
+        <span data-ref="name"></span>
+        <input type="number" min="1" max="10" data-ref="input" />
+      </div>
+    </template>
+
+    <template id="tpl-cl-split-chip">
+      <div class="chip chip--w40">
+        <span data-ref="name"></span>
+        <input type="number" min="0" max="100" data-ref="input" />
+        <span>%</span>
+      </div>
+    </template>
+
+    <template id="tpl-cl-chore-card">
+      <div class="cl-chore-card" data-ref="card">
+        <div class="cl-chore-top">
+          <input type="text" data-field="name" data-ref="nameInput" />
+          <span class="cl-pts-badge" data-ref="ptsBadge"></span>
+          <button class="icon-delete" data-ref="delBtn" title="Remove chore">✕</button>
+        </div>
+        <div class="cl-chip-groups">
+          <div class="cl-chip-group">
+            <div class="subrow-label">frequency &amp; time</div>
+            <div class="cl-chip-row">
+              <label class="chip chip--w52">×/week <input type="number" min="0" step="1" data-field="timesPerWeek" data-ref="timesPerWeek" /></label>
+              <label class="chip chip--w52">min <input type="number" min="0" step="1" data-field="minutes" data-ref="minutes" /></label>
+            </div>
+          </div>
+          <div class="cl-chip-group">
+            <div class="subrow-label">dislike (1&ndash;10), per person</div>
+            <div class="cl-chip-row" data-ref="dislikeRow"></div>
+          </div>
+          <div class="cl-chip-group">
+            <div class="subrow-label">share of the chore</div>
+            <div class="cl-chip-row" data-ref="splitRow">
+              <span class="cl-split-total" data-ref="splitTotal"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="tpl-cl-person">
+      <div class="cl-person">
+        <div class="cl-person-head">
+          <div>
+            <input class="cl-person-name" data-ref="nameInput" />
+            <button class="cl-person-remove" data-ref="removeBtn">remove</button>
+          </div>
+          <div class="cl-person-total" data-ref="total"></div>
+        </div>
+        <div class="cl-person-tickets" data-ref="tickets"></div>
+      </div>
+    </template>
+
+    <template id="tpl-cl-ticket">
+      <div class="compact-list">
+        <span class="cl-ticket-name" data-ref="name"></span>
+        <span class="cl-ticket-share" data-ref="share"></span>
+        <span class="cl-ticket-pts" data-ref="pts"></span>
+      </div>
+    </template>
   </main>
 </div>
 </body>
