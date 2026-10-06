@@ -945,7 +945,6 @@ function renderCascadeOrder(model, container) {
             saveCustomOrder(nextOrder);
         });
 
-        row.append(label, select);
         container.append(row);
 
         // If 'Default' was selected for this priority, stop cascade here
