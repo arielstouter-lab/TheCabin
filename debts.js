@@ -991,12 +991,41 @@ function renderResults(model) {
     const first = res.rows[0];
     const extraNow = first ? Object.values(first.pay).reduce((t, p) => t + p.extra, 0) : 0;
 
+    const highRateDebts = res.debts.filter(d => {
+        const item = model.items.find(i => sameId(i.d.id, d.id));
+        if (!item) return false;
+        return item.apr > 10 || (item.promoApr != null && item.promoApr > 10);
+    });
+
+    let highRateValue = '—';
+    let highRateFoot = 'No debts above 10% APR';
+    if (highRateDebts.length > 0) {
+        const allPaid = highRateDebts.every(d => d.paidOffYm != null);
+        if (allPaid) {
+            const latestYm = highRateDebts.reduce((m, d) => (m == null || ymToIndex(d.paidOffYm) > ymToIndex(m) ? d.paidOffYm : m), null);
+            highRateValue = fmtYm(latestYm);
+            highRateFoot = highRateDebts.length === 1 ? '1 debt above 10% APR' : `${highRateDebts.length} debts above 10% APR`;
+        } else {
+            highRateValue = `Not within ${MAX_MONTHS / 12} yrs`;
+            highRateFoot = `${highRateDebts.length} debts above 10% APR`;
+        }
+    } else if (model.items.some(i => i.apr > 10 || (i.promoApr != null && i.promoApr > 10))) {
+        highRateValue = 'Already met';
+        highRateFoot = 'No active balance above 10% APR';
+    }
+
     renderSummaryCards(dates, [
         {
             label: 'PMI Drops',
             value: datesText(res, 'pmi'),
             unit: '',
             foot: hasPmi ? (res.pmi.length > 1 ? `${res.pmi.length} loans with PMI` : 'First month without PMI') : 'No PMI modelled'
+        },
+        {
+            label: 'Interest rates above 10% paid off',
+            value: highRateValue,
+            unit: '',
+            foot: highRateFoot
         },
         { label: 'Consumer Debt-Free', value: datesText(res, 'consumer'), unit: '', foot: 'Cards and loans, excluding the mortgage' },
         { label: 'Fully Debt-Free', value: datesText(res, 'debt'), unit: '', statusClass: res.debtFreeYm ? 'best' : '', foot: res.completed ? `${res.months} months from the snapshot` : 'Increase the money available or payments' },
