@@ -1033,6 +1033,11 @@ body.cal-page {
 .debt-row-hl td { background: var(--success-bg); }
 .debt-schedule { margin-top: 16px; }
 .debt-schedule summary { cursor: pointer; font-size: var(--text-base); font-weight: 600; color: var(--primary); padding: 6px 0; }
+.debt-cascade-wrap { margin-bottom: 20px; }
+.debt-cascade-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.debt-cascade-row { display: flex; align-items: center; gap: 10px; max-width: 500px; }
+.debt-cascade-label { min-width: 90px; font-size: var(--text-sm); font-weight: 600; color: var(--ink-soft); }
+.debt-cascade-row select { flex: 1; }
 .button-inline.button-ghost { background: var(--card); color: var(--primary); }
 .button-inline.button-ghost:hover:not(:disabled) { background: var(--line); border-color: var(--line); }
 .button-inline:disabled { opacity: 0.5; cursor: not-allowed; }

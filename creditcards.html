@@ -552,19 +552,9 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Money Available</h2>
-                        <span class="card-sub">This defaults to the Budget's Net Balance; override any month. Copy forward" carries your current selection into the next snapshot.</span>
+                        <span class="card-sub">This defaults to the Budget's Net Balance; override any month. Copy forward carries your current selection into the next snapshot.</span>
                     </div>
                     <div class="card-body">
-                        <div class="cc-add-form">
-                            <div class="picker">
-                                <label for="debtOrderSelect">Custom Priority (optional)</label>
-                                <select id="debtOrderSelect" class="text-input">
-                                    <option value="">Default (Strategy Heuristic)</option>
-                                    <option value="custom">Custom Debt Order...</option>
-                                </select>
-                            </div>
-                        </div>
-
                         <div class="cc-add-form">
                             <div class="picker">
                                 <label id="debtMoneyLabel" for="debtMoneyMode">
@@ -595,25 +585,7 @@
                                 </div>
                             </div>
                         </div>
-
-                        <div class="cc-add-form">
-                            <div class="cc-add-form">
-<!--                                <div class="picker">-->
-<!--                                    <label id="debtMoneyLabel" for="debtMoneyMode">From this snapshot forward</label>-->
-<!--                                    <select id="debtMoneyMode">-->
-<!--                                        <option id="debtNetBalance" value="default" class="tax-val">$0.00/mo</option>-->
-<!--                                        <option value="fixed">Fixed amount</option>-->
-<!--                                    </select>-->
-<!--                                </div>-->
-<!--                                <div class="picker">-->
-<!--                                    <label for="debtMoneyAmount">Amount per month</label>-->
-<!--                                    <div class="num-wrap money">-->
-<!--                                        <input type="number" class="text-input" id="debtMoneyAmount" min="0" step="any" />-->
-<!--                                    </div>-->
-<!--                                </div>-->
-                            </div>
-                                <p class="form-note" id="debtMoneyNote"></p>
-                        </div>
+                        <p class="form-note" id="debtMoneyNote"></p>
                     </div>
                 </div>
 
@@ -621,36 +593,27 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Payoff Plan</h2>
-                        <span class="card-sub">Scenarios compared from the selected snapshot</span>
+                        <span class="card-sub">Strategy and month-by-month projection from the selected snapshot</span>
                     </div>
                     <div class="card-body">
                         <p id="debtResultsEmpty" class="empty-state">Add a debt with a balance to see payoff dates.</p>
                         <div id="debtResultsWrap" hidden>
                             <div id="debtWarnings"></div>
 
-                            <div class="table-wrap">
-                                <table class="cc-table">
-                                    <thead>
-                                    <tr>
-                                        <th class="min-col">Scenario</th>
-                                        <th>PMI drops</th>
-                                        <th>Consumer debt-free</th>
-                                        <th>Fully debt-free</th>
-                                        <th class="col-num">Interest</th>
-                                        <th class="col-num">PMI paid</th>
-                                        <th class="col-num">Total cost</th>
-                                        <th class="col-num">Saved vs. minimums</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody id="debtScenarioBody"></tbody>
-                                </table>
-                            </div>
-
                             <div class="cc-add-form">
                                 <div class="picker">
-                                    <label for="debtPlanSelect">Month-by-month plan</label>
-                                    <select id="debtPlanSelect"></select>
+                                    <label for="debtStrategySelect">Payoff Strategy</label>
+                                    <select id="debtStrategySelect" class="text-input">
+                                        <option value="avalanche">Avalanche (highest APR first)</option>
+                                        <option value="snowball">Snowball (smallest balance first)</option>
+                                        <option value="custom">Custom Debt Order</option>
+                                    </select>
                                 </div>
+                            </div>
+
+                            <div id="debtCustomOrderWrap" class="debt-cascade-wrap" hidden>
+                                <div class="eyebrow" style="margin-bottom: 8px;">Custom Payoff Priority</div>
+                                <div id="debtCascadeContainer" class="debt-cascade-list"></div>
                             </div>
 
                             <div id="debtDatesGrid" class="summary-grid"></div>

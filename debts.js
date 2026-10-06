@@ -27,9 +27,8 @@ let deps = { getNetBalance: () => 0, getBankRows: () => [] };
 let debtRows = [];
 let snapRows = [];
 let moneyRows = [];
-let settings = { strategy: 'avalanche' };
+let settings = { strategy: 'avalanche', customOrder: [] };
 let selectedMonth = null;
-let planKey = 'pmi';
 let channel = null;
 let reloadTimer = null;
 let renderQueued = false;
@@ -81,7 +80,11 @@ function el(tag, text, cls) {
     return e;
 }
 
-const strategyLabel = s => (s === 'snowball' ? 'Snowball (smallest balance first)' : 'Avalanche (highest APR first)');
+const strategyLabel = s => {
+    if (s === 'snowball') return 'Snowball (smallest balance first)';
+    if (s === 'custom') return 'Custom debt order';
+    return 'Avalanche (highest APR first)';
+};
 
 // ------------------------------------------------------------- data access
 async function fetchAll(table, orderCol) {
@@ -98,7 +101,13 @@ async function fetchDebtData() {
         fetchAll(MONEY_TABLE, 'month')
     ]);
     const { data, error } = await sb.from(SETTINGS_TABLE).select('*').eq('id', 1).maybeSingle();
-    if (!error && data) settings = { ...settings, ...data };
+    if (!error && data) {
+        settings = {
+            ...settings,
+            ...data,
+            customOrder: data.custom_order || data.customOrder || settings.customOrder || []
+        };
+    }
 }
 
 export async function loadDebtData() {
@@ -236,17 +245,16 @@ async function createSnapshot(month) {
     if (snapshotMonths().includes(month)) { selectedMonth = month; renderDebts(); return; }
     if (!sb) return;
 
-    // Project balances forward from the latest earlier snapshot using the selected plan
+    // Project balances forward from the latest earlier snapshot using the current strategy / plan
     const priorMonth = snapshotMonths().find(m => m < month);
     let projection = null;
     if (priorMonth) {
         const pm = buildModel(priorMonth);
-        if (pm) {
-            const sc = pm.scenarios.find(x => x.key === planKey) || pm.scenarios.find(x => x.key === 'plan');
+        if (pm && pm.planResult) {
             projection = {
-                label: sc.label,
-                result: sc.result,
-                row: sc.result.rows.find(r => r.ym === month) || null,
+                label: strategyLabel(settings.strategy),
+                result: pm.planResult,
+                row: pm.planResult.rows.find(r => r.ym === month) || null,
                 ids: new Set(pm.engineDebts.map(x => x.id))
             };
         }
@@ -372,6 +380,21 @@ async function saveStrategy(strategy) {
     }
 }
 
+async function saveCustomOrder(customOrder) {
+    settings.customOrder = customOrder;
+    settings.custom_order = customOrder;
+    renderDebts();
+    if (!sb) return;
+    try {
+        const { error } = await sb.from(SETTINGS_TABLE).upsert([{ id: 1, custom_order: customOrder }], { onConflict: 'id' });
+        if (error) {
+            console.warn('Could not save custom order to database:', error);
+        }
+    } catch (err) {
+        console.warn('Could not save custom order:', err);
+    }
+}
+
 // ------------------------------------------------------------------ model
 // Everything derived from the current snapshot + Budget, computed once per render.
 function buildModel(forMonth) {
@@ -477,7 +500,7 @@ function buildModel(forMonth) {
             };
         });
 
-// Expand the per-snapshot money setting into the month-by-month map the engine uses
+    // Expand the per-snapshot money setting into the month-by-month map the engine uses
     // (months with no fixed amount fall back to the Budget Net Balance).
     const overrideMap = {};
     for (let i = 1; i <= MAX_MONTHS; i++) {
@@ -489,44 +512,29 @@ function buildModel(forMonth) {
     const engineDebts = items.map(i => i.engine);
     const pmiDebts = engineDebts.filter(d => d.pmiAmount > 0 && d.targetBalance > 0);
     const pmiNeeded = pmiDebts.filter(d => d.balance > d.targetBalance);
+    const customOrder = Array.isArray(settings.customOrder) ? settings.customOrder : (Array.isArray(settings.custom_order) ? settings.custom_order : []);
 
     const base = {
         debts: engineDebts,
         monthlyMoney: Math.max(0, netBalance),
         overrides: overrideMap,
         startYm: month,
-        strategy: settings.strategy,
-        order: settings.customOrder || [],
+        strategy: settings.strategy === 'snowball' ? 'snowball' : 'avalanche',
+        order: settings.strategy === 'custom' ? customOrder : [],
+        stopAtPmi: pmiNeeded.map(d => d.id),
         anchors
     };
 
-    const scenarios = [
-        { key: 'min', label: 'Minimums only (no extra)', result: simulate({ ...base, mode: 'minimums' }) },
-        { key: 'plan', label: strategyLabel(settings.strategy), result: simulate(base) }
-    ];
-
-    // Add PMI scenario only when extra payments can help eliminate PMI
-    if (pmiNeeded.length > 0) {
-        scenarios.push({
-            key: 'pmi',
-            label: `PMI target first, then ${settings.strategy === 'snowball' ? 'snowball' : 'avalanche'}`,
-            result: simulate({ ...base, stopAtPmi: pmiNeeded.map(d => d.id) })
-        });
-    }
-
-    if (!scenarios.some(s => s.key === planKey)) {
-        planKey = pmiNeeded.length > 0 ? 'pmi' : 'plan';
-    }
+    const planResult = simulate(base);
 
     if (netBalance <= 0 && items.length && moneyFor(addMonths(month, 1)) == null) {
         warnings.push('The Budget Net Balance is zero or negative, so there is no extra money to apply. Set a fixed amount under Money Available to test a plan.');
     }
-    const plan = scenarios.find(s => s.key === 'plan').result;
-    if (plan.totalShortfall > 0) {
-        warnings.push(`In some months the money available doesn't cover the minimums that aren't already in the Budget (short by ${fmt$(plan.totalShortfall)} in total).`);
+    if (planResult.totalShortfall > 0) {
+        warnings.push(`In some months the money available doesn't cover the minimums that aren't already in the Budget (short by ${fmt$(planResult.totalShortfall)} in total).`);
     }
 
-    return { month, items, netBalance, scenarios, warnings, engineDebts };
+    return { month, items, netBalance, planResult, warnings, engineDebts };
 }
 
 // -------------------------------------------------------------- rendering
@@ -824,8 +832,6 @@ function renderMoney(model) {
     const net = num(deps.getNetBalance());
     const netEl = $('debtNetBalance');
     if (netEl) netEl.textContent = `Budget Net Balance ${fmt$(net)}/mo`;
-    const strat = $('debtStrategySelect');
-    if (strat) strat.value = settings.strategy;
 
     const mode = $('debtMoneyMode');
     const amt = $('debtMoneyAmount');
@@ -881,57 +887,106 @@ function datesText(result, kind) {
     }
     return result.debtFreeYm ? fmtYm(result.debtFreeYm) : `Not within ${MAX_MONTHS / 12} yrs`;
 }
+function renderCascadeOrder(model, container) {
+    if (!container) return;
+    container.replaceChildren();
+
+    const items = model ? model.items : [];
+    if (!items.length) return;
+
+    // List all debts in the snapshot, sorted by highest APR first
+    const allDebts = [...items].sort((a, b) => b.rateNow - a.rateNow || a.balance - b.balance);
+    const customOrder = Array.isArray(settings.customOrder) ? settings.customOrder : (Array.isArray(settings.custom_order) ? settings.custom_order : []);
+
+    // Filter out any IDs that no longer exist in this snapshot
+    const validOrder = customOrder.filter(id => allDebts.some(it => String(it.d.id) === String(id)));
+    const currentOrder = [...new Set(validOrder)];
+
+    const numRows = Math.min(allDebts.length, currentOrder.length + 1);
+
+    for (let i = 0; i < numRows; i++) {
+        const chosenSoFar = currentOrder.slice(0, i);
+        const selectedId = currentOrder[i] || '';
+
+        // Exclude debts chosen in previous priorities
+        const available = allDebts.filter(it => !chosenSoFar.map(String).includes(String(it.d.id)));
+
+        const row = el('div', null, 'debt-cascade-row');
+        const label = el('label', `Priority #${i + 1}`, 'debt-cascade-label');
+        const select = el('select', null, 'text-input');
+
+        const defOpt = el('option', i === 0 ? 'Default (highest interest first)' : 'Default (highest interest for remaining)');
+        defOpt.value = '';
+        select.append(defOpt);
+
+        available.forEach(it => {
+            const optText = `${it.d.name} (${it.rateNow}% APR · ${fmt$(it.balance)})`;
+            const opt = el('option', optText);
+            opt.value = String(it.d.id);
+            select.append(opt);
+        });
+
+        select.value = selectedId ? String(selectedId) : '';
+
+        select.addEventListener('change', () => {
+            const val = select.value;
+            let nextOrder;
+            if (!val) {
+                nextOrder = currentOrder.slice(0, i);
+            } else {
+                nextOrder = [...currentOrder.slice(0, i), val];
+            }
+            saveCustomOrder(nextOrder);
+        });
+
+        row.append(label, select);
+        container.append(row);
+
+        // If 'Default' was selected for this priority, stop cascade here
+        if (!selectedId) {
+            break;
+        }
+    }
+}
+
 function renderResults(model) {
-    const scenBody = $('debtScenarioBody');
     const dates = $('debtDatesGrid');
     const warn = $('debtWarnings');
-    const planSel = $('debtPlanSelect');
+    const stratSel = $('debtStrategySelect');
+    const customWrap = $('debtCustomOrderWrap');
+    const cascadeBox = $('debtCascadeContainer');
     const resultsEmpty = $('debtResultsEmpty');
     const resultsWrap = $('debtResultsWrap');
-    if (!scenBody) return;
+    if (!dates) return;
 
     const hasData = !!(model && model.items.some(i => i.balance > 0));
     if (resultsEmpty) resultsEmpty.hidden = hasData;
     if (resultsWrap) resultsWrap.hidden = !hasData;
-    scenBody.replaceChildren();
-    warn.replaceChildren();
-    if (!hasData) { dates.replaceChildren(); $('debtPlanHead').replaceChildren(); $('debtPlanBody').replaceChildren(); return; }
+    if (warn) warn.replaceChildren();
+    if (!hasData) {
+        dates.replaceChildren();
+        $('debtPlanHead')?.replaceChildren();
+        $('debtPlanBody')?.replaceChildren();
+        if (cascadeBox) cascadeBox.replaceChildren();
+        if (customWrap) customWrap.hidden = true;
+        return;
+    }
 
     model.warnings.forEach(w => warn.append(el('p', w, 'form-error')));
 
-// Scenario comparison table
-    const minCost = model.scenarios[0].result.totalCost;
-    model.scenarios.forEach(sc => {
-        const res = sc.result;
-        const hasPmi = res.pmi && res.pmi.length > 0;
-        const tr = document.createElement('tr');
-        tr.append(
-            el('td', sc.label),
-            el('td', datesText(res, 'pmi')),
-            el('td', datesText(res, 'consumer')),
-            el('td', datesText(res, 'debt')),
-            el('td', fmt$(res.totalInterest), 'col-num'),
-            el('td', hasPmi ? fmt$(res.totalPmi) : '—', 'col-num'),
-            el('td', fmt$(res.totalCost), 'col-num'),
-            el('td', sc.key === 'min' ? '—' : fmt$(minCost - res.totalCost), 'col-num')
-        );
-        scenBody.append(tr);
-    });
-
-    // Populate plan selector options
-    if (planSel) {
-        planSel.replaceChildren();
-        model.scenarios.forEach(sc => {
-            const o = el('option', sc.label);
-            o.value = sc.key;
-            planSel.append(o);
-        });
-        planSel.value = planKey;
+    if (stratSel) {
+        stratSel.value = settings.strategy || 'avalanche';
     }
 
-    // Active scenario extraction for cards and plan table
-    const sc = model.scenarios.find(s => s.key === planKey) || model.scenarios[0];
-    const res = sc.result;
+    if (settings.strategy === 'custom') {
+        if (customWrap) customWrap.hidden = false;
+        renderCascadeOrder(model, cascadeBox);
+    } else {
+        if (customWrap) customWrap.hidden = true;
+        if (cascadeBox) cascadeBox.replaceChildren();
+    }
+
+    const res = model.planResult;
     const hasPmi = res.pmi && res.pmi.length > 0;
     const first = res.rows[0];
     const extraNow = first ? Object.values(first.pay).reduce((t, p) => t + p.extra, 0) : 0;
@@ -946,11 +1001,11 @@ function renderResults(model) {
         { label: 'Consumer Debt-Free', value: datesText(res, 'consumer'), unit: '', foot: 'Cards and loans, excluding the mortgage' },
         { label: 'Fully Debt-Free', value: datesText(res, 'debt'), unit: '', statusClass: res.debtFreeYm ? 'best' : '', foot: res.completed ? `${res.months} months from the snapshot` : 'Increase the money available or payments' },
         {
-            label: 'Extra Next Month', value: sc.key === 'min' ? '—' : fmt$(extraNow),
-            foot: sc.key === 'min' ? 'Minimums only applies no extra money' : `${fmt$(first?.available ?? 0)} available &minus; regular payments not in the Budget`
+            label: 'Extra Next Month', value: fmt$(extraNow),
+            foot: `${fmt$(first?.available ?? 0)} available &minus; regular payments not in the Budget`
         }
     ]);
-    renderPlanTable(model, res, sc.key === 'min');
+    renderPlanTable(model, res, false);
 }
 
 function renderPlanTable(model, res, isMinOnly) {
@@ -1013,7 +1068,6 @@ export function initDebts(d) {
     $('debtNewSnapshotBtn')?.addEventListener('click', () => createSnapshot($('debtNewMonth').value));
     $('debtDeleteMonthBtn')?.addEventListener('click', () => deleteMonth(resolveMonth()));
     $('debtStrategySelect')?.addEventListener('change', e => saveStrategy(e.target.value));
-    $('debtPlanSelect')?.addEventListener('change', e => { planKey = e.target.value; renderDebts(); });
 
     const addBtn = $('addDebtBtn');
     if (addBtn) {
