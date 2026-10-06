@@ -426,7 +426,7 @@ function buildModel(forMonth) {
                 promoApr: numOrNull(s.promo_apr),
                 promoStart: s.promo_start ? String(s.promo_start).slice(0, 10) : null,
                 promoEnd: s.promo_end ? String(s.promo_end).slice(0, 10) : null,
-                paymentOverride: num(s.payment_override) > 0 ? num(s.payment_override) : 0,
+                paymentOverride: numOrNull(s.payment_override),
                 piPayment: mort ? mort.pi : 0
             };
         });
@@ -440,7 +440,7 @@ function buildModel(forMonth) {
         .map(({ s, d }) => {
             const balance = num(s.balance);
             const apr = num(s.apr);
-            const override = num(s.payment_override) > 0 ? num(s.payment_override) : null;
+            const override = numOrNull(s.payment_override);
             const isMortgage = d.kind === 'mortgage';
             const isTermLoan =
                 d.kind === 'mortgage' ||
@@ -494,7 +494,7 @@ function buildModel(forMonth) {
                 engine: {
                     id: d.id, name: d.name, kind: d.kind, balance, apr, promoApr, promoStart, promoEnd,
                     minPct, minFloor, addsInterest,
-                    paymentOverride: override || 0, inBudget: !!d.in_budget,
+                    paymentOverride: override, inBudget: !!d.in_budget,
                     piPayment: mort ? mort.pi : 0, pmiAmount, targetBalance
                 }
             };
@@ -604,7 +604,7 @@ function buildDebtRow(it) {
     r.promoEnd.value = s.promo_end ? String(s.promo_end).slice(0, 10) : '';
     r.promoWrap.hidden = isMortgage;
     r.minPay.textContent = fmt$(it.scheduled);
-    r.minPay.title = it.override ? 'Using your override' : 'Calculated minimum';
+    r.minPay.title = it.override != null ? 'Using your override' : 'Calculated minimum';
     r.interest.textContent = fmt$(it.interest + it.pmiNow);
     r.interest.title = it.pmiNow > 0
         ? `Interest ${fmt$(it.interest)} + PMI ${fmt$(it.pmiNow)}`
@@ -798,13 +798,18 @@ function buildLoanCard(it) {
     if (mort.rows) {
         const frag = document.createDocumentFragment();
         mort.rows.forEach(row => {
-            const tr = document.createElement('tr');
+            const tr = cloneEl('tpl-mortgage-schedule-row');
+            const rowRefs = refs(tr);
             if (row.ym === it.s.month) tr.className = 'debt-row-hl';
-            tr.append(el('td', String(row.n)), el('td', fmtYm(row.ym)));
-            ['payment', 'interest', 'principal', 'balance'].forEach(k => tr.append(el('td', fmt$(row[k]), 'col-num')));
+            rowRefs.num.textContent = String(row.n);
+            rowRefs.month.textContent = fmtYm(row.ym);
+            rowRefs.payment.textContent = fmt$(row.payment);
+            rowRefs.interest.textContent = fmt$(row.interest);
+            rowRefs.principal.textContent = fmt$(row.principal);
+            rowRefs.balance.textContent = fmt$(row.balance);
             if (targetRow && row.n === targetRow.n) {
                 tr.className = 'debt-row-hl';
-                tr.children[1].textContent += ' — PMI target';
+                rowRefs.month.textContent += ' — PMI target';
             }
             frag.append(tr);
         });
@@ -911,9 +916,10 @@ function renderCascadeOrder(model, container) {
         // Exclude debts chosen in previous priorities
         const available = allDebts.filter(it => !chosenSoFar.map(String).includes(String(it.d.id)));
 
-        const row = el('div', null, 'debt-cascade-row');
-        const label = el('label', `Priority #${i + 1}`, 'debt-cascade-label');
-        const select = el('select', null, 'text-input');
+        const row = cloneEl('tpl-debt-cascade-row');
+        const r = refs(row);
+        r.label.textContent = `Priority #${i + 1}`;
+        const select = r.select;
 
         const defOpt = el('option', i === 0 ? 'Default (highest interest first)' : 'Default (highest interest for remaining)');
         defOpt.value = '';
@@ -1016,16 +1022,16 @@ function renderResults(model) {
 
     renderSummaryCards(dates, [
         {
-            label: 'PMI Drops',
-            value: datesText(res, 'pmi'),
-            unit: '',
-            foot: hasPmi ? (res.pmi.length > 1 ? `${res.pmi.length} loans with PMI` : 'First month without PMI') : 'No PMI modelled'
-        },
-        {
             label: 'Interest rates above 10% paid off',
             value: highRateValue,
             unit: '',
             foot: highRateFoot
+        },
+        {
+            label: 'PMI Drops',
+            value: datesText(res, 'pmi'),
+            unit: '',
+            foot: hasPmi ? (res.pmi.length > 1 ? `${res.pmi.length} loans with PMI` : 'First month without PMI') : 'No PMI modelled'
         },
         { label: 'Consumer Debt-Free', value: datesText(res, 'consumer'), unit: '', foot: 'Cards and loans, excluding the mortgage' },
         { label: 'Fully Debt-Free', value: datesText(res, 'debt'), unit: '', statusClass: res.debtFreeYm ? 'best' : '', foot: res.completed ? `${res.months} months from the snapshot` : 'Increase the money available or payments' },
@@ -1044,9 +1050,9 @@ function renderPlanTable(model, res, isMinOnly) {
     body.replaceChildren();
 
     const debts = model.engineDebts.filter(d => res.debts.some(x => x.id === d.id));
-    const cols = ['Month', 'Money Available', 'Extra Applied To', 'Interest', 'Total Balance', ...debts.map(d => d.name), 'Notes'];
+    const cols = ['Month', 'Money Available', 'Extra Applied To', 'Interest', 'Total Balance', 'Notes', ...debts.map(d => d.name)];
     const tr = document.createElement('tr');
-    cols.forEach((c, i) => tr.append(el('th', c, i === 0 || i === 2 || i === cols.length - 1 ? '' : 'col-num')));
+    cols.forEach(c => tr.append(el('th', c, ['Month', 'Extra Applied To', 'Notes'].includes(c) ? '' : 'col-num')));
     head.append(tr);
 
     const nameOf = Object.fromEntries(debts.map(d => [d.id, d.name]));
@@ -1056,31 +1062,19 @@ function renderPlanTable(model, res, isMinOnly) {
         const extras = Object.entries(row.pay).filter(([, p]) => p.extra > 0.005).map(([id, p]) => `${nameOf[id]} ${fmt$(p.extra)}`);
         const notes = [...row.events];
 
-        if (row.shortfall > 0.005) {
-            notes.push(`short ${fmt$(row.shortfall)}`);
-        }
+        const line = cloneEl('tpl-debt-plan-row');
+        const r = refs(line);
+        r.month.textContent = fmtYm(row.ym);
+        r.available.textContent = row.available == null ? '—' : fmt$(row.available);
+        r.extra.textContent = isMinOnly ? '—' : (extras.join(' · ') || '—');
+        r.interest.textContent = fmt$(row.interest);
+        r.balance.textContent = fmt$(row.totalBalance);
+        r.notes.textContent = notes.join(' · ');
 
-        // Display variance notes when an anchor snapshot intervened
-        if (row.anchor && row.anchor.length > 0) {
-            const varDetails = row.anchor
-                .map(a => `${a.name}: actual ${fmt$(a.actual)} vs projected ${fmt$(a.projected)}`)
-                .join(', ');
-            notes.push(`Statement adjusted (${varDetails})`);
-        }
-
-        const line = document.createElement('tr');
-        line.append(
-            el('td', fmtYm(row.ym)),
-            el('td', row.available == null ? '—' : fmt$(row.available), 'col-num'),
-            el('td', isMinOnly ? '—' : (extras.join(' · ') || '—')),
-            el('td', fmt$(row.interest), 'col-num'),
-            el('td', fmt$(row.totalBalance), 'col-num')
-        );
         debts.forEach(d => line.append(el('td', row.balances[d.id] > 0.005 ? fmt$(row.balances[d.id]) : '✓', 'col-num')));
-        line.append(el('td', notes.join(' · '), 'form-note'));
 
-        // Highlight rows that have milestone events or anchor reconciliation
-        if (row.events.length || (row.anchor && row.anchor.length > 0)) {
+        // Highlight rows that have milestone events
+        if (notes.length) {
             line.className = 'debt-row-hl';
         }
 

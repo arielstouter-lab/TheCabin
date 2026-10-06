@@ -77,7 +77,7 @@ function scheduledPayment(d, balance, interest, rate) {
     const owed = balance + interest;
     if (owed <= EPS) return 0;
     let p;
-    if (d.paymentOverride > 0) p = d.paymentOverride;
+    if (d.paymentOverride != null && d.paymentOverride >= 0) p = d.paymentOverride;
     else if (d.piPayment > 0) p = d.piPayment; // mortgages and amortizing loans
     else p = minimumPayment({ balance, apr: rate, minPct: d.minPct, minFloor: d.minFloor, addsInterest: d.addsInterest });
     return Math.min(owed, p);
@@ -150,7 +150,7 @@ export function simulate({
         id: d.id, name: d.name, kind: d.kind, apr: Number(d.apr) || 0, rate: Number(d.apr) || 0,
         promoApr: d.promoApr ?? null, promoStart: d.promoStart || null, promoEnd: d.promoEnd || null,
         minPct: d.minPct ?? 1, minFloor: d.minFloor ?? 35, addsInterest: d.addsInterest !== false,
-        paymentOverride: d.paymentOverride > 0 ? d.paymentOverride : 0,
+        paymentOverride: d.paymentOverride != null && Number(d.paymentOverride) >= 0 ? Number(d.paymentOverride) : null,
         inBudget: !!d.inBudget, piPayment: Number(d.piPayment) || 0,
         pmiAmount: d.pmiAmount > 0 && d.targetBalance > 0 ? d.pmiAmount : 0,
         targetBalance: Number(d.targetBalance) || 0,
@@ -278,7 +278,7 @@ export function simulate({
                 d.promoApr = a.promoApr ?? null;
                 d.promoStart = a.promoStart || null;
                 d.promoEnd = a.promoEnd || null;
-                d.paymentOverride = a.paymentOverride > 0 ? a.paymentOverride : 0;
+                d.paymentOverride = a.paymentOverride != null && Number(a.paymentOverride) >= 0 ? Number(a.paymentOverride) : null;
                 if (a.piPayment != null) d.piPayment = Number(a.piPayment) || 0;
                 if (actual > EPS) {
                     if (!d.everActive) { d.everActive = true; d.firstActiveYm = ym; }

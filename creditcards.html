@@ -809,8 +809,8 @@
                                     <select class="text-input" data-ref="payRow"></select>
                                 </div>
                                 <div class="picker" data-ref="pmiRowWrap">
-                                    ...
-                                    <select data-ref="pmiRow"></select>
+                                    <label>Budget row: PMI payment</label>
+                                    <select class="text-input" data-ref="pmiRow"></select>
                                 </div>
                                 <div class="picker" data-ref="homeValueWrap">
                                     <label>Home value (original)</label>
@@ -852,6 +852,35 @@
                         </details>
                     </div>
                 </div>
+            </template>
+
+            <template id="tpl-debt-cascade-row">
+                <div class="debt-cascade-row">
+                    <label class="debt-cascade-label" data-ref="label"></label>
+                    <select class="text-input" data-ref="select"></select>
+                </div>
+            </template>
+
+            <template id="tpl-mortgage-schedule-row">
+                <tr>
+                    <td data-ref="num"></td>
+                    <td data-ref="month"></td>
+                    <td class="col-num" data-ref="payment"></td>
+                    <td class="col-num" data-ref="interest"></td>
+                    <td class="col-num" data-ref="principal"></td>
+                    <td class="col-num" data-ref="balance"></td>
+                </tr>
+            </template>
+
+            <template id="tpl-debt-plan-row">
+                <tr>
+                    <td data-ref="month"></td>
+                    <td class="col-num" data-ref="available"></td>
+                    <td data-ref="extra"></td>
+                    <td class="col-num" data-ref="interest"></td>
+                    <td class="col-num" data-ref="balance"></td>
+                    <td class="form-note" data-ref="notes"></td>
+                </tr>
             </template>
 
         </section>
