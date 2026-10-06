@@ -102,11 +102,9 @@ textarea { font: inherit; }
   &.aisle-chip { margin-left: auto; background: var(--card); color: var(--ink-soft); border-color: var(--line); white-space: nowrap; }
 }
 
-.chip--w52 input[type=number] { --chip-w: 56px; }
+.chiplg input[type=number] { --chip-w: 58px; }
 
-.chip--w40 input[type=number] { --chip-w: 40px; }
-
-.chip--w36 input[type=number] { --chip-w: 40px; }
+.chipsm input[type=number] { --chip-w: 40px; }
 
 .chip-danger {
   background: var(--danger);
