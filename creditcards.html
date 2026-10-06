@@ -611,9 +611,11 @@
                                 </div>
                             </div>
 
-                            <div id="debtCustomOrderWrap" class="debt-cascade-wrap" hidden>
-                                <div class="eyebrow" style="margin-bottom: 8px;">Custom Payoff Priority</div>
-                                <div id="debtCascadeContainer" class="debt-cascade-list"></div>
+                            <div id="debtCustomOrderWrap" class="cc-add-form" hidden>
+                                <div class="picker">
+                                    <div class="eyebrow" style="margin-bottom: 8px;">Custom Payoff Priority</div>
+                                    <div id="debtCascadeContainer"></div>
+                                </div>
                             </div>
 
                             <div id="debtDatesGrid" class="summary-grid"></div>
@@ -855,8 +857,8 @@
             </template>
 
             <template id="tpl-debt-cascade-row">
-                <div class="debt-cascade-row">
-                    <label class="debt-cascade-label" data-ref="label"></label>
+                <div class="cl-chip-groups">
+                    <label class="card-label" data-ref="label"></label>
                     <select class="text-input" data-ref="select"></select>
                 </div>
             </template>
