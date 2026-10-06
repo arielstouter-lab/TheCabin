@@ -12,8 +12,8 @@ import { cloneEl, refs } from './dom.js';
 import { renderSummaryCards } from './summary-card.js';
 import {
     amortizedPayment, minimumPayment, amortizationSchedule, scheduledBalanceAt,
-    simulate, effectiveApr, addMonths, isYm, MAX_MONTHS
-} from './debt-engine.js';
+    simulate, effectiveApr, ymToIndex, addMonths, isYm, MAX_MONTHS
+} from './debt-engine-v2.js';
 
 const sb = window.supabaseClient;
 const TABLES = window.TABLES;
@@ -386,6 +386,29 @@ function buildModel(forMonth) {
     const netBalance = num(deps.getNetBalance());
     const warnings = [];
 
+    const subsequentMonths = [...new Set(snapRows.map(s => s.month))]
+        .filter(m => isYm(m) && ymToIndex(m) > ymToIndex(month));
+
+    const anchors = {};
+    subsequentMonths.forEach(m => {
+        const snapsForMonth = snapRows.filter(s => s.month === m);
+        anchors[m] = {};
+        snapsForMonth.forEach(s => {
+            const d = debtRows.find(x => x.id === s.debt_id);
+            if (!d) return;
+            const mort = (d.kind === 'mortgage' || d.kind === 'loan') ? loanInfo(d, num(s.apr)) : null;
+            anchors[m][s.debt_id] = {
+                balance: num(s.balance),
+                apr: num(s.apr),
+                promoApr: numOrNull(s.promo_apr),
+                promoStart: s.promo_start ? String(s.promo_start).slice(0, 10) : null,
+                promoEnd: s.promo_end ? String(s.promo_end).slice(0, 10) : null,
+                paymentOverride: num(s.payment_override) > 0 ? num(s.payment_override) : 0,
+                piPayment: mort ? mort.pi : 0
+            };
+        });
+    });
+
     const items = snapRows
         .filter(s => s.month === month)
         .map(s => ({ s, d: debtRows.find(x => x.id === s.debt_id) }))
@@ -403,15 +426,15 @@ function buildModel(forMonth) {
             const minFloor = 35;
             const addsInterest = d.min_adds_interest !== false;
             const promoApr = !isMortgage ? numOrNull(s.promo_apr) : null;
-            const promoStartYm = dateToYm(s.promo_start);
-            const promoEndYm = dateToYm(s.promo_end);
+            const promoStart = s.promo_start ? String(s.promo_start).slice(0, 10) : null;
+            const promoEnd = s.promo_end ? String(s.promo_end).slice(0, 10) : null;
             // Rate charged in the first projected month (the month after the snapshot)
-            const rateNow = effectiveApr({ apr, promoApr, promoStartYm, promoEndYm }, addMonths(month, 1));
+            const rateNow = effectiveApr({ apr, promoApr, promoStart, promoEnd }, addMonths(month, 1));
             const interest = (balance * rateNow) / 1200;
 
             if (promoApr != null) {
-                if (!promoEndYm) warnings.push(`${d.name}: the promo rate has no expiration date, so it is treated as permanent.`);
-                else if (promoStartYm && promoEndYm <= promoStartYm) warnings.push(`${d.name}: the promo expires before it starts.`);
+                if (!promoEnd) warnings.push(`${d.name}: the promo rate has no expiration date, so it is treated as permanent.`);
+                else if (promoStart && promoEnd <= promoStart) warnings.push(`${d.name}: the promo expires before it starts.`);
             }
 
             const mort = isTermLoan
@@ -446,7 +469,7 @@ function buildModel(forMonth) {
                 homeValue, ltv, targetBalance, pmiAmount, pmiRowAmount,
                 pmiNow: pmiAmount > 0 && balance > targetBalance + 0.005 ? pmiAmount : 0,
                 engine: {
-                    id: d.id, name: d.name, kind: d.kind, balance, apr, promoApr, promoStartYm, promoEndYm,
+                    id: d.id, name: d.name, kind: d.kind, balance, apr, promoApr, promoStart, promoEnd,
                     minPct, minFloor, addsInterest,
                     paymentOverride: override || 0, inBudget: !!d.in_budget,
                     piPayment: mort ? mort.pi : 0, pmiAmount, targetBalance
@@ -462,27 +485,46 @@ function buildModel(forMonth) {
         const amt = moneyFor(ym);
         if (amt != null) overrideMap[ym] = amt;
     }
-    
+
     const engineDebts = items.map(i => i.engine);
-    const base = { debts: engineDebts, monthlyMoney: Math.max(0, netBalance), overrides: overrideMap, startYm: month, strategy: settings.strategy };
+    const pmiDebts = engineDebts.filter(d => d.pmiAmount > 0 && d.targetBalance > 0);
+    const pmiNeeded = pmiDebts.filter(d => d.balance > d.targetBalance);
+
+    const base = {
+        debts: engineDebts,
+        monthlyMoney: Math.max(0, netBalance),
+        overrides: overrideMap,
+        startYm: month,
+        strategy: settings.strategy,
+        order: settings.customOrder || [],
+        anchors
+    };
 
     const scenarios = [
         { key: 'min', label: 'Minimums only (no extra)', result: simulate({ ...base, mode: 'minimums' }) },
         { key: 'plan', label: strategyLabel(settings.strategy), result: simulate(base) }
     ];
-    const pmiPossible = engineDebts.some(d => d.pmiAmount > 0 && d.balance > d.targetBalance);
-    if (pmiPossible) {
+
+    // Add PMI scenario only when extra payments can help eliminate PMI
+    if (pmiNeeded.length > 0) {
         scenarios.push({
             key: 'pmi',
             label: `PMI target first, then ${settings.strategy === 'snowball' ? 'snowball' : 'avalanche'}`,
-            result: simulate({ ...base, pmiFirst: true })
+            result: simulate({ ...base, stopAtPmi: pmiNeeded.map(d => d.id) })
         });
     }
 
-if (netBalance <= 0 && items.length && moneyFor(addMonths(month, 1)) == null) warnings.push('The Budget Net Balance is zero or negative, so there is no extra money to apply. Set a fixed amount under Money Available to test a plan.');    const plan = scenarios.find(s => s.key === 'plan').result;
-    if (plan.totalShortfall > 0) warnings.push(`In some months the money available doesn't cover the minimums that aren't already in the Budget (short by ${fmt$(plan.totalShortfall)} in total).`);
+    if (!scenarios.some(s => s.key === planKey)) {
+        planKey = pmiNeeded.length > 0 ? 'pmi' : 'plan';
+    }
 
-    if (!scenarios.some(s => s.key === planKey)) planKey = pmiPossible ? 'pmi' : 'plan';
+    if (netBalance <= 0 && items.length && moneyFor(addMonths(month, 1)) == null) {
+        warnings.push('The Budget Net Balance is zero or negative, so there is no extra money to apply. Set a fixed amount under Money Available to test a plan.');
+    }
+    const plan = scenarios.find(s => s.key === 'plan').result;
+    if (plan.totalShortfall > 0) {
+        warnings.push(`In some months the money available doesn't cover the minimums that aren't already in the Budget (short by ${fmt$(plan.totalShortfall)} in total).`);
+    }
 
     return { month, items, netBalance, scenarios, warnings, engineDebts };
 }
@@ -820,9 +862,18 @@ function renderMoney(model) {
 // ---------------------------------------------------------------- results
 function datesText(result, kind) {
     if (kind === 'pmi') {
-        if (!result.hasPmi) return '—';
-        if (result.pmiAlreadyMet) return 'Already met';
-        return result.pmiFreeYm ? fmtYm(result.pmiFreeYm) : 'Not reached';
+        const pmis = result.pmi || [];
+        if (!pmis.length) return '—';
+        if (pmis.every(p => p.alreadyMet)) return 'Already met';
+
+        const dropDates = pmis.map(p => p.freeYm).filter(Boolean);
+        if (!dropDates.length) return `Not within ${MAX_MONTHS / 12} yrs`;
+
+        // If all loans with PMI reach their target, show the latest drop date
+        if (dropDates.length === pmis.length) {
+            return fmtYm(dropDates.sort().pop());
+        }
+        return `Partial by ${fmtYm(dropDates.sort()[0])}`;
     }
     if (kind === 'consumer') {
         if (!result.consumerCount) return '—';
@@ -830,7 +881,6 @@ function datesText(result, kind) {
     }
     return result.debtFreeYm ? fmtYm(result.debtFreeYm) : `Not within ${MAX_MONTHS / 12} yrs`;
 }
-
 function renderResults(model) {
     const scenBody = $('debtScenarioBody');
     const dates = $('debtDatesGrid');
@@ -849,10 +899,11 @@ function renderResults(model) {
 
     model.warnings.forEach(w => warn.append(el('p', w, 'form-error')));
 
-    // scenario comparison
+// Scenario comparison table
     const minCost = model.scenarios[0].result.totalCost;
     model.scenarios.forEach(sc => {
         const res = sc.result;
+        const hasPmi = res.pmi && res.pmi.length > 0;
         const tr = document.createElement('tr');
         tr.append(
             el('td', sc.label),
@@ -860,29 +911,38 @@ function renderResults(model) {
             el('td', datesText(res, 'consumer')),
             el('td', datesText(res, 'debt')),
             el('td', fmt$(res.totalInterest), 'col-num'),
-            el('td', res.hasPmi ? fmt$(res.totalPmi) : '—', 'col-num'),
+            el('td', hasPmi ? fmt$(res.totalPmi) : '—', 'col-num'),
             el('td', fmt$(res.totalCost), 'col-num'),
             el('td', sc.key === 'min' ? '—' : fmt$(minCost - res.totalCost), 'col-num')
         );
         scenBody.append(tr);
     });
 
-    // plan picker
-    planSel.replaceChildren();
-    model.scenarios.forEach(sc => {
-        const o = el('option', sc.label);
-        o.value = sc.key;
-        planSel.append(o);
-    });
-    planSel.value = planKey;
+    // Populate plan selector options
+    if (planSel) {
+        planSel.replaceChildren();
+        model.scenarios.forEach(sc => {
+            const o = el('option', sc.label);
+            o.value = sc.key;
+            planSel.append(o);
+        });
+        planSel.value = planKey;
+    }
 
-    const sc = model.scenarios.find(x => x.key === planKey) || model.scenarios[1];
+    // Active scenario extraction for cards and plan table
+    const sc = model.scenarios.find(s => s.key === planKey) || model.scenarios[0];
     const res = sc.result;
+    const hasPmi = res.pmi && res.pmi.length > 0;
     const first = res.rows[0];
     const extraNow = first ? Object.values(first.pay).reduce((t, p) => t + p.extra, 0) : 0;
 
     renderSummaryCards(dates, [
-        { label: 'PMI Drops', value: datesText(res, 'pmi'), unit: '', foot: res.hasPmi ? 'First month without PMI' : 'No PMI modelled' },
+        {
+            label: 'PMI Drops',
+            value: datesText(res, 'pmi'),
+            unit: '',
+            foot: hasPmi ? (res.pmi.length > 1 ? `${res.pmi.length} loans with PMI` : 'First month without PMI') : 'No PMI modelled'
+        },
         { label: 'Consumer Debt-Free', value: datesText(res, 'consumer'), unit: '', foot: 'Cards and loans, excluding the mortgage' },
         { label: 'Fully Debt-Free', value: datesText(res, 'debt'), unit: '', statusClass: res.debtFreeYm ? 'best' : '', foot: res.completed ? `${res.months} months from the snapshot` : 'Increase the money available or payments' },
         {
@@ -890,7 +950,6 @@ function renderResults(model) {
             foot: sc.key === 'min' ? 'Minimums only applies no extra money' : `${fmt$(first?.available ?? 0)} available &minus; regular payments not in the Budget`
         }
     ]);
-
     renderPlanTable(model, res, sc.key === 'min');
 }
 
@@ -908,10 +967,23 @@ function renderPlanTable(model, res, isMinOnly) {
 
     const nameOf = Object.fromEntries(debts.map(d => [d.id, d.name]));
     const frag = document.createDocumentFragment();
+
     res.rows.forEach(row => {
         const extras = Object.entries(row.pay).filter(([, p]) => p.extra > 0.005).map(([id, p]) => `${nameOf[id]} ${fmt$(p.extra)}`);
         const notes = [...row.events];
-        if (row.shortfall > 0.005) notes.push(`short ${fmt$(row.shortfall)}`);
+
+        if (row.shortfall > 0.005) {
+            notes.push(`short ${fmt$(row.shortfall)}`);
+        }
+
+        // Display variance notes when an anchor snapshot intervened
+        if (row.anchor && row.anchor.length > 0) {
+            const varDetails = row.anchor
+                .map(a => `${a.name}: actual ${fmt$(a.actual)} vs projected ${fmt$(a.projected)}`)
+                .join(', ');
+            notes.push(`Statement adjusted (${varDetails})`);
+        }
+
         const line = document.createElement('tr');
         line.append(
             el('td', fmtYm(row.ym)),
@@ -922,7 +994,12 @@ function renderPlanTable(model, res, isMinOnly) {
         );
         debts.forEach(d => line.append(el('td', row.balances[d.id] > 0.005 ? fmt$(row.balances[d.id]) : '✓', 'col-num')));
         line.append(el('td', notes.join(' · '), 'form-note'));
-        if (row.events.length) line.className = 'debt-row-hl';
+
+        // Highlight rows that have milestone events or anchor reconciliation
+        if (row.events.length || (row.anchor && row.anchor.length > 0)) {
+            line.className = 'debt-row-hl';
+        }
+
         frag.append(line);
     });
     body.append(frag);

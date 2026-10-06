@@ -78,7 +78,6 @@ export function renderPantryPanel(sec){
 
         sortedGroups.forEach(([aisleId, groupItems]) => {
             const details = document.createElement('details');
-            details.open = true;
 
             const summary = document.createElement('summary');
 
