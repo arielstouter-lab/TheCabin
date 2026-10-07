@@ -14,14 +14,12 @@ async function getOrCreateMovingSection() {
     return sec;
 }
 
+let movingSection = null;
+
 async function render() {
     const panelEl = document.getElementById('lst-panel');
-    if (!panelEl) return;
-
-    const sec = await getOrCreateMovingSection();
-    if (!sec) return;
-
-    panelEl.replaceChildren(renderPantryPanel(sec));
+    if (!panelEl || !movingSection) return;
+    panelEl.replaceChildren(renderPantryPanel(movingSection));
 }
 
 onStateChange(render);
@@ -35,14 +33,14 @@ initSync(sb, {
     }
 });
 
+async function init() {
+    await loadAll();
+    movingSection = await getOrCreateMovingSection();
+    render();
+}
+
 if (window.initAppPage) {
-    window.initAppPage(async () => {
-        await loadAll();
-        await render();
-    });
+    window.initAppPage(init);
 } else {
-    document.addEventListener('app:ready', async () => {
-        await loadAll();
-        await render();
-    }, { once: true });
+    document.addEventListener('app:ready', init, { once: true });
 }
