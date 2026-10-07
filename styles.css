@@ -183,7 +183,7 @@ textarea { font: inherit; }
 
 .recipe-url-link {
   opacity: 0.6;
-  color: var(--ink-soft)
+  color: var(--ink-soft);
 }
 
 /* Form Controls */
@@ -342,7 +342,7 @@ select { cursor: pointer; }
 }
 
 .card {  display: flex; flex-direction: column; min-width: 0; max-width: 100%; margin-bottom: 20px; padding: 40px; box-shadow: var(--shadow); gap: 12px;
-  .tax-val { font-weight: 600; color: var(--ink); white-space: nowrap;
+  .tax-val { font-weight: 600; color: var(--ink); white-space: nowrap; }
 }
 
 .card-head { display: flex; align-items: center; justify-content: space-between; padding: 0 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 10px; gap: 10px; }
@@ -432,7 +432,7 @@ select { cursor: pointer; }
 }
 
 .nav-label {
-  color: var(--nav-label);
+  color: var(--nav-label, var(--ink-soft));
 }
 
 .sidebar-bottom { margin-top: auto; }
