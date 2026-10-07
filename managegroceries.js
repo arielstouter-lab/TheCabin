@@ -1,3 +1,5 @@
+import { writeOrQueue, nowStamp, initSync } from './sync.js';
+
 (function(){
     const sb = window.supabaseClient;
     const TABLES = window.TABLES;
@@ -69,6 +71,7 @@
         }
         render();
         setupRealtime();
+        if(sb) initSync(sb);
     }
 
     // ---- Aisles ---------------------------------------------------
@@ -188,6 +191,7 @@
         const text = rawText.trim();
         if(!text) return;
         const key = window.groceryKey(text);
+        if(!key) return;
         const existingMemory = itemMemory.find(m => m.item_key === key);
 
         const previousMemory = itemMemory.map(m => ({...m}));
@@ -203,26 +207,24 @@
         );
         render();
 
-        const nowIso = new Date().toISOString();
+        const nowIso = nowStamp();
         try{
-            if(existingMemory){
-                const {error} = await sb.from(TABLES.GROCERY_ITEM_MEMORY)
-                    .update({aisle_id: aisleId || null, updated_at: nowIso})
-                    .eq('item_key', key);
-                if(error) throw error;
-            } else {
-                const {data, error} = await sb.from(TABLES.GROCERY_ITEM_MEMORY)
-                    .insert({item_key: key, aisle_id: aisleId || null, updated_at: nowIso})
-                    .select()
-                    .single();
-                if(error) throw error;
-                itemMemory = itemMemory.map(m => m.id === `pending-${key}` ? data : m);
+            const { data, error } = await sb.from(TABLES.GROCERY_ITEM_MEMORY)
+                .upsert(
+                    { item_key: key, aisle_id: aisleId || null, updated_at: nowIso },
+                    { onConflict: 'item_key' }
+                )
+                .select()
+                .maybeSingle();
+            if(error) throw error;
+            if(data){
+                itemMemory = itemMemory.map(m => m.item_key === key ? data : m);
             }
 
             const matchingIds = groceryItems.filter(i => window.groceryKey(i.text) === key).map(i => i.id);
             if(matchingIds.length){
                 const {error: itemsErr} = await sb.from(TABLES.LIST_ITEMS)
-                    .update({aisle_id: aisleId || null})
+                    .update({aisle_id: aisleId || null, updated_at: nowIso})
                     .in('id', matchingIds);
                 if(itemsErr) throw itemsErr;
             }

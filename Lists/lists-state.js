@@ -24,8 +24,15 @@ export const state = {
     people: [],
     recipes: [],
     groceryAisles: [],
-    groceryItemMemory: []
+    groceryItemMemory: [],
+    memoryLookup: new Map()
 };
+
+export function rebuildMemoryLookup(){
+    state.memoryLookup = new Map(
+        (state.groceryItemMemory || []).map(m => [window.groceryKey(m.item_key), m.aisle_id])
+    );
+}
 
 let realtimeChannel = null;
 let realtimeDebounceTimer = null;
@@ -110,6 +117,7 @@ function loadFromLocalCache(){
         state.recipes = data.recipes || [];
         state.groceryAisles = data.groceryAisles || [];
         state.groceryItemMemory = data.groceryItemMemory || [];
+        rebuildMemoryLookup();
         return true;
     } catch(e){
         return false;
@@ -243,6 +251,7 @@ export async function loadAll(options = {}){
         state.recipes = mergeRecipesWithPendingWrites(recipeResult.data || []);
         state.groceryAisles = aisleResult.data || [];
         state.groceryItemMemory = memoryResult.data || [];
+        rebuildMemoryLookup();
 
         state.itemsBySection = mergeItemsWithPendingWrites(itemResult.data || []);
         await ensurePermanentSections();
@@ -414,6 +423,93 @@ export async function saveRecipeField(recipe, field, value){
     });
 }
 
+export async function assignItemTag(rawText, aisleId, sectionId = null){
+    const text = String(rawText || '').trim();
+    if(!text) return;
+    const key = window.groceryKey(text);
+    if(!key) return;
+
+    const nowIso = nowStamp();
+    const existingIndex = state.groceryItemMemory.findIndex(m => m.item_key === key);
+    if(existingIndex >= 0){
+        state.groceryItemMemory[existingIndex] = {
+            ...state.groceryItemMemory[existingIndex],
+            aisle_id: aisleId || null,
+            updated_at: nowIso
+        };
+    } else {
+        state.groceryItemMemory.push({
+            item_key: key,
+            aisle_id: aisleId || null,
+            updated_at: nowIso
+        });
+    }
+    rebuildMemoryLookup();
+
+    const targetSectionIds = sectionId ? [sectionId] : Object.keys(state.itemsBySection);
+    const updatedItemIds = [];
+    targetSectionIds.forEach(secId => {
+        state.itemsBySection[secId] = (state.itemsBySection[secId] || []).map(item => {
+            if(window.groceryKey(item.text) === key){
+                updatedItemIds.push(item.id);
+                return { ...item, aisle_id: aisleId || null, updated_at: nowIso };
+            }
+            return item;
+        });
+    });
+
+    saveToLocalCache();
+
+    await writeOrQueue(sb, {
+        table: TABLES.GROCERY_ITEM_MEMORY,
+        type: 'upsert',
+        id: key,
+        idColumn: 'item_key',
+        payload: { item_key: key, aisle_id: aisleId || null, updated_at: nowIso },
+        options: { onConflict: 'item_key' }
+    });
+
+    await Promise.all(updatedItemIds.map(id => writeOrQueue(sb, {
+        table: TABLES.LIST_ITEMS,
+        type: 'update',
+        id,
+        payload: { aisle_id: aisleId || null, updated_at: nowIso }
+    })));
+}
+
+export async function deleteItemTagMapping(itemKey){
+    const key = window.groceryKey(itemKey) || itemKey;
+    state.groceryItemMemory = state.groceryItemMemory.filter(m => m.item_key !== key && m.item_key !== itemKey);
+    rebuildMemoryLookup();
+    saveToLocalCache();
+
+    await writeOrQueue(sb, {
+        table: TABLES.GROCERY_ITEM_MEMORY,
+        type: 'delete',
+        id: itemKey,
+        idColumn: 'item_key'
+    });
+}
+
+export async function deleteTag(aisleId){
+    state.groceryAisles = state.groceryAisles.filter(a => a.id !== aisleId);
+    state.groceryItemMemory = state.groceryItemMemory.map(m => m.aisle_id === aisleId ? { ...m, aisle_id: null } : m);
+    rebuildMemoryLookup();
+
+    Object.keys(state.itemsBySection).forEach(secId => {
+        state.itemsBySection[secId] = (state.itemsBySection[secId] || []).map(item =>
+            item.aisle_id === aisleId ? { ...item, aisle_id: null } : item
+        );
+    });
+    saveToLocalCache();
+
+    await writeOrQueue(sb, {
+        table: TABLES.GROCERY_AISLES,
+        type: 'delete',
+        id: aisleId
+    });
+}
+
 // ---- Sorting -------------------------------------------------------------
 
 function aisleSortValue(aisleId){
@@ -480,8 +576,18 @@ export function aisleIdForItemText(text){
     const key = window.groceryKey(text);
     if(!key) return null;
 
-    const exactMatch = state.groceryItemMemory.find(m => window.groceryKey(m.item_key) === key);
-    if(exactMatch) return exactMatch.aisle_id;
+    if(state.memoryLookup && state.memoryLookup.has(key)){
+        return state.memoryLookup.get(key);
+    }
+
+    const phraseMatch = state.groceryItemMemory
+        .filter(m => {
+            const memKey = window.groceryKey(m.item_key);
+            return memKey && (key.includes(memKey) || memKey.includes(key));
+        })
+        .sort((a, b) => window.groceryKey(b.item_key).length - window.groceryKey(a.item_key).length)[0];
+
+    if(phraseMatch) return phraseMatch.aisle_id;
 
     const partialMatch = state.groceryItemMemory
         .filter(m => window.groceryKeysMatch(text, m.item_key))

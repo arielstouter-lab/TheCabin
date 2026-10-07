@@ -34,8 +34,9 @@ export function nowStamp() {
     return new Date().toISOString();
 }
 
-// op: { table, type: 'insert' | 'update' | 'delete', id, idColumn, payload }
+// op: { table, type: 'insert' | 'update' | 'upsert' | 'delete', id, idColumn, payload, options }
 // - insert: payload is the full row to insert (include updated_at: nowStamp())
+// - upsert: payload is the row (include updated_at: nowStamp()), options: { onConflict }
 // - update: payload is the patch (must include updated_at: nowStamp())
 // - delete: id + idColumn only
 export async function writeOrQueue(sb, op) {
@@ -52,6 +53,9 @@ async function trySend(sb, op) {
     try {
         if (op.type === 'insert') {
             const { error } = await sb.from(op.table).insert(op.payload);
+            if (error) throw error;
+        } else if (op.type === 'upsert') {
+            const { error } = await sb.from(op.table).upsert(op.payload, op.options || { onConflict: op.idColumn || 'id' });
             if (error) throw error;
         } else if (op.type === 'update') {
             const { error } = await sb.from(op.table)

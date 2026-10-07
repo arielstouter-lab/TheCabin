@@ -262,6 +262,7 @@ function groceryKeysMatch(itemText, memoryKey) {
 
   if (!itemKey || !normalizedMemoryKey) return false;
   if (itemKey === normalizedMemoryKey) return true;
+  if (itemKey.includes(normalizedMemoryKey) || normalizedMemoryKey.includes(itemKey)) return true;
 
   const itemWords = groceryWords(itemKey);
   const memoryWords = groceryWords(normalizedMemoryKey);
