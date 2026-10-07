@@ -720,7 +720,6 @@ body.cal-page {
 .lst-item {
   padding: 9px 10px;
   margin-bottom: 8px;
-  display: flex;
   flex-direction: column;
   gap: 5px;
   &.checked {
