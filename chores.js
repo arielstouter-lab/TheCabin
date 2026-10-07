@@ -179,7 +179,7 @@ function renderBeam(){
 
   if(state.people.length === 0){
     const label = document.createElement('p');
-    label.className = 'cl-beam-label';
+    label.className = 'note';
     label.textContent = 'Add people to see the balance.';
     beam.append(label);
     if (targetLabel) targetLabel.textContent = '';
@@ -188,7 +188,7 @@ function renderBeam(){
   if (targetLabel) targetLabel.textContent = 'target ≈ ' + Math.round(mean) + ' pts/wk each';
 
   const label = document.createElement('p');
-  label.className = 'cl-beam-label';
+  label.className = 'note';
   label.textContent = 'Weekly points per person — gold line marks the even split.';
   beam.append(label);
 

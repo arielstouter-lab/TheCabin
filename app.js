@@ -464,7 +464,7 @@ function setStatus(msg, targetIdOrType, maybeType) {
   }
 
   const el = (targetId && document.getElementById(targetId)) ||
-             document.querySelector('.status-line') ||
+             document.querySelector('.note') ||
              document.getElementById('status-line') ||
              document.getElementById('lst-status');
   if (el) {

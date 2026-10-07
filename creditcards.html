@@ -44,7 +44,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Credit Card Spending</h2>
-                        <span class="card-sub">Monthly credit card spend per category, used by credit card comparison</span>
+                        <span class="note">Monthly credit card spend per category, used by credit card comparison</span>
                     </div>
                     <div class="card-body">
                         <div class="table-wrap">
@@ -76,7 +76,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="newCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input form-note" id="newCategoryNotes" placeholder="Notes (optional)" />
+                                <input type="text" class="text-input note" id="newCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="addCategoryBtn">Add category</button>
                         </div>
@@ -86,7 +86,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Bank Account Spending</h2>
-                        <span class="card-sub">Non-card monthly expenses</span>
+                        <span class="note">Non-card monthly expenses</span>
                     </div>
                     <div class="card-body">
                         <div class="table-wrap">
@@ -118,7 +118,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="newBankCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input form-note" id="newBankCategoryNotes" placeholder="Notes (optional)" />
+                                <input type="text" class="text-input note" id="newBankCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="addBankCategoryBtn">Add expense</button>
                         </div>
@@ -128,7 +128,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Income</h2>
-                        <span class="card-sub">Monthly income sources (e.g. primary salary, side income)</span>
+                        <span class="note">Monthly income sources (e.g. primary salary, side income)</span>
                     </div>
                     <div class="card-body">
                         <div class="table-wrap">
@@ -160,7 +160,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="newIncomeAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input form-note" id="newIncomeNotes" placeholder="Notes (optional)" />
+                                <input type="text" class="text-input note" id="newIncomeNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="addIncomeBtn">Add income</button>
                         </div>
@@ -170,7 +170,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Monthly Budget Balance</h2>
-                        <span class="card-sub">Total Income &minus; Total Spending = Net Balance</span>
+                        <span class="note">Total Income &minus; Total Spending = Net Balance</span>
                     </div>
                     <div class="card-body">
                         <div id="balanceSummaryGrid" class="summary-grid"></div>
@@ -222,7 +222,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Credit Cards</h2>
-                        <span class="card-sub">Annual fee &amp; base rate ("everything else") for each card</span>
+                        <span class="note">Annual fee &amp; base rate ("everything else") for each card</span>
                     </div>
                     <div class="card-body">
                         <div class="table-wrap">
@@ -252,14 +252,14 @@
                             </div>
                             <button class="button-inline" id="addCardBtn">Add card</button>
                         </div>
-                        <p class="form-note">Base rate applies to any category that doesn't have its own rate set below.</p>
+                        <p class="note">Base rate applies to any category that doesn't have its own rate set below.</p>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Card Rewards</h2>
-                        <span class="card-sub">Category-specific rates that override a card's base rate</span>
+                        <span class="note">Category-specific rates that override a card's base rate</span>
                     </div>
                     <div class="card-body">
                         <div class="table-wrap">
@@ -291,7 +291,7 @@
                             </div>
                             <button class="button-inline" id="addRewardBtn">Add rate</button>
                         </div>
-                        <p class="form-note">Special refund is a flat $/mo add-on for that specific card + category (e.g. a fixed statement credit), on top of the percentage reward.</p>
+                        <p class="note">Special refund is a flat $/mo add-on for that specific card + category (e.g. a fixed statement credit), on top of the percentage reward.</p>
                     </div>
                 </div>
             </div>
@@ -301,7 +301,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">San Jacinto</h2>
-                        <span class="card-sub">Rental Property</span>
+                        <span class="note">Rental Property</span>
                     </div>
                     <div class="card-body">
                         <div class="cc-add-form">
@@ -342,7 +342,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="sanJacintoNewCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input form-note" id="sanJacintoNewCategoryNotes" placeholder="Notes (optional)" />
+                                <input type="text" class="text-input note" id="sanJacintoNewCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="sanJacintoAddCategoryBtn">Add expense</button>
                         </div>
@@ -392,7 +392,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">County Line</h2>
-                        <span class="card-sub">Rental Property</span>
+                        <span class="note">Rental Property</span>
                     </div>
                     <div class="card-body">
                         <div class="cc-add-form">
@@ -433,7 +433,7 @@
                                 <div class="num-wrap money">
                                     <input type="number" class="text-input" id="countyLineNewCategoryAmount" placeholder="Amount" min="0" step="any" />
                                 </div>
-                                <input type="text" class="text-input form-note" id="countyLineNewCategoryNotes" placeholder="Notes (optional)" />
+                                <input type="text" class="text-input note" id="countyLineNewCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="countyLineAddCategoryBtn">Add expense</button>
                         </div>
@@ -488,7 +488,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Outstanding Debts</h2>
-                        <span class="card-sub">Balances as of the selected month. Projections start the month after.</span>
+                        <span class="note">Balances as of the selected month. Projections start the month after.</span>
                     </div>
                     <div class="card-body">
                         <div class="cc-add-form">
@@ -542,7 +542,7 @@
                             </div>
                             <button type="button" class="button-inline" id="addDebtBtn">Add debt</button>
                         </div>
-                        <p class="form-note">Payment is the calculated minimum (1%, minimum of $35) unless you type an override. For loans, enter your fixed payment as the override. Tick <em>In Budget</em> when the regular payment is already one of your Budget expenses, so it isn't subtracted from your available money twice.</p>
+                        <p class="note">Payment is the calculated minimum (1%, minimum of $35) unless you type an override. For loans, enter your fixed payment as the override. Tick <em>In Budget</em> when the regular payment is already one of your Budget expenses, so it isn't subtracted from your available money twice.</p>
 
                         <div id="debtSummaryGrid" class="summary-grid"></div>
                     </div>
@@ -552,7 +552,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Money Available</h2>
-                        <span class="card-sub">This defaults to the Budget's Net Balance; override any month. Copy forward carries your current selection into the next snapshot.</span>
+                        <span class="note">This defaults to the Budget's Net Balance; override any month. Copy forward carries your current selection into the next snapshot.</span>
                     </div>
                     <div class="card-body">
                         <div class="cc-add-form">
@@ -585,7 +585,7 @@
                                 </div>
                             </div>
                         </div>
-                        <p class="form-note" id="debtMoneyNote"></p>
+                        <p class="note" id="debtMoneyNote"></p>
                     </div>
                 </div>
 
@@ -593,7 +593,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Payoff Plan</h2>
-                        <span class="card-sub">Strategy and month-by-month projection from the selected snapshot</span>
+                        <span class="note">Strategy and month-by-month projection from the selected snapshot</span>
                     </div>
                     <div class="card-body">
                         <p id="debtResultsEmpty" class="empty-state">Add a debt with a balance to see payoff dates.</p>
@@ -626,7 +626,7 @@
                                     <tbody id="debtPlanBody"></tbody>
                                 </table>
                             </div>
-                            <p class="form-note">Assumes no new charges on these debts, interest of APR&divide;12 on the balance each month, and that freed-up payments (paid-off debts, PMI ending) roll into the money available. Real issuers use average daily balances, so expect small differences.</p>
+                            <p class="note">Assumes no new charges on these debts, interest of APR&divide;12 on the balance each month, and that freed-up payments (paid-off debts, PMI ending) roll into the money available. Real issuers use average daily balances, so expect small differences.</p>
                         </div>
                     </div>
                 </div>
@@ -652,7 +652,7 @@
                     </td>
                     <td>
                         <div class="note-cell">
-                            <span class="form-note note-editable" contenteditable="true" data-ref="notes"></span>
+                            <span class="note note-editable" contenteditable="true" data-ref="notes"></span>
                             <button type="button" class="icon-edit-note" title="Edit note" data-ref="editNote">📝</button>
                         </div>
                     </td>
@@ -697,11 +697,11 @@
                 <tr class="rental-income-row">
                     <td>
                         <span class="rental-prop-title" data-ref="propName"></span>
-                        <span class="chip form-note" data-ref="chip"></span>
+                        <span class="chip note" data-ref="chip"></span>
                     </td>
-                    <td><span class="card-sub">Monthly</span></td>
+                    <td><span class="note">Monthly</span></td>
                     <td class="col-num" data-ref="profit1"></td>
-                    <td><span class="form-note">Rental Net</span></td>
+                    <td><span class="note">Rental Net</span></td>
                     <td class="col-num" data-ref="profit2"></td>
                     <td class="col-action"><span class="icon-locked" title="Calculated from Rentals tab — non-editable">🔒</span></td>
                 </tr>
@@ -781,7 +781,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title" data-ref="title"></h2>
-                        <span class="card-sub">Mortgage, PMI and amortization</span>
+                        <span class="note">Mortgage, PMI and amortization</span>
                     </div>
                     <div class="card-body">
                         <div class="cc-add-form">
@@ -829,7 +829,7 @@
                                 </div>
                             </div>
                         </div>
-                        <p class="form-note">If you leave the first payment month blank it is assumed to be two months after origination. The schedule uses this snapshot's APR, so it assumes a fixed rate.</p>
+                        <p class="note">If you leave the first payment month blank it is assumed to be two months after origination. The schedule uses this snapshot's APR, so it assumes a fixed rate.</p>
 
                         <div data-ref="summary" class="summary-grid"></div>
 
@@ -858,7 +858,7 @@
 
             <template id="tpl-debt-cascade-row">
                 <div class="cl-chip-groups">
-                    <label class="card-label" data-ref="label"></label>
+                    <label class="note" data-ref="label"></label>
                     <select class="text-input" data-ref="select"></select>
                 </div>
             </template>
@@ -881,7 +881,7 @@
                     <td data-ref="extra"></td>
                     <td class="col-num" data-ref="interest"></td>
                     <td class="col-num" data-ref="balance"></td>
-                    <td class="form-note" data-ref="notes"></td>
+                    <td class="note" data-ref="notes"></td>
                 </tr>
             </template>
 

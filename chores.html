@@ -34,7 +34,7 @@
         <div class="card">
           <div class="card-head">
             <h2 class="card-title">Chores</h2>
-            <span class="card-sub">pts = ×/week &times; minutes &times; their dislike(1&ndash;10) &times; their share %</span>
+            <span class="note">pts = ×/week &times; minutes &times; their dislike(1&ndash;10) &times; their share %</span>
           </div>
           <div class="cl-chore-list" id="cl-chore-list"></div>
           <div class="add-item">
@@ -55,7 +55,7 @@
         <div class="card">
           <div class="card-head">
             <h2 class="card-title">People</h2>
-            <span class="card-sub" id="cl-target-label"></span>
+            <span class="note" id="cl-target-label"></span>
           </div>
           <div class="cl-people" id="cl-people-list"></div>
           <div class="cl-panel-actions">
@@ -67,8 +67,6 @@
           </div>
         </div>
       </div>
-
-      <p class="cl-note">Shared with everyone who's logged in — anyone in the household can add, edit, or rebalance chores, and everyone sees the same ledger.</p>
     </section>
 
     <!-- ============ Templates ============ -->
@@ -111,18 +109,18 @@
         </div>
         <div class="cl-chip-groups">
           <div class="cl-chip-group">
-            <div class="subrow-label">frequency &amp; time</div>
+            <div class="note">frequency &amp; time</div>
             <div class="cl-chip-row">
               <label class="chip chiplg">×/week <input type="number" min="0" step="1" data-field="timesPerWeek" data-ref="timesPerWeek" /></label>
               <label class="chip chiplg">min <input type="number" min="0" step="1" data-field="minutes" data-ref="minutes" /></label>
             </div>
           </div>
           <div class="cl-chip-group">
-            <div class="subrow-label">dislike (1&ndash;10), per person</div>
+            <div class="note">dislike (1&ndash;10), per person</div>
             <div class="cl-chip-row" data-ref="dislikeRow"></div>
           </div>
           <div class="cl-chip-group">
-            <div class="subrow-label">share of the chore</div>
+            <div class="note">share of the chore</div>
             <div class="cl-chip-row" data-ref="splitRow">
               <span class="cl-split-total" data-ref="splitTotal"></span>
             </div>

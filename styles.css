@@ -269,15 +269,11 @@ select { cursor: pointer; }
   to { transform: rotate(360deg); }
 }
 
-.status-line { font-size: var(--text-xs); color: var(--ink-soft); margin-bottom: 10px; min-height: 14px; }
-
 .empty-state { color: var(--ink-soft); font-size: var(--text-sm); font-style: italic; padding: 4px 0 12px; text-align: center; margin: 16px 0; }
-
-.form-note { font-size: var(--text-xs); color: var(--ink-soft); margin-top: 10px; line-height: 1.4; }
 
 .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
 
-.card-label { color: var(--ink-soft); font-size: var(--text-sm); }
+.note { color: var(--ink-soft); font-size: var(--text-sm); }
 
 /* Tabs System */
 .tabs-container { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; scrollbar-width: thin; border-bottom: 2px solid var(--line); padding-bottom: 4px; margin-bottom: 10px; }
@@ -345,19 +341,13 @@ select { cursor: pointer; }
   margin: 0.5rem 0;
 }
 
-.card {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  max-width: 100%;
-  margin-bottom: 20px;
+.card {  display: flex; flex-direction: column; min-width: 0; max-width: 100%; margin-bottom: 20px; padding: 40px; box-shadow: var(--shadow); gap: 12px;
+  .tax-val { font-weight: 600; color: var(--ink); white-space: nowrap;
 }
 
 .card-head { display: flex; align-items: center; justify-content: space-between; padding: 0 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 10px; gap: 10px; }
 
 .card-title { font-family: var(--font-serif), serif; font-weight: 600; font-size: var(--text-xl); margin: 0; }
-
-.card-sub { font-size: var(--text-xs); color: var(--ink-soft); text-align: right; line-height: 1.4; }
 
 .card-search { padding: 10px 14px 4px; }
 
@@ -521,8 +511,6 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
 
 .auth-container { width: 100%; max-width: 420px; }
 
-.card { padding: 40px; box-shadow: var(--shadow); }
-
 .brand {
   display: flex;
   gap: 10px;
@@ -622,8 +610,6 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
 
 .cal-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft); }
 
-.cal-selected-label { font-size: var(--text-xs); color: var(--ink-soft); }
-
 .compact-list { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: var(--text-base); }
 
 .cal-event-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -644,8 +630,6 @@ body.cal-page {
 }
 
 /* --- Chores List --- */
-.cl-beam-label { font-size: var(--text-sm); color: var(--ink-soft); margin: 0 0 12px; }
-
 .cl-beam-row {
   display: flex;
   align-items: center;
@@ -740,8 +724,6 @@ body.cal-page {
 
 .cl-ticket-pts { font-variant-numeric: tabular-nums; color: var(--ochre); font-weight: 600; font-size: var(--text-sm); flex-shrink: 0; }
 
-.cl-note { font-size: var(--text-xs); color: var(--ink-soft); margin-top: 16px; line-height: 1.5; }
-
 /* --- Lists & Pantry --- */
 .lst-items { flex: 1; }
 
@@ -816,8 +798,6 @@ body.cal-page {
   user-select: none;
   input { margin: 0; }
 }
-
-.subrow-label { font-size: var(--text-2xs); color: var(--ink-soft); margin: 0 0 2px; text-transform: none; white-space: nowrap; }
 
 /* --- Weather Card & Forecast --- */
 .weather-card,
@@ -954,13 +934,6 @@ body.cal-page {
     &::after { content: '%'; position: absolute; right: 9px; font-size: var(--text-sm); color: var(--ink-soft); pointer-events: none; }
     input { padding-right: 22px; }
   }
-}
-
-.card {
-  margin-top: 14px;
-  padding: 40px;
-  gap: 12px;
-  .tax-val { font-weight: 600; color: var(--ink); white-space: nowrap; }
 }
 
 .win-a { font-weight: 600; color: var(--primary); }
@@ -1116,7 +1089,7 @@ input[type=month] { border: 1px solid var(--line); border-radius: var(--radius-s
   .cal-day { min-height: 40px; }
   .cal-day-o { right: -1px; }
   .card-head { flex-wrap: wrap; gap: 6px; }
-  .card-sub { text-align: left; }
+  .note { text-align: left; }
   .cl-panel-actions .button { flex: 1 1 auto; font-size: var(--text-base); padding: 0 12px; }
   .cc-add-form { flex-direction: column; align-items: stretch; }
   .cc-add-form .button-inline { width: 100%; text-align: center; }
