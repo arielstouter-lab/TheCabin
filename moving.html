@@ -46,7 +46,7 @@
             </div>
         </template>
 
-        <template id="tpl-pantry-item">
+        <template id="tpl-list-item">
             <div class="lst-item lst-item-row">
                 <span class="lst-item-text" data-ref="text"></span>
                 <div class="lst-actions">
@@ -62,6 +62,25 @@
         </template>
 
         <!-- Shared templates required by lists-pantry.js -->
+        <template id="tpl-chip">
+            <span class="chip"></span>
+        </template>
+
+        <template id="tpl-clear-checked">
+            <button type="button" class="button-inline lst-clear-checked">Clear checked</button>
+        </template>
+
+        <template id="tpl-tags-toggle">
+            <label class="checkbox-label lst-tags-toggle" title="Enable tagging/categories on this list">
+                <input type="checkbox" data-ref="toggle" />
+                <span>Tags</span>
+            </label>
+        </template>
+
+        <template id="tpl-delete-tab">
+            <button type="button" class="button-inline delete-btn">Delete tab</button>
+        </template>
+
         <template id="tpl-empty">
             <p class="empty-state"></p>
         </template>

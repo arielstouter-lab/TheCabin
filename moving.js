@@ -1,7 +1,7 @@
 import {
     state, sb, loadAll, createSection, onStateChange, stopRealtime
 } from './Lists/lists-state.js';
-import { renderPantryPanel } from './Lists/lists-pantry.js';
+import { renderListPanel } from './Lists/lists-panel.js';
 import { initSync } from './SharedJS/sync.js';
 
 const SECTION_NAME = 'Moving';
