@@ -27,7 +27,7 @@
             <div class="card" id="lst-panel"></div>
         </section>
 
-        <!-- ============ Pantry Templates ============ -->
+        <!-- ============ List Templates ============ -->
         <template id="tpl-list-panel">
             <div class="card-head" data-ref="head">
                 <h2 class="card-title" data-ref="title"></h2>
@@ -36,32 +36,29 @@
             <div class="lst-add-item">
                 <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
                 <div class="lst-add-row2">
-                    <div class="stepper">
-                        <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="newQtyDown">−</button>
-                        <span class="stepper-val" data-ref="newQtyVal">1</span>
-                        <button type="button" class="stepper-btn" title="Increase quantity" data-ref="newQtyUp">+</button>
-                    </div>
+                    <select class="select-input" data-ref="newPerson">
+                        <option value="">Unassigned</option>
+                    </select>
+                    <input type="date" class="date-input" data-ref="newDue" />
+                    <label class="checkbox-label" title="High priority">
+                        <input type="checkbox" data-ref="newPriority" />
+                        <span>High priority</span>
+                    </label>
                     <button class="button-inline" data-ref="addBtn">Add</button>
                 </div>
             </div>
         </template>
 
         <template id="tpl-list-item">
-            <div class="lst-item lst-item-row">
+            <div class="lst-item" draggable="true">
+                <span class="drag-handle" title="Drag to reorder" data-ref="handle">⋮⋮</span>
+                <input type="checkbox" data-ref="checkbox" />
                 <span class="lst-item-text" data-ref="text"></span>
-                <div class="lst-actions">
-                    <div class="stepper">
-                        <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="qtyDown">−</button>
-                        <span class="stepper-val" data-ref="qtyVal"></span>
-                        <button type="button" class="stepper-btn" title="Increase quantity" data-ref="qtyUp">+</button>
-                    </div>
-                    <button type="button" class="button-inline" data-ref="addToGroceries">Add to groceries</button>
-                    <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
-                </div>
+                <span class="lst-meta" data-ref="meta"></span>
+                <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
             </div>
         </template>
 
-        <!-- Shared templates required by lists-pantry.js -->
         <template id="tpl-chip">
             <span class="chip"></span>
         </template>
