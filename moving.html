@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Lists</title>
+    <title>Moving</title>
     <link rel="stylesheet" href="styles.css">
     <script src="SharedJS/head-loader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="SharedJS/config.js" defer></script>
     <script src="app.js" defer></script>
-    <script type="module" src="Lists/lists.js" defer></script>
+    <script type="module" src="moving.js" defer></script>
 </head>
 
 <body class="app-page">
@@ -23,48 +23,27 @@
             </div>
         </header>
 
-        <div class="card-head" data-ref="head">
-            <h2 class="card-title" data-ref="title"></h2>
-        </div>
-        <div class="lst-items" data-ref="items"></div>
-        <div class="lst-add-item">
-            <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
-            <div class="lst-add-row2">
-                <div class="stepper">
-                    <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="newQtyDown">−</button>
-                    <span class="stepper-val" data-ref="newQtyVal">1</span>
-                    <button type="button" class="stepper-btn" title="Increase quantity" data-ref="newQtyUp">+</button>
-                </div>
-                <button class="button-inline" data-ref="addBtn">Add</button>
+        <section class="content">
+            <div class="card" id="lst-panel"></div>
+        </section>
+
+        <!-- ============ Pantry Templates ============ -->
+        <template id="tpl-pantry-panel">
+            <div class="card-head" data-ref="head">
+                <h2 class="card-title" data-ref="title"></h2>
             </div>
-        </div>
-
-        <!-- ============ Shared small pieces ============ -->
-        <template id="tpl-empty">
-            <p class="empty-state"></p>
-        </template>
-
-        <template id="tpl-chip">
-            <span class="chip"></span>
-        </template>
-
-        <template id="tpl-clear-checked">
-            <button type="button" class="button-inline" data-ref="clearBtn">Clear checked</button>
-        </template>
-
-        <template id="tpl-manage-link">
-            <a href="managegroceries.html" class="button-inline">Manage tags</a>
-        </template>
-
-        <template id="tpl-delete-tab">
-            <button type="button" class="icon-delete" title="Remove tab">✕</button>
-        </template>
-
-        <template id="tpl-tags-toggle">
-            <label class="tags-toggle">
-                <input type="checkbox" role="switch" data-ref="toggle" />
-                <span>Tags</span>
-            </label>
+            <div class="lst-items" data-ref="items"></div>
+            <div class="lst-add-item">
+                <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
+                <div class="lst-add-row2">
+                    <div class="stepper">
+                        <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="newQtyDown">−</button>
+                        <span class="stepper-val" data-ref="newQtyVal">1</span>
+                        <button type="button" class="stepper-btn" title="Increase quantity" data-ref="newQtyUp">+</button>
+                    </div>
+                    <button class="button-inline" data-ref="addBtn">Add</button>
+                </div>
+            </div>
         </template>
 
         <template id="tpl-pantry-item">
@@ -82,6 +61,14 @@
             </div>
         </template>
 
+        <!-- Shared templates required by lists-pantry.js -->
+        <template id="tpl-empty">
+            <p class="empty-state"></p>
+        </template>
+
+        <template id="tpl-manage-link">
+            <a href="managegroceries.html" class="button-inline">Manage tags</a>
+        </template>
     </main>
 </div>
 </body>
