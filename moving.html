@@ -27,7 +27,7 @@
             <div class="card" id="lst-panel"></div>
         </section>
 
-        <!-- ============ List Templates ============ -->
+        <!-- ============ Templates ============ -->
         <template id="tpl-list-panel">
             <div class="card-head" data-ref="head">
                 <h2 class="card-title" data-ref="title"></h2>
@@ -35,47 +35,20 @@
             <div class="lst-items" data-ref="items"></div>
             <div class="lst-add-item">
                 <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
-                <div class="lst-add-row2">
-                    <select class="select-input" data-ref="newPerson">
-                        <option value="">Unassigned</option>
-                    </select>
-                    <input type="date" class="date-input" data-ref="newDue" />
-                    <label class="checkbox-label" title="High priority">
-                        <input type="checkbox" data-ref="newPriority" />
-                        <span>High priority</span>
-                    </label>
-                    <button class="button-inline" data-ref="addBtn">Add</button>
-                </div>
+                <button class="button-inline" data-ref="addBtn">Add</button>
             </div>
         </template>
 
         <template id="tpl-list-item">
-            <div class="lst-item" draggable="true">
-                <span class="drag-handle" title="Drag to reorder" data-ref="handle">⋮⋮</span>
-                <input type="checkbox" data-ref="checkbox" />
-                <span class="lst-item-text" data-ref="text"></span>
-                <span class="lst-meta" data-ref="meta"></span>
-                <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+            <div class="lst-item lst-item-row">
+                <label class="lst-check-label">
+                    <input type="checkbox" data-ref="checkbox" />
+                    <span class="lst-item-text" data-ref="text"></span>
+                </label>
+                <div class="lst-actions">
+                    <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+                </div>
             </div>
-        </template>
-
-        <template id="tpl-chip">
-            <span class="chip"></span>
-        </template>
-
-        <template id="tpl-clear-checked">
-            <button type="button" class="button-inline lst-clear-checked">Clear checked</button>
-        </template>
-
-        <template id="tpl-tags-toggle">
-            <label class="checkbox-label lst-tags-toggle" title="Enable tagging/categories on this list">
-                <input type="checkbox" data-ref="toggle" />
-                <span>Tags</span>
-            </label>
-        </template>
-
-        <template id="tpl-delete-tab">
-            <button type="button" class="button-inline delete-btn">Delete tab</button>
         </template>
 
         <template id="tpl-empty">
