@@ -75,7 +75,6 @@ function renderGroupedListPanel(sec) {
         // Render each collapsible section with checkbox items
         sortedGroups.forEach(([aisleId, groupItems]) => {
             const details = document.createElement('details');
-            details.open = true; // Open by default
 
             const summary = document.createElement('summary');
             let tagName = 'Unassigned';
