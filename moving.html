@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Lists</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="SharedJS/head-loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="SharedJS/config.js" defer></script>
+    <script src="app.js" defer></script>
+    <script type="module" src="Lists/lists.js" defer></script>
+</head>
+
+<body class="app-page">
+<div class="app-shell">
+    <main class="main-content">
+        <a href="app.html" class="brand-link">
+            <div class="brand-mark"></div>
+        </a>
+
+        <header class="topbar">
+            <div class="text-center">
+                <h1>Moving out of County Line</h1>
+            </div>
+        </header>
+
+
+        <!-- ============ Shared small pieces ============ -->
+        <template id="tpl-empty">
+            <p class="empty-state"></p>
+        </template>
+
+        <template id="tpl-chip">
+            <span class="chip"></span>
+        </template>
+
+        <template id="tpl-clear-checked">
+            <button type="button" class="button-inline" data-ref="clearBtn">Clear checked</button>
+        </template>
+
+        <template id="tpl-manage-link">
+            <a href="managegroceries.html" class="button-inline">Manage tags</a>
+        </template>
+
+        <template id="tpl-delete-tab">
+            <button type="button" class="icon-delete" title="Remove tab">✕</button>
+        </template>
+
+        <template id="tpl-tags-toggle">
+            <label class="tags-toggle">
+                <input type="checkbox" role="switch" data-ref="toggle" />
+                <span>Tags</span>
+            </label>
+        </template>
+
+        <!-- ============ Pantry (lists-pantry.js) ============ -->
+        <template id="tpl-pantry-panel">
+            <div class="card-head" data-ref="head">
+                <h2 class="card-title" data-ref="title"></h2>
+            </div>
+            <div class="lst-items" data-ref="items"></div>
+            <div class="lst-add-item">
+                <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
+                <div class="lst-add-row2">
+                    <div class="stepper">
+                        <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="newQtyDown">−</button>
+                        <span class="stepper-val" data-ref="newQtyVal">1</span>
+                        <button type="button" class="stepper-btn" title="Increase quantity" data-ref="newQtyUp">+</button>
+                    </div>
+                    <button class="button-inline" data-ref="addBtn">Add</button>
+                </div>
+            </div>
+        </template>
+
+        <template id="tpl-pantry-item">
+            <div class="lst-item lst-item-row">
+                <span class="lst-item-text" data-ref="text"></span>
+                <div class="lst-actions">
+                    <div class="stepper">
+                        <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="qtyDown">−</button>
+                        <span class="stepper-val" data-ref="qtyVal"></span>
+                        <button type="button" class="stepper-btn" title="Increase quantity" data-ref="qtyUp">+</button>
+                    </div>
+                    <button type="button" class="button-inline" data-ref="addToGroceries">Add to groceries</button>
+                    <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+                </div>
+            </div>
+        </template>
+
+    </main>
+</div>
+</body>
+</html>
