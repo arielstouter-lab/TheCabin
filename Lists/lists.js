@@ -5,11 +5,11 @@ import {
     state, sb, loadAll, orderedSections, sectionSlug, findSectionBySlug,
     isPantry, isRecipes, isGroceries, createSection, onStateChange, stopRealtime
 } from './lists-state.js';
-import { cloneEl, refs, emptyState } from '../dom.js';
+import { cloneEl, refs, emptyState } from '../SharedJS/dom.js';
 import { renderListPanel, reorderItems } from './lists-panel.js';
 import { renderPantryPanel } from './lists-pantry.js';
 import { renderRecipesPanel } from './lists-recipes.js';
-import { initSync } from '../sync.js';
+import { initSync } from '../SharedJS/sync.js';
 
 let activeSlug = null;
 

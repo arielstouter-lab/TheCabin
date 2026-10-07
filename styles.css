@@ -518,7 +518,7 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
   h1 { margin: 0; font-size: var(--text-xl); font-weight: 700; }
 }
 
-.brand-mark { width: 100%; height: 100%; border-radius: var(--radius-sm); background-image: url('pinecone.png'); background-size: cover; background-position: center; background-repeat: no-repeat; }
+.brand-mark { width: 100%; height: 100%; border-radius: var(--radius-sm); background-image: url('Images/pinecone.png'); background-size: cover; background-position: center; background-repeat: no-repeat; }
 
 .brand-link { display: block; width: 34px; height: 34px; margin: 10px auto 10px; }
 

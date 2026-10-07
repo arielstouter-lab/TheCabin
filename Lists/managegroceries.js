@@ -1,4 +1,4 @@
-import { writeOrQueue, nowStamp, initSync } from './sync.js';
+import { writeOrQueue, nowStamp, initSync } from '../SharedJS/sync.js';
 
 (function(){
     const sb = window.supabaseClient;

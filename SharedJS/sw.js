@@ -1,37 +1,44 @@
-const CACHE_NAME = 'thecabin-v5';
+const CACHE_NAME = 'thecabin-v6';
 const STATIC_ASSETS = [
-  './',
-  'index.html',
-  'app.html',
-  'calendar.html',
-  'chores.html',
-  'lists.html',
-  'managegroceries.html',
-  'weather.html',
-  'styles.css',
+  '../',
+  '../index.html',
+  '../app.html',
+  '../calendar.html',
+  '../chores.html',
+  '../creditcards.html',
+  '../lists.html',
+  '../login.html',
+  '../managegroceries.html',
+  '../settings.html',
+  '../weather.html',
+  '../styles.css',
+  '../manifest.json',
+  '../app.js',
+  '../calendar.js',
+  '../chores.js',
+  '../login.js',
+  '../weather.js',
   'head-loader.js',
-  'app.js',
-  'calendar.js',
-  'chores.js',
-  'creditcards.js',
+  'config.js',
   'dom.js',
   'sync.js',
-  'category-row.js',
+  'settings.js',
   'summary-card.js',
-  'lists/lists.js',
-    'lists/lists-panel.js',
-    'lists/lists-pantry.js',
-    'lists/lists-recipes.js',
-    'lists/lists-state.js',
-  'managegroceries.js',
-  'weather.js',
-  'config.js',
-  'manifest.json',
-  'pinecone.png',
-  'spring.jpg',
-  'summer.jpg',
-  'fall.jpg',
-  'winter.jpg'
+  '../Financial/category-row.js',
+  '../Financial/creditcards.js',
+  '../Financial/debt-engine-v2.js',
+  '../Financial/debts.js',
+  '../Lists/lists.js',
+  '../Lists/lists-panel.js',
+  '../Lists/lists-pantry.js',
+  '../Lists/lists-recipes.js',
+  '../Lists/lists-state.js',
+  '../Lists/managegroceries.js',
+  '../Images/pinecone.png',
+  '../Images/spring.jpg',
+  '../Images/summer.jpg',
+  '../Images/fall.jpg',
+  '../Images/winter.jpg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -71,7 +78,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(event.request).then((cached) => cached || caches.match('index.html')))
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match('../index.html')))
     );
     return;
   }

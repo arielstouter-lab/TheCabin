@@ -10,7 +10,7 @@ import {
     deleteSection, updateSectionTagsEnabled,
     personName, dueClass, saveToLocalCache, requestRender
 } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
+import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
 
 function makeChip(text, extraClass){
     const chip = cloneEl('tpl-chip');

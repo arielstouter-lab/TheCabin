@@ -1,7 +1,7 @@
 // State, persistence, realtime and helpers shared by every panel.
 // Nothing in here touches the DOM except through setStatus / the render callback.
 
-import { writeOrQueue, getPendingOp, nowStamp } from '../sync.js';
+import { writeOrQueue, getPendingOp, nowStamp } from '../SharedJS/sync.js';
 
 export const TABLES = window.TABLES;
 export const RPC = window.RPC;

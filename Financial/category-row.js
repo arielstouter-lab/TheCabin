@@ -6,7 +6,7 @@
 // Needs #tpl-category-row present in the page. Sits next to dom.js at
 // the app root so any page can import it the same way.
 
-import { cloneEl, refs, focusAtEnd } from './dom.js';
+import { cloneEl, refs, focusAtEnd } from '../SharedJS/dom.js';
 
 const FREQUENCIES = [
     { value: 'monthly', label: 'Monthly' },

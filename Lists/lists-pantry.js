@@ -6,7 +6,7 @@ import {
     state, createListItem, updateListItem, deleteListItem,
     requestRender, addIngredientsToGroceries
 } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState } from '../dom.js';
+import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
 
 async function deleteItem(id){
     await deleteListItem(id);

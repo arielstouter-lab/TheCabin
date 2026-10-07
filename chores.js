@@ -1,4 +1,4 @@
-import { cloneEl, refs, emptyState } from './dom.js';
+import { cloneEl, refs, emptyState } from './SharedJS/dom.js';
 
 const DEFAULT_DISLIKE = 5;
 const sb = window.supabaseClient;

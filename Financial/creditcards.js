@@ -1,6 +1,6 @@
-import { cloneEl, refs } from './dom.js';
+import { cloneEl, refs } from '../SharedJS/dom.js';
 import { buildCategoryRow } from './category-row.js';
-import { renderSummaryCards } from './summary-card.js';
+import { renderSummaryCards } from '../SharedJS/summary-card.js';
 import { initDebts, loadDebtData, renderDebts } from './debts.js';
 
 const sb = window.supabaseClient;

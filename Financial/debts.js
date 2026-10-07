@@ -8,8 +8,8 @@
 //
 // Math lives in debt-engine.js; this file is UI + Supabase only.
 
-import { cloneEl, refs } from './dom.js';
-import { renderSummaryCards } from './summary-card.js';
+import { cloneEl, refs } from '../SharedJS/dom.js';
+import { renderSummaryCards } from '../SharedJS/summary-card.js';
 import {
     amortizedPayment, minimumPayment, amortizationSchedule, scheduledBalanceAt,
     simulate, effectiveApr, ymToIndex, addMonths, isYm, MAX_MONTHS
