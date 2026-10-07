@@ -90,7 +90,9 @@ export function orderedSections(){
     const groceries = state.sections.find(isGroceries);
     const pantry = state.sections.find(isPantry);
     const recipes = state.sections.find(isRecipes);
-    const rest = state.sections.filter(s => s !== groceries && s !== pantry && s !== recipes);
+    const rest = state.sections.filter(s =>
+        s !== groceries && s !== pantry && s !== recipes && !s.hidden_from_lists
+    );
     return [groceries, pantry, recipes, ...rest].filter(Boolean);
 }
 
