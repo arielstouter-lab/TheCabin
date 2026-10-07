@@ -19,7 +19,7 @@ let movingSection = null;
 async function render() {
     const panelEl = document.getElementById('lst-panel');
     if (!panelEl || !movingSection) return;
-    panelEl.replaceChildren(renderPantryPanel(movingSection));
+    panelEl.replaceChildren(renderListPanel(movingSection));
 }
 
 onStateChange(render);
