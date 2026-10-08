@@ -173,8 +173,33 @@ textarea { font: inherit; }
   border-radius: 50%;
   font-size: 42px;
   cursor: pointer;
-  background: var(--primary);
-  color: var(--ochre);
+  background: var(--ochre);
+  color: var(--ink);
+}
+
+.voice-modal.hidden {
+  display: none;
+}
+
+.voice-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.voice-panel {
+  width: 500px;
+  max-width: 90vw;
+  background: var(--card);
+  padding: 20px;
+  border-radius: 12px;
+}
+
+#voiceText {
+  width: 100%;
 }
 
 .icon-delete {
@@ -282,7 +307,7 @@ select { cursor: pointer; }
 
 .empty-state { color: var(--ink-soft); font-size: var(--text-sm); font-style: italic; padding: 4px 0 12px; text-align: center; margin: 16px 0; }
 
-.dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; padding: 10px; }
 
 .note { color: var(--ink-soft); font-size: var(--text-sm); }
 
