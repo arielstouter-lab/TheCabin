@@ -87,8 +87,19 @@ voiceBtn.onclick = () => {
 
     voiceModal.classList.remove('hidden');
 
-    if (!isRecording) {
-        startListening();
+    if (SpeechRecognition) {
+
+        if (!isRecording) {
+            startListening();
+        }
+
+    } else {
+
+        // Give the modal time to render
+        setTimeout(() => {
+            voiceText.focus();
+            voiceText.click();
+        }, 100);
     }
 };
 
