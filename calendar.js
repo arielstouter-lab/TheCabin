@@ -290,7 +290,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
                 row.prepend(box);
                 if(ev.priority){
                     const chip = document.createElement('span');
-                    chip.className = 'priority-chip';
+                    chip.className = 'chip priority-chip';
                     chip.textContent = 'High priority';
                     row.querySelector('.cal-event-title').after(chip);
                 }
