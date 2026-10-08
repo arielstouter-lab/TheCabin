@@ -26,6 +26,7 @@ const STATIC_ASSETS = [
   'sync.js',
   'settings.js',
   'summary-card.js',
+  'speech-to-text.js',
   '../Financial/category-row.js',
   '../Financial/creditcards.js',
   '../Financial/debt-engine-v2.js',

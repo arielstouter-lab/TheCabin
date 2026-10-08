@@ -170,7 +170,7 @@ textarea { font: inherit; }
   width: 80px;
   height: 80px;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--radius-lg);
   font-size: 42px;
   cursor: pointer;
   background: var(--ochre);
