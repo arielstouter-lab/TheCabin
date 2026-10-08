@@ -51,11 +51,7 @@ if (SpeechRecognition) {
 }
 
 function startListening() {
-    if (!SpeechRecognition) {
-        recordBtn.disabled = true;
-        recordBtn.textContent =
-            'Speech Recognition Unavailable';
-    }
+    if (!recognition) return;
 
     recognition.start();
 
@@ -73,9 +69,15 @@ function stopListening() {
 }
 
 function updateRecordButton() {
+    if (!SpeechRecognition) {
+        recordBtn.textContent =
+            'Speech Recognition Unavailable';
+        return;
+    }
+
     recordBtn.textContent = isRecording
-        ? '⏹ Stop Recording'
-        : '🎤 Start Recording';
+        ? 'Stop Recording'
+        : 'Start Recording';
 }
 
 voiceBtn.onclick = () => {
