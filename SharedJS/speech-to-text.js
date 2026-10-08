@@ -19,13 +19,10 @@ if (SpeechRecognition) {
     recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
-        let text = '';
+        const result =
+            event.results[event.results.length - 1][0].transcript;
 
-        for (let i = 0; i < event.results.length; i++) {
-            text += event.results[i][0].transcript;
-        }
-
-        voiceText.value = text;
+        voiceText.value += result + ' ';
     };
 
     recognition.onend = () => {
