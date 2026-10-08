@@ -13,10 +13,26 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const LAYER_PANELS = { moon: 'moon-panel', o: 'o-panel' };  // layer -> stats panel id
     const CACHE_KEY = 'thecabin_cached_calendar';
+    const LISTS_CACHE_KEY = 'thecabin_cached_lists';
+
+// Keeps the Lists page's offline cache in step when an item is checked here,
+// so Lists doesn't briefly show it unchecked while the write is still queued.
+    function patchListsCache(id, patch){
+        try{
+            const raw = localStorage.getItem(LISTS_CACHE_KEY);
+            if(!raw) return;
+            const data = JSON.parse(raw);
+            Object.values(data.itemsBySection || {}).forEach(items => {
+                const item = items.find(i => i.id === id);
+                if(item) Object.assign(item, patch);
+            });
+            localStorage.setItem(LISTS_CACHE_KEY, JSON.stringify(data));
+        } catch(e){}
+    }
 
     // ---------- state ----------
     const histories = { o: [], moon: [] };        // every event_date per layer, ascending
-    const visibleLayers = new Set(['default']);
+    const visibleLayers = new Set(['default', 'list']);
     let viewYear, viewMonth;                      // month is 0-indexed
     let selectedDate;                             // 'YYYY-MM-DD'
     let eventsByDate = {};                        // 'YYYY-MM-DD' -> [event rows]
@@ -98,6 +114,22 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
     }
 
     // ---------- data loading ----------
+// Dated list items show up as a read-only 'list' layer. They're derived at
+// load time and never copied into the events table. Checked or deleted items
+// (including ones whose write is still queued) are left out.
+    function addListItems(rows){
+        rows.forEach(row => {
+            const op = getPendingOp(TABLES.LIST_ITEMS, row.id);
+            if(op && op.type === 'delete') return;
+            const item = (op && op.type === 'update') ? { ...row, ...op.payload } : row;
+            if(item.checked || !item.due_date) return;
+            (eventsByDate[item.due_date] ||= []).push({
+                id: item.id, title: item.text, event_date: item.due_date,
+                layer: 'list', source: 'list', sort_order: 0
+            });
+        });
+    }
+
     async function loadMonth(){
         const first = toDateStr(new Date(viewYear, viewMonth, 1));
         const last = toDateStr(new Date(viewYear, viewMonth + 1, 0));
@@ -107,13 +139,22 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         }
 
         try{
-            const { data, error } = await sb.from(TABLES.EVENTS)
-                .select('*')
-                .gte('event_date', first)
-                .lte('event_date', last)
-                .order('sort_order', { ascending: true });
-            if(error) throw error;
-            eventsByDate = mergeEventsWithPendingWrites(data || []);
+            const [events, items] = await Promise.all([
+                sb.from(TABLES.EVENTS)
+                    .select('*')
+                    .gte('event_date', first)
+                    .lte('event_date', last)
+                    .order('sort_order', { ascending: true }),
+                sb.from(TABLES.LIST_ITEMS)
+                    .select('id, text, due_date, checked')
+                    .gte('due_date', first)
+                    .lte('due_date', last)
+            ]);
+            if(events.error) throw events.error;
+            if(items.error) throw items.error;
+
+            eventsByDate = mergeEventsWithPendingWrites(events.data || []);
+            addListItems(items.data || []);
             saveToLocalCache();
         } catch(err){
             console.error('Failed to load events:', err);
@@ -193,9 +234,9 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         if(dateStr === today) classes.push('today');
         if(dateStr === selectedDate) classes.push('selected');
 
-        // dots: default layer
-        const dots = defaultCount
-            ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(defaultCount, 4))}</div>`
+        const dotCount = defaultCount + inLayer('list').length;
+        const dots = dotCount
+            ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(dotCount, 4))}</div>`
             : '';
 
         // os: single icon
@@ -233,7 +274,18 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
             row.dataset.eventRow = ev.id;
             row.querySelector('.cal-event-title').textContent =
                 (ev.layer === 'moon' ? 'Flow: ' : '') + ev.title;
-            row.querySelector('.icon-delete').dataset.delEvent = ev.id;
+
+            if(ev.source === 'list'){
+                const box = document.createElement('input');
+                box.type = 'checkbox';
+                box.className = 'cal-event-check';
+                box.dataset.checkItem = ev.id;
+                row.querySelector('.icon-delete').remove();
+                row.prepend(box);
+            } else {
+                row.querySelector('.icon-delete').dataset.delEvent = ev.id;
+            }
+
             if(index === null){
                 row.querySelector('.drag-handle').remove();
             } else {
@@ -393,16 +445,22 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
 
     // ---------- realtime ----------
     let realtimeChannel = null;
-    let realtimeDebounceTimer = null;
 
     function setupRealtime(){
         if(realtimeChannel || !sb) return;
-        realtimeChannel = sb.channel('calendar-realtime-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.EVENTS }, () => {
-                clearTimeout(realtimeDebounceTimer);
-                realtimeDebounceTimer = setTimeout(refreshAll, 300);
-            })
-            .subscribe();
+        const timers = {};
+        const handlers = [
+            [TABLES.EVENTS, refreshAll],
+            [TABLES.LIST_ITEMS, loadMonth]   // list changes only need the month reloaded
+        ];
+        let channel = sb.channel('calendar-realtime-channel');
+        handlers.forEach(([table, handler]) => {
+            channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+                clearTimeout(timers[table]);
+                timers[table] = setTimeout(handler, 300);
+            });
+        });
+        realtimeChannel = channel.subscribe();
     }
 
     // ---------- event listeners ----------
@@ -478,6 +536,25 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         render();
 
         await writeOrQueue(sb, { table: TABLES.EVENTS, type: 'delete', id });
+    });
+
+    $('cal-events-wrap').addEventListener('change', async e => {
+        const box = e.target.closest('.cal-event-check');
+        if(!box) return;
+
+        const id = box.dataset.checkItem;
+        const updated_at = nowStamp();
+
+        eventsByDate[selectedDate] = (eventsByDate[selectedDate] || [])
+            .filter(ev => String(ev.id) !== id);
+        patchListsCache(id, { checked: true, updated_at });
+        saveToLocalCache();
+        render();
+
+        await writeOrQueue(sb, {
+            table: TABLES.LIST_ITEMS, type: 'update', id,
+            payload: { checked: true, updated_at }
+        });
     });
 
     window.addEventListener('beforeunload', () => {
