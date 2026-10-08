@@ -3,6 +3,20 @@ const voiceModal = document.getElementById('voiceModal');
 const closeVoiceBtn = document.getElementById('closeVoiceBtn');
 const recordBtn = document.getElementById('recordBtn');
 const voiceText = document.getElementById('voiceText');
+const clearVoiceBtn =
+    document.getElementById('clearVoiceBtn');
+
+voiceText.value =
+    localStorage.getItem('voiceTranscript') || '';
+
+clearVoiceBtn.onclick = () => {
+    voiceText.value = '';
+
+    localStorage.removeItem(
+        'voiceTranscript'
+    );
+};
+
 
 const SpeechRecognition =
     window.SpeechRecognition ||
@@ -19,10 +33,15 @@ if (SpeechRecognition) {
     recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
-        const result =
-            event.results[event.results.length - 1][0].transcript;
+        let text = '';
 
-        voiceText.value += result + ' ';
+        for (let i = 0; i < event.results.length; i++) {
+            text += event.results[i][0].transcript;
+        }
+
+        voiceText.value = text;
+
+        localStorage.setItem('voiceTranscript', text);
     };
 
     recognition.onend = () => {
@@ -60,6 +79,10 @@ function updateRecordButton() {
 }
 
 voiceBtn.onclick = () => {
+
+    voiceText.value =
+        localStorage.getItem('voiceTranscript') || '';
+
     voiceModal.classList.remove('hidden');
 
     if (!isRecording) {
@@ -93,6 +116,13 @@ closeVoiceBtn.onclick = async () => {
 
     voiceModal.classList.add('hidden');
 };
+
+voiceText.addEventListener('input', () => {
+    localStorage.setItem(
+        'voiceTranscript',
+        voiceText.value
+    );
+});
 
 if (!SpeechRecognition) {
     recordBtn.disabled = true;
