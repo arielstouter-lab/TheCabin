@@ -757,6 +757,7 @@ body.cal-page {
 .lst-items summary {
   margin-bottom: 20px;
   color: var(--ink-soft);
+  display: flex;
 }
 
 .lst-item {
