@@ -19,124 +19,124 @@ clearVoiceBtn.onclick = () => {
 
 
 const SpeechRecognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
+    window.SpeechRecognition || window.webkitSpeechRecognition;
 
 let recognition = null;
-let isRecording = false;
+let state = 'idle';          // 'idle' | 'starting' | 'recording' | 'stopping'
+let startWhenIdle = false;   // user asked to start while still stopping
+let baseText = '';           // text already in the box before this session
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
-        voiceText.value = 'STARTED';
-        isRecording = true;
+        state = 'recording';
         updateRecordButton();
     };
 
     recognition.onend = () => {
-        voiceText.value += '\nENDED';
-        isRecording = false;
+        state = 'idle';
         updateRecordButton();
+
+        if (startWhenIdle) {
+            startWhenIdle = false;
+            startListening();
+        }
     };
 
     recognition.onerror = (event) => {
-        voiceText.value += `\nERROR: ${event.error}`;
-        isRecording = false;
-        updateRecordButton();
+        console.error('Speech error:', event.error);
+        // 'no-speech' and 'aborted' are routine; onend fires after every error
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            voiceText.placeholder = 'Microphone permission denied. Use keyboard dictation.';
+        }
     };
 
     recognition.onresult = (event) => {
         let text = '';
-
         for (let i = 0; i < event.results.length; i++) {
             text += event.results[i][0].transcript;
         }
-
-        voiceText.value = text;
-
-        localStorage.setItem('voiceTranscript', text);
+        voiceText.value = (baseText ? baseText + ' ' : '') + text;
+        localStorage.setItem('voiceTranscript', voiceText.value);
     };
-
 }
 
 function startListening() {
-
     if (!recognition) {
         voiceText.focus();
         return;
     }
 
+    if (state === 'stopping') {          // wait for onend, then start
+        startWhenIdle = true;
+        return;
+    }
+    if (state !== 'idle') return;
+
+    baseText = voiceText.value.trim();
+    state = 'starting';
+    updateRecordButton();
+
     try {
         recognition.start();
     } catch (err) {
         console.error(err);
+        state = 'idle';
+        updateRecordButton();
     }
 }
 
 function stopListening() {
     if (!recognition) return;
+    startWhenIdle = false;
 
-    recognition.stop();
-
-    isRecording = false;
-    updateRecordButton();
+    if (state === 'recording' || state === 'starting') {
+        state = 'stopping';
+        updateRecordButton();
+        recognition.stop();
+    }
 }
 
 function updateRecordButton() {
     if (!recognition) {
         recordBtn.disabled = true;
-        recordBtn.textContent =
-            'Use Keyboard Dictation';
+        recordBtn.textContent = 'Use Keyboard Dictation';
         return;
     }
 
-    recordBtn.disabled = false;
+    // Disable only while the engine is in transition
+    recordBtn.disabled = (state === 'starting' || state === 'stopping');
 
-    recordBtn.textContent = isRecording
-        ? 'Stop Recording'
-        : 'Start Recording';
+    recordBtn.textContent =
+        state === 'recording' ? 'Stop Recording' :
+            state === 'starting'  ? 'Starting…' :
+                state === 'stopping'  ? 'Stopping…' :
+                    'Start Recording';
 }
 
 voiceBtn.onclick = () => {
-
-    voiceText.value =
-        localStorage.getItem('voiceTranscript') || '';
-
+    voiceText.value = localStorage.getItem('voiceTranscript') || '';
     voiceModal.classList.remove('hidden');
 
     if (SpeechRecognition) {
-
-        if (!isRecording) {
-            startListening();
-        }
-
+        startListening();   // safe now: handles idle/stopping/already running
     } else {
-
-        // Give the modal time to render
-        setTimeout(() => {
-            voiceText.focus();
-            voiceText.click();
-        }, 100);
+        setTimeout(() => voiceText.focus(), 100);
     }
 };
 
 recordBtn.onclick = () => {
-    if (isRecording) {
-        stopListening();
-    } else {
-        startListening();
-    }
+    if (state === 'recording') stopListening();
+    else startListening();
 };
 
 closeVoiceBtn.onclick = async () => {
-    if (isRecording) {
-        stopListening();
-    }
+    stopListening();
+    // ...rest unchanged (clipboard copy, hide modal)
 
     const text = voiceText.value.trim();
 
