@@ -877,13 +877,13 @@ body.cal-page {
   gap: 12px;
   padding: 12px 16px;
   font-size: var(--text-md);
-  color: var(--card);
+  color: rgba(var(--weather-fg), 0.85);
   &:not(:last-child) { border-bottom: 1px solid rgba(var(--weather-fg), 0.08); }
 }
 
 .wf-day { font-weight: 600; }
 
-.wf-icon svg, .wf-moon svg { width: 20px; height: 20px; color: var(--white); }
+.wc-meta-item svg, .wf-icon svg, .wf-moon svg { width: 20px; height: 20px; color: var(--white); }
 
 /* --- Credit Cards Rewards & Financial --- */
 .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; }
