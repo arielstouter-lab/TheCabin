@@ -114,9 +114,10 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
     }
 
     // ---------- data loading ----------
-// Dated list items show up as a read-only 'list' layer. They're derived at
-// load time and never copied into the events table. Checked or deleted items
-// (including ones whose write is still queued) are left out.
+
+    // Dated list items show up as a read-only 'list' layer. They're derived at
+    // load time and never copied into the events table. Checked or deleted items
+    // (including ones whose write is still queued) are left out.
     function addListItems(rows){
         rows.forEach(row => {
             const op = getPendingOp(TABLES.LIST_ITEMS, row.id);
@@ -125,7 +126,8 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
             if(item.checked || !item.due_date) return;
             (eventsByDate[item.due_date] ||= []).push({
                 id: item.id, title: item.text, event_date: item.due_date,
-                layer: 'list', source: 'list', sort_order: 0
+                layer: 'list', source: 'list', sort_order: 0,
+                priority: !!item.priority
             });
         });
     }
@@ -146,7 +148,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
                     .lte('event_date', last)
                     .order('sort_order', { ascending: true }),
                 sb.from(TABLES.LIST_ITEMS)
-                    .select('id, text, due_date, checked')
+                    .select('id, text, due_date, checked, priority')
                     .gte('due_date', first)
                     .lte('due_date', last)
             ]);
@@ -234,9 +236,13 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         if(dateStr === today) classes.push('today');
         if(dateStr === selectedDate) classes.push('selected');
 
-        const dotCount = defaultCount + inLayer('list').length;
-        const dots = dotCount
-            ? `<div class="cal-day-dot-row">${'<span class="cal-day-dot"></span>'.repeat(Math.min(dotCount, 4))}</div>`
+        const dotItems = [...inLayer('default'), ...inLayer('list')]
+            .sort((a, b) => !!b.priority - !!a.priority);
+
+        const dots = dotItems.length
+            ? `<div class="cal-day-dot-row">${dotItems.slice(0, 4)
+                .map(ev => `<span class="cal-day-dot${ev.priority ? ' priority' : ''}"></span>`)
+                .join('')}</div>`
             : '';
 
         // os: single icon
@@ -282,6 +288,12 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
                 box.dataset.checkItem = ev.id;
                 row.querySelector('.icon-delete').remove();
                 row.prepend(box);
+                if(ev.priority){
+                    const chip = document.createElement('span');
+                    chip.className = 'priority-chip';
+                    chip.textContent = 'High priority';
+                    row.querySelector('.cal-event-title').after(chip);
+                }
             } else {
                 row.querySelector('.icon-delete').dataset.delEvent = ev.id;
             }
@@ -299,6 +311,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         const evs = (eventsByDate[selectedDate] || []).filter(isVisible);
         const defaults = evs.filter(isDefault);
         const others = evs.filter(ev => !isDefault(ev));
+        others.sort((a, b) => !!b.priority - !!a.priority);   // stable, so only list items reorder
 
         list.replaceChildren();
         pinned.replaceChildren();

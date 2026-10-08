@@ -610,6 +610,8 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
 
 .cal-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft); }
 
+.cal-day-dot.priority { background: var(--danger); }
+
 .compact-list { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: var(--text-base); }
 
 .cal-event-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

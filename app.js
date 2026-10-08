@@ -300,10 +300,10 @@ function getSeason(date) {
 }
 
 const SEASON_IMAGES = {
-  spring: 'spring.jpg',
-  summer: 'summer.jpg',
-  fall: 'fall.jpg',
-  winter: 'winter.jpg'
+  spring: 'Images/spring.jpg',
+  summer: 'Images/summer.jpg',
+  fall: 'Images/fall.jpg',
+  winter: 'Images/winter.jpg'
 };
 
 let currentSeason = null;
