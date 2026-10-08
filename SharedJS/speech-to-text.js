@@ -62,7 +62,7 @@ function createRecognition() {
                     'Voice capture is not working in this browser. Use your keyboard\'s mic button.';
                 voiceText.focus();
             }
-        }, 6000);
+        }, 2000);
     };
 
     recognition.onaudiostart = markSignal;
@@ -154,7 +154,7 @@ function stopListening() {
         // If onend never fires, don't stay stuck
         stopTimer = setTimeout(() => {
             if (state === 'stopping') forceReset();
-        }, 1500);
+        }, 800);
     }
 }
 
