@@ -85,6 +85,27 @@
             </div>
           </a>
 
+        <div class="card-body">
+          <button id="voiceBtn" class="voice-btn">
+            🎤
+          </button>
+
+          <div id="voiceModal" class="voice-modal hidden">
+            <div class="voice-panel">
+              <h3>Voice Note</h3>
+
+              <textarea
+                      id="voiceText"
+                      rows="6"
+                      placeholder="Speech will appear here..."
+              ></textarea>
+
+              <button id="recordBtn">Start Recording</button>
+              <button id="closeVoiceBtn">Close</button>
+            </div>
+          </div>
+        </div>
+
         <div class="dashboard-grid">
           <div class="card-row">
             <span class="note">Account</span>
