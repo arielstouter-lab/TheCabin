@@ -1,104 +1,106 @@
 const voiceBtn = document.getElementById('voiceBtn');
 const voiceModal = document.getElementById('voiceModal');
 const closeVoiceBtn = document.getElementById('closeVoiceBtn');
-
-voiceBtn.onclick = async () => {
-    voiceModal.classList.remove('hidden');
-
-    if (!isRecording) {
-        await startRecording();
-    }
-};
-
-closeVoiceBtn.onclick = () => {
-    if (isRecording) {
-        stopRecording();
-    }
-
-    voiceModal.classList.add('hidden');
-};
+const recordBtn = document.getElementById('recordBtn');
+const voiceText = document.getElementById('voiceText');
 
 const SpeechRecognition =
     window.SpeechRecognition ||
     window.webkitSpeechRecognition;
 
-const hasSpeechRecognition = !!SpeechRecognition;
-
-if (!hasSpeechRecognition) {
-    recordBtn.textContent =
-        'Speech recognition unavailable';
-}
-
-let recorder;
-let chunks = [];
+let recognition = null;
 let isRecording = false;
-let mediaStream;
-const recordBtn = document.getElementById('recordBtn');
 
-recordBtn.onclick = async () => {
-    if (isRecording) {
-        stopRecording();
-    } else {
-        await startRecording();
-    }
-};
+if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
 
-async function startRecording() {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: true
-    });
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
 
-    chunks = [];
+    recognition.onresult = (event) => {
+        let text = '';
 
-    recorder = new MediaRecorder(mediaStream);
+        for (let i = 0; i < event.results.length; i++) {
+            text += event.results[i][0].transcript;
+        }
 
-    recorder.ondataavailable = e => {
-        chunks.push(e.data);
+        voiceText.value = text;
     };
 
-    recorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, {
-            type: 'audio/webm'
-        });
-
+    recognition.onend = () => {
         isRecording = false;
         updateRecordButton();
-
-        await uploadForTranscription(audioBlob);
-
-        mediaStream.getTracks().forEach(track => track.stop());
     };
+}
 
-    recorder.start();
+function startListening() {
+    if (!SpeechRecognition) {
+        recordBtn.disabled = true;
+        recordBtn.textContent =
+            'Speech Recognition Unavailable';
+    }
+
+    recognition.start();
 
     isRecording = true;
     updateRecordButton();
 }
 
-function stopRecording() {
-    if (recorder && isRecording) {
-        recorder.stop();
-    }
+function stopListening() {
+    if (!recognition) return;
+
+    recognition.stop();
+
+    isRecording = false;
+    updateRecordButton();
 }
 
 function updateRecordButton() {
     recordBtn.textContent = isRecording
-        ? 'Stop Recording'
-        : 'Start Recording';
+        ? '⏹ Stop Recording'
+        : '🎤 Start Recording';
 }
 
-async function uploadForTranscription(audioBlob) {
-    const formData = new FormData();
-    formData.append('audio', audioBlob);
+voiceBtn.onclick = () => {
+    voiceModal.classList.remove('hidden');
 
-    const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        body: formData
-    });
+    if (!isRecording) {
+        startListening();
+    }
+};
 
-    const data = await response.json();
+recordBtn.onclick = () => {
+    if (isRecording) {
+        stopListening();
+    } else {
+        startListening();
+    }
+};
 
-    document.getElementById('voiceText').value = data.text;
+closeVoiceBtn.onclick = async () => {
+    if (isRecording) {
+        stopListening();
+    }
+
+    const text = voiceText.value.trim();
+
+    if (text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            console.log('Copied voice text to clipboard');
+        } catch (err) {
+            console.error('Clipboard copy failed:', err);
+        }
+    }
+
+    voiceModal.classList.add('hidden');
+};
+
+if (!SpeechRecognition) {
+    recordBtn.disabled = true;
+    recordBtn.textContent =
+        'Speech Recognition Unavailable';
 }
 
 updateRecordButton();
