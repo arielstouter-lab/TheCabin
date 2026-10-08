@@ -11,7 +11,7 @@
 </head>
 
 <body class="app-page">
-<div class="app-shell">
+<details class="app-shell">
     <main class="main-content">
         <a href="app.html" class="brand-link">
             <div class="brand-mark"></div>
@@ -153,8 +153,8 @@
             </template>
 
             <template id="tpl-recipe-card">
-                <div class="lst-panel">
-                    <div class="card-head">
+                <details>
+                    <summary>
                         <div class="card-title" data-ref="name"></div>
                         <div class="note-cell" style="white-space: wrap">
                             <span class="note note-editable" contenteditable="true" data-placeholder="Notes" data-ref="notes"></span>
@@ -163,9 +163,9 @@
                             <a class="recipe-url-link" target="_blank" rel="noopener noreferrer" title="Open link" hidden data-ref="urlLink">↗</a>
                         </div>
                         <button type="button" class="button-inline" data-ref="addAll">Add full recipe</button>
-                    </div>
+                    </summary>
                     <div class="recipe-ingredients" data-ref="ingredients"></div>
-                </div>
+                </details>
             </template>
 
             <template id="tpl-recipe-ingredient">
