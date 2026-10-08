@@ -18,6 +18,17 @@ closeVoiceBtn.onclick = () => {
     voiceModal.classList.add('hidden');
 };
 
+const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+const hasSpeechRecognition = !!SpeechRecognition;
+
+if (!hasSpeechRecognition) {
+    recordBtn.textContent =
+        'Speech recognition unavailable';
+}
+
 let recorder;
 let chunks = [];
 let isRecording = false;
