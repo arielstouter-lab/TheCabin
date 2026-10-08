@@ -32,6 +32,11 @@ if (SpeechRecognition) {
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
+    recognition.onstart = () => {
+        isRecording = true;
+        updateRecordButton();
+    };
+
     recognition.onresult = (event) => {
         let text = '';
 
@@ -48,15 +53,26 @@ if (SpeechRecognition) {
         isRecording = false;
         updateRecordButton();
     };
+
+    recognition.onerror = (event) => {
+        console.log('Speech error:', event.error);
+
+        isRecording = false;
+        updateRecordButton();
+    };
 }
 
 function startListening() {
-    if (!recognition) return;
 
-    recognition.start();
+    if (!recognition) {
+        return;
+    }
 
-    isRecording = true;
-    updateRecordButton();
+    try {
+        recognition.start();
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 function stopListening() {
@@ -69,11 +85,14 @@ function stopListening() {
 }
 
 function updateRecordButton() {
-    if (!SpeechRecognition) {
+    if (!recognition) {
+        recordBtn.disabled = true;
         recordBtn.textContent =
-            'Speech Recognition Unavailable';
+            'Use Keyboard Dictation';
         return;
     }
+
+    recordBtn.disabled = false;
 
     recordBtn.textContent = isRecording
         ? 'Stop Recording'
