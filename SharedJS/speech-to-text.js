@@ -23,10 +23,26 @@ const SpeechRecognition =
 
 let recognition = null;
 let state = 'idle';          // 'idle' | 'starting' | 'recording' | 'stopping'
-let startWhenIdle = false;   // user asked to start while still stopping
-let baseText = '';           // text already in the box before this session
+let startWhenIdle = false;
+let baseText = '';
+let gotSignal = false;
+let noSignalTimer = null;
+let stopTimer = null;
+let speechBroken = false;    // set when the engine proves unusable this session
 
-if (SpeechRecognition) {
+function clearTimers() {
+    clearTimeout(noSignalTimer);
+    clearTimeout(stopTimer);
+}
+
+function markSignal() {
+    gotSignal = true;
+    clearTimeout(noSignalTimer);
+}
+
+function createRecognition() {
+    if (!SpeechRecognition) return;
+
     recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -34,10 +50,26 @@ if (SpeechRecognition) {
 
     recognition.onstart = () => {
         state = 'recording';
+        gotSignal = false;
         updateRecordButton();
+
+        // Engines that start but never hear anything (e.g. some WebViews)
+        noSignalTimer = setTimeout(() => {
+            if (!gotSignal && state === 'recording') {
+                speechBroken = true;
+                forceReset();
+                voiceText.placeholder =
+                    'Voice capture is not working in this browser. Use your keyboard\'s mic button.';
+                voiceText.focus();
+            }
+        }, 6000);
     };
 
+    recognition.onaudiostart = markSignal;
+    recognition.onspeechstart = markSignal;
+
     recognition.onend = () => {
+        clearTimers();
         state = 'idle';
         updateRecordButton();
 
@@ -49,13 +81,15 @@ if (SpeechRecognition) {
 
     recognition.onerror = (event) => {
         console.error('Speech error:', event.error);
-        // 'no-speech' and 'aborted' are routine; onend fires after every error
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            voiceText.placeholder = 'Microphone permission denied. Use keyboard dictation.';
+            speechBroken = true;
+            voiceText.placeholder =
+                'Microphone permission denied. Use your keyboard\'s mic button.';
         }
     };
 
     recognition.onresult = (event) => {
+        markSignal();
         let text = '';
         for (let i = 0; i < event.results.length; i++) {
             text += event.results[i][0].transcript;
@@ -65,13 +99,30 @@ if (SpeechRecognition) {
     };
 }
 
+// Throw away a stuck engine and build a fresh one
+function forceReset() {
+    clearTimers();
+    startWhenIdle = false;
+
+    if (recognition) {
+        const old = recognition;
+        old.onstart = old.onend = old.onerror = old.onresult =
+            old.onaudiostart = old.onspeechstart = null;
+        try { old.abort(); } catch (e) {}
+    }
+
+    createRecognition();
+    state = 'idle';
+    updateRecordButton();
+}
+
 function startListening() {
-    if (!recognition) {
+    if (!recognition || speechBroken) {
         voiceText.focus();
         return;
     }
 
-    if (state === 'stopping') {          // wait for onend, then start
+    if (state === 'stopping') {
         startWhenIdle = true;
         return;
     }
@@ -85,8 +136,7 @@ function startListening() {
         recognition.start();
     } catch (err) {
         console.error(err);
-        state = 'idle';
-        updateRecordButton();
+        forceReset();
     }
 }
 
@@ -97,7 +147,14 @@ function stopListening() {
     if (state === 'recording' || state === 'starting') {
         state = 'stopping';
         updateRecordButton();
-        recognition.stop();
+        clearTimeout(noSignalTimer);
+
+        try { recognition.stop(); } catch (e) {}
+
+        // If onend never fires, don't stay stuck
+        stopTimer = setTimeout(() => {
+            if (state === 'stopping') forceReset();
+        }, 1500);
     }
 }
 
@@ -108,7 +165,12 @@ function updateRecordButton() {
         return;
     }
 
-    // Disable only while the engine is in transition
+    if (speechBroken) {
+        recordBtn.disabled = true;
+        recordBtn.textContent = 'Use Keyboard Dictation';
+        return;
+    }
+
     recordBtn.disabled = (state === 'starting' || state === 'stopping');
 
     recordBtn.textContent =
@@ -117,6 +179,8 @@ function updateRecordButton() {
                 state === 'stopping'  ? 'Stopping…' :
                     'Start Recording';
 }
+
+createRecognition();
 
 voiceBtn.onclick = () => {
     voiceText.value = localStorage.getItem('voiceTranscript') || '';

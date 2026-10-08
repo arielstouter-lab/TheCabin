@@ -1,15 +1,32 @@
 const { createClient } = window.supabase;
 
+// Cap every direct Supabase request so a weak connection fails fast instead of
+// hanging the page. Honors an abort signal passed in by the caller (sync.js
+// uses one per queued write).
+const REQUEST_TIMEOUT_MS = 20000;
+function fetchWithTimeout(input, init = {}) {
+  const controller = new AbortController();
+  const outer = init.signal;
+  if (outer) {
+    if (outer.aborted) controller.abort();
+    else outer.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 const supabaseClient = createClient(
-  window.APP_CONFIG.supabaseUrl,
-  window.APP_CONFIG.supabaseKey
+    window.APP_CONFIG.supabaseUrl,
+    window.APP_CONFIG.supabaseKey,
+    { global: { fetch: fetchWithTimeout } }
 );
 window.supabaseClient = supabaseClient;
 
-// Register Service Worker for PWA and offline resilience
+// Register Service Worker for PWA and offline resilience.
+// sw.js lives at the site root so it controls every page.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('.SharedJS/sw.js').catch((err) => {
+    navigator.serviceWorker.register('sw.js').catch((err) => {
       console.warn('Service worker registration failed:', err);
     });
   });
@@ -28,19 +45,61 @@ window.initAppPage = function(callback) {
   }
 };
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const currentPage = window.location.pathname.split("/").pop() || "index.html";
+/* -----------------------------
+   Session (offline-aware)
+----------------------------- */
+
+const AUTH_TIMEOUT_MS = 4000;
+
+function raceTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timed out')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// The session supabase-js keeps in localStorage. getSession() returns null
+// when the access token has expired and the refresh request can't reach the
+// network — but in that case the stored session is still there (supabase only
+// deletes it when the server actually rejects the refresh token). That lets
+// the app keep working offline instead of bouncing to the login page.
+function readStoredSession() {
+  try {
+    const ref = new URL(window.APP_CONFIG.supabaseUrl).hostname.split('.')[0];
+    const raw = localStorage.getItem(`sb-${ref}-auth-token`);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return (s && s.access_token && s.refresh_token && s.user) ? s : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function resolveSession() {
+  // No connection: don't wait on a refresh that can't happen.
+  if (!navigator.onLine) return readStoredSession();
 
   try {
-    let {
-      data: { session }
-    } = await supabaseClient.auth.getSession();
+    const { data: { session } } = await raceTimeout(supabaseClient.auth.getSession(), AUTH_TIMEOUT_MS);
+    if (session) return session;
+  } catch (e) {
+    // timed out (weak signal) — fall through to the stored session
+  }
+  return readStoredSession();
+}
 
-    if (!session) {
+document.addEventListener("DOMContentLoaded", async () => {
+  const currentPage = window.location.pathname.split("/").pop() || "index.html";
+  const PUBLIC_PAGES = ["index.html", ""];
+
+  try {
+    let session = await resolveSession();
+
+    // IP-based auto login needs the network; skip it when offline.
+    if (!session && navigator.onLine) {
       session = await bootstrapAuth();
     }
-
-    const PUBLIC_PAGES = ["index.html", ""];
 
     if (PUBLIC_PAGES.includes(currentPage)) {
       if (session) {
@@ -59,7 +118,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   } catch (err) {
     console.error("Auth bootstrap failed:", err);
-    if (currentPage !== "index.html" && currentPage !== "") {
+    const stored = readStoredSession();
+    if (stored && !PUBLIC_PAGES.includes(currentPage)) {
+      setupApp(stored);
+    } else if (!PUBLIC_PAGES.includes(currentPage)) {
       window.location.href = "index.html";
     } else {
       setupLogin();
@@ -72,17 +134,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 ----------------------------- */
 
 async function bootstrapAuth() {
-  const { data: { session } } = await supabaseClient.auth.getSession()
-  if (session) return session
+  try {
+    const { data, error } = await raceTimeout(
+        supabaseClient.functions.invoke('ip-login'),
+        AUTH_TIMEOUT_MS * 2
+    );
+    if (error || !data?.token_hash) return null;
 
-  const { data, error } = await supabaseClient.functions.invoke('ip-login')
-  if (error || !data?.token_hash) return null
-
-  const { data: verified } = await supabaseClient.auth.verifyOtp({
-    type: 'magiclink',
-    token_hash: data.token_hash,
-  })
-  return verified?.session ?? null
+    const { data: verified } = await supabaseClient.auth.verifyOtp({
+      type: 'magiclink',
+      token_hash: data.token_hash,
+    });
+    return verified?.session ?? null;
+  } catch (e) {
+    return null;
+  }
 }
 
 // Global password toggle handler for any .password-toggle button inside .password-input
@@ -150,10 +216,10 @@ function setupLogin() {
 
     // Authenticate through Supabase Auth
     const { error: loginError } =
-      await supabaseClient.auth.signInWithPassword({
-        email,
-        password
-      });
+        await supabaseClient.auth.signInWithPassword({
+          email,
+          password
+        });
 
     if (loginError) {
       showLoginError("Invalid username or password.");
@@ -167,11 +233,11 @@ function setupLogin() {
 
     window.location.href = "app.html";
 
-      function showLoginError(message) {
-        errorElement.textContent = message;
-        errorElement.hidden = false;
-      }
-    });
+    function showLoginError(message) {
+      errorElement.textContent = message;
+      errorElement.hidden = false;
+    }
+  });
 }
 
 /* -----------------------------
@@ -208,8 +274,11 @@ function setupApp(session) {
   });
 
   // Keep the UI in sync if the auth state changes elsewhere.
-  supabaseClient.auth.onAuthStateChange((event, newSession) => {
-    if (event === "SIGNED_OUT" || !newSession) {
+  // Only an actual sign-out leaves the page: supabase also fires
+  // INITIAL_SESSION with a null session when it is offline with an expired
+  // token, and that must not kick the user to the login page.
+  supabaseClient.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT") {
       window.location.href = "index.html";
     }
   });
@@ -278,9 +347,9 @@ function getInitial(email) {
   if (!email) return "U";
 
   return email
-    .trim()
-    .charAt(0)
-    .toUpperCase();
+      .trim()
+      .charAt(0)
+      .toUpperCase();
 }
 
 function todayStr(d) {
@@ -465,9 +534,9 @@ function setStatus(msg, targetIdOrType, maybeType) {
   }
 
   const el = (targetId && document.getElementById(targetId)) ||
-             document.querySelector('.note') ||
-             document.getElementById('status-line') ||
-             document.getElementById('lst-status');
+      document.querySelector('.note') ||
+      document.getElementById('status-line') ||
+      document.getElementById('lst-status');
   if (el) {
     el.textContent = msg;
     setTimeout(() => {

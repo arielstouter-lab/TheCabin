@@ -1,18 +1,36 @@
 import {
     state, sb, loadAll, createSection, createListItem,
-    updateListItem, deleteListItem, onStateChange, stopRealtime
+    updateListItem, deleteListItem, onStateChange, stopRealtime,
+    isStateTrusted
 } from './Lists/lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from './SharedJS/dom.js';
 import { initSync } from './SharedJS/sync.js';
 
 const SECTION_NAME = 'Moving';
 
-async function getOrCreateMovingSection() {
-    let sec = state.sections.find(s => s.name.toLowerCase() === SECTION_NAME.toLowerCase());
-    if (!sec) {
-        sec = await createSection(SECTION_NAME);
-    }
-    return sec;
+let movingSection = null;
+let sectionPromise = null;
+
+function findMovingSection() {
+    return state.sections.find(s => s.name.toLowerCase() === SECTION_NAME.toLowerCase()) || null;
+}
+
+// Finds the Moving section, creating it only when we're sure it doesn't exist.
+// Until state has loaded (from the server or the local cache) an empty section
+// list means "unknown", and creating a section then would duplicate the real one.
+// The shared promise stops concurrent renders from creating it twice.
+function ensureMovingSection() {
+    if (movingSection) return Promise.resolve(movingSection);
+
+    const found = findMovingSection();
+    if (found) return Promise.resolve((movingSection = found));
+
+    if (!isStateTrusted()) return Promise.resolve(null);
+
+    sectionPromise ||= createSection(SECTION_NAME)
+        .then(sec => (movingSection = sec))
+        .finally(() => { sectionPromise = null; });
+    return sectionPromise;
 }
 
 function buildChecklistItem(item) {
@@ -25,13 +43,15 @@ function buildChecklistItem(item) {
     r.text.textContent = item.text;
     r.checkbox.checked = !!item.checked;
 
-    r.checkbox.addEventListener('change', async () => {
-        await updateListItem(item.id, { checked: r.checkbox.checked });
+    // Local state changes synchronously inside updateListItem/deleteListItem,
+    // so render right away instead of waiting on the network.
+    r.checkbox.addEventListener('change', () => {
+        updateListItem(item.id, { checked: r.checkbox.checked }).catch(console.error);
         render();
     });
 
-    r.del.addEventListener('click', async () => {
-        await deleteListItem(item.id);
+    r.del.addEventListener('click', () => {
+        deleteListItem(item.id).catch(console.error);
         render();
     });
 
@@ -100,12 +120,20 @@ function renderGroupedListPanel(sec) {
     async function addNewItem() {
         const text = r.newText.value.trim();
         if (!text) return;
-        await createListItem({
+
+        // The item is in local state the moment this call starts; the network
+        // write happens in the background (and is queued if there's no signal).
+        createListItem({
             section_id: sec.id,
             text,
             checked: false
-        });
-        render();
+        }).catch(console.error);
+
+        await render();
+
+        // Keep the keyboard open so several items can be added in a row.
+        const input = document.querySelector('#lst-panel [data-ref="newText"]');
+        if (input) input.focus();
     }
 
     r.addBtn.addEventListener('click', addNewItem);
@@ -119,15 +147,18 @@ function renderGroupedListPanel(sec) {
     return frag;
 }
 
-let movingSection = null;
-
 async function render() {
     const panelEl = document.getElementById('lst-panel');
     if (!panelEl) return;
-    if (!movingSection) movingSection = await getOrCreateMovingSection();
-    if (!movingSection) return;
 
-    panelEl.replaceChildren(renderGroupedListPanel(movingSection));
+    const sec = await ensureMovingSection();
+    if (!sec) {
+        // First-ever load with no signal and nothing cached yet.
+        panelEl.replaceChildren(emptyState('Connect once to download your list — after that it works offline.'));
+        return;
+    }
+
+    panelEl.replaceChildren(renderGroupedListPanel(sec));
 }
 
 onStateChange(render);
@@ -138,12 +169,14 @@ initSync(sb, {
         if (window.setStatus) {
             window.setStatus(n ? `${n} change${n === 1 ? '' : 's'} pending sync…` : '');
         }
-    }
+    },
+    // After queued edits reach the server, pull fresh data so this page also
+    // shows anything changed on other devices while we were offline.
+    onFlushed: () => loadAll({ silent: true })
 });
 
 async function init() {
-    await loadAll();
-    movingSection = await getOrCreateMovingSection();
+    await loadAll();   // renders cached data first, then the fresh copy
     render();
 }
 

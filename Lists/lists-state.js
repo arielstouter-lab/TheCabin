@@ -1,7 +1,7 @@
 // State, persistence, realtime and helpers shared by every panel.
 // Nothing in here touches the DOM except through setStatus / the render callback.
 
-import { writeOrQueue, getPendingOp, nowStamp } from '../SharedJS/sync.js';
+import { writeOrQueue, pendingTypes, nowStamp, withTimeout } from '../SharedJS/sync.js';
 
 export const TABLES = window.TABLES;
 export const RPC = window.RPC;
@@ -9,7 +9,7 @@ export const sb = window.supabaseClient;
 export const PERMANENT_TABS = ['Groceries', 'Pantry', 'Recipes'];
 
 const CACHE_KEY = 'thecabin_cached_lists';
-const INSERT_RETRY_DELAY_MS = 800;
+const LOAD_TIMEOUT_MS = 10000;
 const REALTIME_TABLES = [
     TABLES.LIST_ITEMS,
     TABLES.LIST_SECTIONS,
@@ -27,6 +27,14 @@ export const state = {
     groceryItemMemory: [],
     memoryLookup: new Map()
 };
+
+// True once state came from the server or from a previous successful load
+// (the local cache). Until then an empty `sections` list means "we don't know
+// yet", NOT "nothing exists" — so callers must not create sections from it.
+let stateTrusted = false;
+export function isStateTrusted(){
+    return stateTrusted;
+}
 
 export function rebuildMemoryLookup(){
     state.memoryLookup = new Map(
@@ -120,6 +128,7 @@ function loadFromLocalCache(){
         state.groceryAisles = data.groceryAisles || [];
         state.groceryItemMemory = data.groceryItemMemory || [];
         rebuildMemoryLookup();
+        stateTrusted = true;
         return true;
     } catch(e){
         return false;
@@ -150,20 +159,49 @@ export function stopRealtime(){
 
 // ---- Loading -------------------------------------------------------------
 
-async function ensurePermanentSections(){
+// Creates a section locally and queues the insert. The id is generated here so
+// the section (and items added to it) work offline and sync in order later.
+function makeSection(name){
+    const sec = { id: crypto.randomUUID(), name, created_at: nowStamp() };
+    addSectionLocally(sec);
+    writeOrQueue(sb, {
+        table: TABLES.LIST_SECTIONS,
+        type: 'insert',
+        id: sec.id,
+        payload: sec
+    });
+    return sec;
+}
+
+function ensurePermanentSections(){
     const existingNames = state.sections.map(s => s.name);
     for(const name of PERMANENT_TABS){
         if(existingNames.includes(name)) continue;
-        try{
-            const {data, error} = await sb.from(TABLES.LIST_SECTIONS).insert({name}).select().single();
-            if(!error && data){
-                state.sections.push(data);
-                state.itemsBySection[data.id] = [];
-            }
-        } catch(e){
-            // if this fails, the tab just won't appear until the next load
-        }
+        makeSection(name);
     }
+}
+
+// Merges freshly-loaded server sections with anything still pending in the
+// offline write queue (a section created or edited offline, or deleted
+// offline, must survive a reload before it has synced).
+function mergeSectionsWithPendingWrites(serverSections){
+    const previousById = {};
+    state.sections.forEach(s => { previousById[s.id] = s; });
+
+    const merged = [];
+    serverSections.forEach(sec => {
+        const types = pendingTypes(TABLES.LIST_SECTIONS, sec.id);
+        if(types.has('delete')) return;
+        merged.push((types.has('update') && previousById[sec.id]) ? previousById[sec.id] : sec);
+    });
+
+    const serverIds = new Set(serverSections.map(s => s.id));
+    state.sections.forEach(sec => {
+        const types = pendingTypes(TABLES.LIST_SECTIONS, sec.id);
+        if(types.has('insert') && !types.has('delete') && !serverIds.has(sec.id)) merged.push(sec);
+    });
+
+    return merged;
 }
 
 // Merges freshly-loaded server items with anything still pending in the
@@ -179,17 +217,17 @@ function mergeItemsWithPendingWrites(serverItems){
 
     const next = {};
     serverItems.forEach(item => {
-        const op = getPendingOp(TABLES.LIST_ITEMS, item.id);
-        if(op && op.type === 'delete') return; // deleted locally, not yet synced — don't resurrect
-        const finalItem = (op && op.type === 'update' && previousById[item.id]) ? previousById[item.id] : item;
+        const types = pendingTypes(TABLES.LIST_ITEMS, item.id);
+        if(types.has('delete')) return; // deleted locally, not yet synced — don't resurrect
+        const finalItem = (types.has('update') && previousById[item.id]) ? previousById[item.id] : item;
         (next[finalItem.section_id] ||= []).push(finalItem);
     });
 
     // Items added while offline (pending insert) won't be in server data yet.
     const serverIds = new Set(serverItems.map(i => i.id));
     Object.values(previousById).forEach(item => {
-        const op = getPendingOp(TABLES.LIST_ITEMS, item.id);
-        if(op && op.type === 'insert' && !serverIds.has(item.id)){
+        const types = pendingTypes(TABLES.LIST_ITEMS, item.id);
+        if(types.has('insert') && !types.has('delete') && !serverIds.has(item.id)){
             (next[item.section_id] ||= []).push(item);
         }
     });
@@ -205,8 +243,8 @@ function mergeRecipesWithPendingWrites(serverRecipes){
     state.recipes.forEach(r => { previousById[r.id] = r; });
 
     return serverRecipes.map(r => {
-        const op = getPendingOp(TABLES.RECIPES, r.id);
-        return (op && op.type === 'update' && previousById[r.id]) ? previousById[r.id] : r;
+        const types = pendingTypes(TABLES.RECIPES, r.id);
+        return (types.has('update') && previousById[r.id]) ? previousById[r.id] : r;
     });
 }
 
@@ -218,6 +256,8 @@ export async function loadAll(options = {}){
     }
 
     try{
+        // On a weak connection a request can hang for a long time instead of
+        // failing; cap it so the cached data stays in charge.
         const [
             peopleResult,
             sectionResult,
@@ -225,14 +265,14 @@ export async function loadAll(options = {}){
             recipeResult,
             aisleResult,
             memoryResult
-        ] = await Promise.all([
+        ] = await withTimeout(Promise.all([
             sb.from(TABLES.PEOPLE).select('*').order('created_at'),
             sb.from(TABLES.LIST_SECTIONS).select('*').order('created_at'),
             sb.from(TABLES.LIST_ITEMS).select('*').order('created_at'),
             sb.from(TABLES.RECIPES).select('*').order('name'),
             sb.from(TABLES.GROCERY_AISLES).select('*').order('sort_order'),
             sb.from(TABLES.GROCERY_ITEM_MEMORY).select('*')
-        ]);
+        ]), LOAD_TIMEOUT_MS, 'Loading lists');
 
         const loadErrors = [
             peopleResult.error,
@@ -249,14 +289,15 @@ export async function loadAll(options = {}){
         }
 
         state.people = peopleResult.data || [];
-        state.sections = sectionResult.data || [];
+        state.sections = mergeSectionsWithPendingWrites(sectionResult.data || []);
         state.recipes = mergeRecipesWithPendingWrites(recipeResult.data || []);
         state.groceryAisles = aisleResult.data || [];
         state.groceryItemMemory = memoryResult.data || [];
         rebuildMemoryLookup();
 
         state.itemsBySection = mergeItemsWithPendingWrites(itemResult.data || []);
-        await ensurePermanentSections();
+        stateTrusted = true;
+        ensurePermanentSections();
         saveToLocalCache();
     } catch(e){
         console.error('Could not load lists:', e);
@@ -332,6 +373,8 @@ export function removeSectionLocally(secId){
 }
 
 // ---- Data mutations & offline sync actions -------------------------------
+// Every mutation updates local state synchronously (before its first await),
+// then hands the write to the outbox, so callers can render immediately.
 
 export async function createListItem(basePayload){
     const id = basePayload.id || crypto.randomUUID();
@@ -390,25 +433,26 @@ export async function createSection(name){
     if(PERMANENT_TABS.includes(name)){
         throw new Error(`"${name}" already exists.`);
     }
-    const { data, error } = await sb.from(TABLES.LIST_SECTIONS).insert({ name }).select().single();
-    if(error || !data) throw error || new Error('Could not add tab.');
-    addSectionLocally(data);
-    return data;
+    return makeSection(name);
 }
 
 export async function deleteSection(secId){
     removeSectionLocally(secId);
-    const { error } = await sb.from(TABLES.LIST_SECTIONS).delete().eq('id', secId);
-    if(error) throw error;
+    await writeOrQueue(sb, {
+        table: TABLES.LIST_SECTIONS,
+        type: 'delete',
+        id: secId
+    });
 }
 
 export async function updateSectionTagsEnabled(secId, enabled){
     updateSectionLocally(secId, { tags_enabled: enabled });
-    const { error } = await sb
-        .from(TABLES.LIST_SECTIONS)
-        .update({ tags_enabled: enabled })
-        .eq('id', secId);
-    if(error) throw error;
+    await writeOrQueue(sb, {
+        table: TABLES.LIST_SECTIONS,
+        type: 'update',
+        id: secId,
+        payload: { tags_enabled: enabled }
+    });
 }
 
 export async function saveRecipeField(recipe, field, value){
