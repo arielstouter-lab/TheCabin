@@ -175,6 +175,8 @@ textarea { font: inherit; }
   cursor: pointer;
   background: var(--ochre);
   color: var(--ink);
+  justify-self: center;
+  align-self: center;
 }
 
 .voice-modal.hidden {
@@ -195,7 +197,8 @@ textarea { font: inherit; }
   max-width: 90vw;
   background: var(--card);
   padding: 20px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  color: var(--ink);
 }
 
 #voiceText {
@@ -527,9 +530,10 @@ select { cursor: pointer; }
   align-items: center;
   padding: 20px 40px;
   background: var(--card);
-  h1 { margin: 0 0 3px; font-size: var(--text-5xl); font-family: var(--font-serif), serif; letter-spacing: -0.3px; }
   p { margin: 0; color: var(--ink-soft); font-size: var(--text-base); }
 }
+
+h1 { margin: 0 0 3px; font-size: var(--text-5xl); font-family: var(--font-serif), serif; letter-spacing: -0.3px; }
 
 .gradient {
   background: linear-gradient(340deg, var(--primary), color-mix(in srgb, var(--primary) 55%, var(--gradient-shade)));
