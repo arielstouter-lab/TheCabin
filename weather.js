@@ -229,7 +229,7 @@ function renderWeekForecast(raw){
         const dayLabel = i === 0 ? "Today" : date.toLocaleDateString([], { weekday: "short" });
         return `
       <div class="wf-row">
-        <b>${dayLabel}<b>
+        <b>${dayLabel}</b>
         <span class="wf-icon">${weatherIcon(info.icon)}</span>
         <span>${info.label}</span>
         <span class="wc-meta-item" title="${moonPhaseName(moon)}">${moonPhaseIcon(moon)}</span>
