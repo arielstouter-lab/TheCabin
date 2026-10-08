@@ -33,7 +33,20 @@ if (SpeechRecognition) {
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
+        voiceText.value = 'STARTED';
         isRecording = true;
+        updateRecordButton();
+    };
+
+    recognition.onend = () => {
+        voiceText.value += '\nENDED';
+        isRecording = false;
+        updateRecordButton();
+    };
+
+    recognition.onerror = (event) => {
+        voiceText.value += `\nERROR: ${event.error}`;
+        isRecording = false;
         updateRecordButton();
     };
 
@@ -49,22 +62,12 @@ if (SpeechRecognition) {
         localStorage.setItem('voiceTranscript', text);
     };
 
-    recognition.onend = () => {
-        isRecording = false;
-        updateRecordButton();
-    };
-
-    recognition.onerror = (event) => {
-        console.log('Speech error:', event.error);
-
-        isRecording = false;
-        updateRecordButton();
-    };
 }
 
 function startListening() {
 
     if (!recognition) {
+        voiceText.focus();
         return;
     }
 
