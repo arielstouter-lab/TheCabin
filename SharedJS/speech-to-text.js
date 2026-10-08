@@ -2,40 +2,79 @@ const voiceBtn = document.getElementById('voiceBtn');
 const voiceModal = document.getElementById('voiceModal');
 const closeVoiceBtn = document.getElementById('closeVoiceBtn');
 
-voiceBtn.onclick = () => {
+voiceBtn.onclick = async () => {
     voiceModal.classList.remove('hidden');
+
+    if (!isRecording) {
+        await startRecording();
+    }
 };
 
 closeVoiceBtn.onclick = () => {
+    if (isRecording) {
+        stopRecording();
+    }
+
     voiceModal.classList.add('hidden');
 };
 
 let recorder;
 let chunks = [];
+let isRecording = false;
+let mediaStream;
+const recordBtn = document.getElementById('recordBtn');
 
-document.getElementById('recordBtn').onclick = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
+recordBtn.onclick = async () => {
+    if (isRecording) {
+        stopRecording();
+    } else {
+        await startRecording();
+    }
+};
+
+async function startRecording() {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true
     });
 
-    recorder = new MediaRecorder(stream);
-
     chunks = [];
 
-    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder = new MediaRecorder(mediaStream);
+
+    recorder.ondataavailable = e => {
+        chunks.push(e.data);
+    };
 
     recorder.onstop = async () => {
         const audioBlob = new Blob(chunks, {
             type: 'audio/webm'
         });
 
+        isRecording = false;
+        updateRecordButton();
+
         await uploadForTranscription(audioBlob);
+
+        mediaStream.getTracks().forEach(track => track.stop());
     };
 
     recorder.start();
 
-    setTimeout(() => recorder.stop(), 10000);
-};
+    isRecording = true;
+    updateRecordButton();
+}
+
+function stopRecording() {
+    if (recorder && isRecording) {
+        recorder.stop();
+    }
+}
+
+function updateRecordButton() {
+    recordBtn.textContent = isRecording
+        ? 'Stop Recording'
+        : 'Start Recording';
+}
 
 async function uploadForTranscription(audioBlob) {
     const formData = new FormData();
@@ -50,3 +89,5 @@ async function uploadForTranscription(audioBlob) {
 
     document.getElementById('voiceText').value = data.text;
 }
+
+updateRecordButton();
