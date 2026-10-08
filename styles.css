@@ -857,6 +857,7 @@ body.cal-page {
   align-items: center;
   gap: 6px;
   svg { width: 18px; height: 18px; flex-shrink: 0; }
+  color: var(--white);
 }
 
 .weather-page { max-width: 520px; margin: 0 auto; padding: 10px 20px 60px; }
@@ -882,12 +883,6 @@ body.cal-page {
 .wf-day { font-weight: 600; }
 
 .wf-icon svg, .wf-moon svg { width: 20px; height: 20px; color: var(--white); }
-
-.wf-condition { color: var(--card); }
-
-.wf-temps { text-align: right; white-space: nowrap; }
-
-.wf-lo { margin-left: 6px; }
 
 /* --- Credit Cards Rewards & Financial --- */
 .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; }

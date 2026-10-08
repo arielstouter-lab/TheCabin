@@ -229,13 +229,13 @@ function renderWeekForecast(raw){
         const dayLabel = i === 0 ? "Today" : date.toLocaleDateString([], { weekday: "short" });
         return `
       <div class="wf-row">
-        <span class="wf-day">${dayLabel}</span>
+        <b>${dayLabel}<b>
         <span class="wf-icon">${weatherIcon(info.icon)}</span>
-        <span class="wf-condition">${info.label}</span>
-        <span class="wf-moon" title="${moonPhaseName(moon)}">${moonPhaseIcon(moon)}</span>
-        <span class="wf-temps">
+        <span>${info.label}</span>
+        <span class="wc-meta-item" title="${moonPhaseName(moon)}">${moonPhaseIcon(moon)}</span>
+        <span>
           <b>${fmtTemp(raw.daily.temperature_2m_max[i], wcUnit)}°</b>
-          <span class="wf-lo">${fmtTemp(raw.daily.temperature_2m_min[i], wcUnit)}°</span>
+          <span>${fmtTemp(raw.daily.temperature_2m_min[i], wcUnit)}°</span>
         </span>
       </div>`;
     }).join("");

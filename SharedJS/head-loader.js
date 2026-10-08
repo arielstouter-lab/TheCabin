@@ -13,7 +13,6 @@ const THEMES = {
         ochre: "#D2A14A",
         line: "#44483D",
         successBg: "#233128",
-        white: "#161914",
         gradientShade: "#0d1420",
 
         wxClear: "#3C8A8C",
@@ -46,7 +45,6 @@ const THEMES = {
         ochre: "#C98A2A",
         line: "#D8C8B2",
         successBg: "#F2F0E1",
-        white: "#FFFFFF",
         gradientShade: "#768796",
 
         wxClear: "#D89A2B",
@@ -77,7 +75,6 @@ const THEMES = {
         ochre: "#D39A32",
         line: "#6B4A6E",
         successBg: "#EEF1E8",
-        white: "#FFFCF8",
         gradientShade: "#0d1420",
 
         wxClear: "#E0A83A",
