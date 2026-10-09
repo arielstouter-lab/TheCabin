@@ -286,6 +286,52 @@ function setupApp(session) {
   document.dispatchEvent(new CustomEvent('app:ready', { detail: { session } }));
 }
 
+let deferredInstallPrompt = null;
+
+function isStandaloneApp() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function setupInstallPrompt() {
+  const installButton = document.getElementById('installAppBtn');
+  if (!installButton || isStandaloneApp()) return;
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    installButton.hidden = false;
+  });
+
+  installButton.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+
+    deferredInstallPrompt.prompt();
+
+    const choice = await deferredInstallPrompt.userChoice;
+    if (choice.outcome === 'accepted') {
+      installButton.hidden = true;
+    }
+
+    deferredInstallPrompt = null;
+  });
+
+  window.addEventListener('appinstalled', () => {
+    installButton.hidden = true;
+    deferredInstallPrompt = null;
+  });
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((error) => {
+      console.error('Service worker registration failed:', error);
+    });
+  });
+}
+
+setupInstallPrompt();
+
+
 // hidden-icon.js
 // Attaches the click behavior for the hidden icon trigger.
 // On click, navigates to the separate password-gated page.
@@ -684,6 +730,14 @@ function initDragAndDrop(container, {
     if (!touch) {
       clearTouchDragState();
       return;
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch((error) => {
+          console.error('Service worker registration failed:', error);
+        });
+      });
     }
 
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
