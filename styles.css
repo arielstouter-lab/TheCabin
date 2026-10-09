@@ -322,7 +322,8 @@ select { cursor: pointer; }
 }
 
 .note-editable:focus {
-  border: 1px solid var(--ochre);
+  outline: none;
+  border: 2px solid var(--ochre);
 }
 
 .recipe-note-cell { white-space: wrap; margin-bottom: 10px;}
@@ -663,7 +664,9 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
 
 .cal-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft); }
 
-.cal-day-dot.priority { background: var(--danger); }
+.cal-day-dot.priority { background: var(--ochre); }
+
+.cal-day-dot.overdue{ background: var(--danger); }
 
 .compact-list { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: var(--text-base); }
 

@@ -253,7 +253,9 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
                     const overdue = ev.source === 'list' && dateStr < today;
 
                     return `<span class="cal-day-dot${
-                        ev.priority || overdue ? ' priority' : ''
+                        overdue ? ' overdue'
+                            : ev.priority ? ' priority'
+                                : ''
                     }"></span>`;
                 })
                 .join('')}</div>`
