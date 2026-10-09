@@ -129,8 +129,7 @@ textarea { font: inherit; }
 }
 
 /* 3. SHARED CORE COMPONENTS */
-/* Buttons — .button-primary/.button-inline share one fill; .logout-button/
-   .password-toggle/.icon-delete share one "plain" reset. */
+/* Buttons — .button-primary/.button-inline share one fill; .logout-button/ */
 .button {
   width: auto;
   height: 46px;
@@ -212,12 +211,6 @@ textarea { font: inherit; }
   line-height: 1;
   flex-shrink: 0;
   &:hover { color: var(--danger); }
-}
-
-.icon-edit-note {
-  background: none;
-  border: none;
-  opacity: 0.6;
 }
 
 .recipe-url-link {
@@ -318,10 +311,13 @@ select { cursor: pointer; }
   min-width: 120px;
   min-height: 1.2em;
   display: inline-block;
+  cursor: text;
  }
 
 .note-editable:empty::before {
   content: attr(data-placeholder);
+  opacity: 0.5;
+  font-style: italic;
 }
 
 .recipe-note-cell { white-space: wrap; margin-bottom: 10px;}

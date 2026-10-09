@@ -3,7 +3,7 @@
 // Field edits route through unified state action helpers with offline sync.
 
 import { state, addIngredientsToGroceries, saveRecipeField } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState, focusAtEnd } from '../SharedJS/dom.js';
+import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
 
 let recipeSearchQuery = '';
 
@@ -39,7 +39,6 @@ function buildRecipeCard(recipe){
     r.notes.addEventListener('keydown', e => {
         if(e.key === 'Enter'){ e.preventDefault(); r.notes.blur(); }
     });
-    r.editNotes.addEventListener('click', () => focusAtEnd(r.notes));
 
     // URL: editable text plus a small link that always reflects the current value.
     r.url.textContent = recipe.url || '';
