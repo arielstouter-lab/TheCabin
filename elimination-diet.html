@@ -24,12 +24,31 @@
         .sev{font-weight:bold}
     </style>
 </head>
-<body>
-<h1>Logging Food</h1>
-<nav id="tabs">
-    <a href="#timeline">Timeline</a><a href="#meals">Meals</a>
-    <a href="#symptoms">Symptoms</a><a href="#ingredients">Ingredients</a>
-</nav>
+
+<body class="app-page">
+<div class="app-shell">
+    <main class="main-content">
+        <a href="app.html" class="brand-link">
+            <div class="brand-mark"></div>
+        </a>
+
+        <header class="topbar">
+            <div class="text-center">
+                <h1>Log Food and Symptoms</h1>
+            </div>
+        </header>
+
+        <section class="content">
+            <div class="tabs-container" id="elimination-tabs">
+                <nav id="tabs">
+                    <a href="#timeline">Timeline</a><a href="#meals">Meals</a>
+                    <a href="#symptoms">Symptoms</a><a href="#ingredients">Ingredients</a>
+                </nav>
+            </div>
+        </section>
+
+    </main>
+</div>
 
 <section class="panel" id="panel-timeline"><div id="timelineList"></div></section>
 
