@@ -6,11 +6,11 @@ const voiceText = document.getElementById('voiceText');
 const clearVoiceBtn =
     document.getElementById('clearVoiceBtn');
 
-voiceText.value =
+voiceText.textContent =
     localStorage.getItem('voiceTranscript') || '';
 
 clearVoiceBtn.onclick = () => {
-    voiceText.value = '';
+    voiceText.textContent = '';
 
     localStorage.removeItem(
         'voiceTranscript'
@@ -58,7 +58,7 @@ function createRecognition() {
             if (!gotSignal && state === 'recording') {
                 speechBroken = true;
                 forceReset();
-                voiceText.placeholder =
+                voiceText.dataset.placeholder =
                     'Voice capture is not working in this browser. Use your keyboard\'s mic button.';
                 voiceText.focus();
             }
@@ -83,7 +83,7 @@ function createRecognition() {
         console.error('Speech error:', event.error);
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
             speechBroken = true;
-            voiceText.placeholder =
+            voiceText.dataset.placeholder =
                 'Microphone permission denied. Use your keyboard\'s mic button.';
         }
     };
@@ -94,8 +94,8 @@ function createRecognition() {
         for (let i = 0; i < event.results.length; i++) {
             text += event.results[i][0].transcript;
         }
-        voiceText.value = (baseText ? baseText + ' ' : '') + text;
-        localStorage.setItem('voiceTranscript', voiceText.value);
+        voiceText.textContent = (baseText ? baseText + ' ' : '') + text;
+        localStorage.setItem('voiceTranscript', voiceText.textContent);
     };
 }
 
@@ -128,7 +128,7 @@ function startListening() {
     }
     if (state !== 'idle') return;
 
-    baseText = voiceText.value.trim();
+    baseText = voiceText.textContent.trim();
     state = 'starting';
     updateRecordButton();
 
@@ -183,7 +183,7 @@ function updateRecordButton() {
 createRecognition();
 
 voiceBtn.onclick = () => {
-    voiceText.value = localStorage.getItem('voiceTranscript') || '';
+    voiceText.textContent = localStorage.getItem('voiceTranscript') || '';
     voiceModal.classList.remove('hidden');
 
     if (SpeechRecognition) {
@@ -202,7 +202,7 @@ closeVoiceBtn.onclick = async () => {
     stopListening();
     // ...rest unchanged (clipboard copy, hide modal)
 
-    const text = voiceText.value.trim();
+    const text = voiceText.textContent.trim();
 
     if (text) {
         try {
@@ -219,7 +219,7 @@ closeVoiceBtn.onclick = async () => {
 voiceText.addEventListener('input', () => {
     localStorage.setItem(
         'voiceTranscript',
-        voiceText.value
+        voiceText.textContent
     );
 });
 

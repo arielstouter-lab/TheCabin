@@ -95,11 +95,12 @@
             <div class="voice-panel">
               <h1>Voice Note</h1>
 
-              <textarea
+              <span
                       id="voiceText"
-                      rows="6"
-                      placeholder="Speech will appear here..."
-              ></textarea>
+                      class="note note-editable"
+                      contenteditable="true"
+                      data-placeholder="Speech will appear here..."
+              ></span>
 
               <div class="dashboard-grid">
                 <button class="button button-primary" id="recordBtn"></button>
