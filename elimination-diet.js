@@ -70,7 +70,7 @@ async function loadAll() {
         sb.from('diet_ingredients').select('*').order('name'),
         sb.from('diet_meals').select('*, diet_meal_ingredients(ingredient_id)').order('eaten_at', { ascending: false }).limit(200),
         sb.from('diet_symptoms').select('*').order('occurred_at', { ascending: false }).limit(200),
-        sb.from('household_recipes').select('*').order('name'),   // read-only; GI tables never write here
+        sb.from('list_recipes').select('*').order('name'),   // read-only; GI tables never write here
         sb.from('diet_item_memory').select('*'),
     ]);
     state.memory = mem.data || [];
