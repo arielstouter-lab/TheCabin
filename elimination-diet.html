@@ -9,11 +9,9 @@
     <script src="app.js" defer></script>
     <script type="module" src="elimination-diet.js"></script>
     <style>
-        /* Page-specific only: tag chips and log rows. Everything else comes from styles.css. */
-        .tag-chip{display:inline-block;padding:2px 8px;margin:2px;border-radius:12px;background:#eee;font-size:.8em;cursor:pointer}
-        .tag-chip.allergen{background:#fde2e2}
-        .tag-chip.trigger{background:#fff0cc}
-        .tag-chip.sel{background:#333;color:#fff}
+        /* Page-specific only: chip toggle state and log rows. Everything else comes from styles.css. */
+        .chip.off{opacity:.35}                          /* unselected tag / ingredient chips */
+        .chip[data-tag],.chip[data-id]{cursor:pointer}
         .diet-row{padding:8px 0;border-bottom:1px solid #ddd}
         .diet-row small{color:#666}
         .diet-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}

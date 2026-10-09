@@ -53,7 +53,9 @@ async function rememberTags(name, tags) {
     const { error } = await sb.from('diet_item_memory').upsert(row, { onConflict: 'item_key' });
     if (error) console.error(error);
 }
-const chipClass = t => 'tag-chip ' + (TAGS[t]?.kind || '');
+// Suspected triggers get the site's priority chip style; everything else is a plain chip.
+const PRIORITY_TAGS = new Set(['gluten', 'dairy', 'high-FODMAP', 'sweetener', 'fatty/fried']);
+const chipClass = t => 'chip' + (PRIORITY_TAGS.has(t) ? ' priority-chip' : '');
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -129,7 +131,7 @@ function renderIngredients() {
     <div class="diet-row" data-id="${i.id}">
       <label><input type="checkbox" class="freq" ${i.is_frequent ? 'checked' : ''}> ★</label>
       <strong>${esc(i.name)}</strong>
-      <div>${ALL_TAGS.map(t => `<span class="${chipClass(t)} ${i.tags.includes(t) ? 'sel' : ''}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>
+      <div>${ALL_TAGS.map(t => `<span class="${chipClass(t)} ${i.tags.includes(t) ? '' : 'off'}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>
       <button type="button" class="icon-delete del" title="Delete ingredient">✕</button>
     </div>`).join('') || '<p>No ingredients yet.</p>';
 }
@@ -164,7 +166,7 @@ function renderMealPicker() {
     const picked = state.ingredients.filter(i => state.picked.has(i.id) && !i.is_frequent);
     $('mealPicker').innerHTML =
         `<div><small>Frequent / selected (tap to toggle):</small><br>` +
-        [...frequent, ...picked].map(i => `<span class="tag-chip ${state.picked.has(i.id) ? 'sel' : ''}" data-id="${i.id}">${esc(i.name)}</span>`).join('') +
+        [...frequent, ...picked].map(i => `<span class="chip ${state.picked.has(i.id) ? '' : 'off'}" data-id="${i.id}">${esc(i.name)}</span>`).join('') +
         `</div><input id="mealAdd" class="text-input" list="ingOptions" placeholder="Add any ingredient (new ones are created)" style="width:100%">
      <datalist id="ingOptions">${state.ingredients.map(i => `<option value="${esc(i.name)}">`).join('')}</datalist>
      <select id="mealRecipe" class="text-input"><option value="">Add all from recipe…</option>${state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('')}</select>`;
