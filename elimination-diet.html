@@ -16,6 +16,9 @@
         .tag-chip.sel{background:#333;color:#fff}
         .diet-row{padding:8px 0;border-bottom:1px solid #ddd}
         .diet-row small{color:#666}
+        .diet-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+        .diet-row[data-meal-id],.diet-row[data-sym-id]{cursor:pointer}
+        .diet-row.editing{background:rgba(0,0,0,.06)}
         .diet-row .sev{font-weight:bold}
         .diet-picker{width:100%}
     </style>
@@ -60,7 +63,7 @@
             <div id="tab-meals" class="tab-pane" hidden>
                 <div class="card">
                     <div class="card-head">
-                        <h2 class="card-title">Log a Meal</h2>
+                        <h2 class="card-title" id="mealFormTitle">Log a Meal</h2>
                         <span class="note">Pick frequent ingredients, type any ingredient, or add everything from a recipe</span>
                     </div>
                     <div class="card-body">
@@ -71,7 +74,8 @@
                                 <input type="text" class="text-input note" id="mealNotes" placeholder="Notes (optional)" />
                             </div>
                             <div id="mealPicker" class="diet-picker"></div>
-                            <button type="submit" class="button-inline">Add meal</button>
+                            <button type="submit" class="button-inline" id="mealSubmit">Add meal</button>
+                            <button type="button" class="button-inline button-ghost" id="mealCancel" hidden>Cancel edit</button>
                         </form>
                     </div>
                 </div>
@@ -90,7 +94,7 @@
             <div id="tab-symptoms" class="tab-pane" hidden>
                 <div class="card">
                     <div class="card-head">
-                        <h2 class="card-title">Log a Symptom</h2>
+                        <h2 class="card-title" id="symFormTitle">Log a Symptom</h2>
                         <span class="note">Severity is 1 (mild) to 10 (severe)</span>
                     </div>
                     <div class="card-body">
@@ -106,7 +110,8 @@
                                 <input type="number" class="text-input" id="symSev" min="1" max="10" value="3" placeholder="Severity" />
                                 <input type="text" class="text-input note" id="symNotes" placeholder="Notes (optional)" />
                             </div>
-                            <button type="submit" class="button-inline">Add symptom</button>
+                            <button type="submit" class="button-inline" id="symSubmit">Add symptom</button>
+                            <button type="button" class="button-inline button-ghost" id="symCancel" hidden>Cancel edit</button>
                         </form>
                     </div>
                 </div>
