@@ -169,10 +169,8 @@ initSync(sb, {
         if (window.setStatus) {
             window.setStatus(n ? `${n} change${n === 1 ? '' : 's'} pending sync…` : '');
         }
-    },
-    // After queued edits reach the server, pull fresh data so this page also
-    // shows anything changed on other devices while we were offline.
-    onFlushed: () => loadAll({ silent: true })
+    }
+    // After offline edits sync, lists-state re-pulls automatically ('sync:flushed').
 });
 
 async function init() {

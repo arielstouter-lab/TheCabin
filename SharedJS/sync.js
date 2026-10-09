@@ -8,12 +8,15 @@
 //   FIRST. writeOrQueue() returns immediately; it never waits on the network.
 //   That means the UI can never hang on a weak "one bar" connection, and an
 //   edit can't be lost if the tab is closed or killed mid-request.
+// - localStorage is the source of truth for the queue. It is re-read before
+//   every change, so two tabs/pages open at once can't overwrite each other's
+//   pending edits.
 // - A background flush sends ops one at a time, in order, and only removes an
 //   op once the server accepted it. It runs right after each write, on
 //   reconnect, when the page becomes visible, and on a 20s interval.
 // - Updates use a conditional WHERE updated_at <= :mine, so a late-arriving
 //   offline write can never overwrite a newer change made elsewhere. An empty
-//   result there is a correctly-lost race, not an error.
+//   result there is a correctly-lost race (a warning is logged), not an error.
 // - Re-sending an op is always safe: inserts that already landed come back as
 //   a duplicate-primary-key error, which is treated as success; updates,
 //   upserts and deletes are idempotent.
@@ -21,6 +24,9 @@
 //   (order preserved). Ops the server actively rejects (constraint/RLS errors)
 //   are retried a few times, then parked in a separate "failed" list so one
 //   bad op can't block the whole queue forever.
+// - When a flush delivers edits that had been waiting a while (i.e. we were
+//   offline), a 'sync:flushed' event fires on window so pages can re-pull the
+//   settled server state.
 
 const QUEUE_KEY = 'thecabin_pending_ops';
 const FAILED_KEY = 'thecabin_failed_ops';
@@ -28,9 +34,10 @@ const SEND_TIMEOUT_MS = 8000;        // give up on a single request after this
 const RETRY_COOLDOWN_MS = 10000;     // after a network failure, don't re-hammer on every write
 const MAX_REJECTIONS = 5;
 const PENDING_BADGE_DELAY_MS = 1500; // don't flash "pending" for edits that sync instantly
+const BACKLOG_MS = 3000;             // an op older than this counts as "was offline"
 const POLL_MS = 20000;
 
-let queue = loadList(QUEUE_KEY);
+let queue = [];
 let flushing = false;
 let lastNetworkFailure = 0;
 let notifyTimer = null;
@@ -46,6 +53,19 @@ function saveList(key, list) {
 }
 
 function saveQueue() { saveList(QUEUE_KEY, queue); }
+
+// Re-read the queue from localStorage (another tab may have changed it).
+// Ops saved by older versions of this file get an id and timestamp here.
+export function refreshQueue() {
+    queue = loadList(QUEUE_KEY);
+    let changed = false;
+    queue.forEach(op => {
+        if (!op.opId) { op.opId = crypto.randomUUID(); changed = true; }
+    });
+    if (changed) saveQueue();
+}
+
+refreshQueue();
 
 export function pendingCount() {
     return queue.length;
@@ -74,7 +94,10 @@ function notify() {
     clearTimeout(notifyTimer);
     if (!ctx.onChange) return;
     if (queue.length === 0) { ctx.onChange(0); return; }
-    notifyTimer = setTimeout(() => { if (ctx.onChange) ctx.onChange(queue.length); }, PENDING_BADGE_DELAY_MS);
+    notifyTimer = setTimeout(() => {
+        refreshQueue();
+        if (ctx.onChange) ctx.onChange(queue.length);
+    }, PENDING_BADGE_DELAY_MS);
 }
 
 // op: { table, type: 'insert' | 'update' | 'upsert' | 'delete' | 'rpc', id, idColumn, payload, options }
@@ -88,7 +111,8 @@ function notify() {
 // stored. Use pendingCount()/initSync's onChange to know whether it has synced.
 export function writeOrQueue(sb, op) {
     if (!ctx.sb) ctx.sb = sb;
-    queue.push(op);
+    refreshQueue();
+    queue.push({ ...op, opId: crypto.randomUUID(), queuedAt: Date.now() });
     saveQueue();
     notify();
     flushQueue(sb); // fire and forget
@@ -109,8 +133,6 @@ function sendOnce(sb, op, signal) {
             // Only tables that carry updated_at get the last-write-wins guard.
             if (op.payload && op.payload.updated_at) q = q.lte('updated_at', op.payload.updated_at);
             return q.select().abortSignal(signal);
-            // An empty result means a newer write already exists server-side.
-            // That's the conflict resolving correctly, not a failure.
         }
         case 'delete':
             return sb.from(op.table).delete().eq(col, op.id).abortSignal(signal);
@@ -133,7 +155,14 @@ async function trySend(sb, op) {
     const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
     try {
         const res = await sendOnce(sb, op, controller.signal);
-        if (!res || !res.error) return 'ok';
+        if (!res || !res.error) {
+            if (op.type === 'update' && res && Array.isArray(res.data) && res.data.length === 0) {
+                // Zero rows updated: either the row is gone or the server already
+                // holds a NEWER value (the conditional updated_at check failed).
+                console.warn('Sync: update changed nothing — server has a newer value or the row is gone:', op);
+            }
+            return 'ok';
+        }
 
         const err = res.error;
         // An earlier attempt landed (e.g. it timed out client-side but the
@@ -157,49 +186,64 @@ function park(op) {
     console.error('Sync: giving up on op after repeated rejections (saved in thecabin_failed_ops):', op);
 }
 
+function removeOp(opId) {
+    refreshQueue();
+    queue = queue.filter(o => o.opId !== opId);
+    saveQueue();
+}
+
 export async function flushQueue(sb = ctx.sb, { force = false } = {}) {
+    refreshQueue();
     if (flushing || !sb || !navigator.onLine || !queue.length) return;
     if (!force && Date.now() - lastNetworkFailure < RETRY_COOLDOWN_MS) return;
 
     flushing = true;
     let sentAny = false;
+    let recovered = false; // delivered something that had been waiting a while
+    const skip = new Set();
     try {
-        let i = 0;
-        // New writes during the flush are appended to the end and picked up here.
-        while (i < queue.length) {
-            const op = queue[i];
+        while (true) {
+            refreshQueue();
+            const op = queue.find(o => !skip.has(o.opId));
+            if (!op) break;
+
             const result = await trySend(sb, op);
 
             if (result === 'ok') {
-                queue.splice(i, 1);
+                removeOp(op.opId);
                 sentAny = true;
                 lastNetworkFailure = 0;
+                if (Date.now() - (op.queuedAt || 0) > BACKLOG_MS) recovered = true;
             } else if (result === 'rejected') {
-                op.attempts = (op.attempts || 0) + 1;
-                if (op.attempts >= MAX_REJECTIONS) {
-                    park(op);
-                    queue.splice(i, 1);
-                } else {
-                    i++; // leave it for a later flush, keep going
+                refreshQueue();
+                const live = queue.find(o => o.opId === op.opId);
+                if (live) {
+                    live.attempts = (live.attempts || 0) + 1;
+                    if (live.attempts >= MAX_REJECTIONS) {
+                        park(live);
+                        queue = queue.filter(o => o.opId !== op.opId);
+                    }
+                    saveQueue();
                 }
+                skip.add(op.opId); // leave it for a later flush, keep going
             } else {
                 lastNetworkFailure = Date.now();
                 break; // offline / timeout / auth: stop here, keep order
             }
-            saveQueue();
         }
     } finally {
-        saveQueue();
         flushing = false;
         notify();
     }
-    if (sentAny && ctx.onFlushed) ctx.onFlushed();
+    if (sentAny && recovered) {
+        if (ctx.onFlushed) ctx.onFlushed();
+        window.dispatchEvent(new CustomEvent('sync:flushed'));
+    }
 }
 
 // Call once per page, after sb is available.
 // onChange(count)  – pending count changed (wire to setStatus / a badge).
-// onFlushed()      – at least one queued op reached the server (good moment
-//                    to refresh from the server).
+// onFlushed()      – edits that had been waiting reached the server.
 export function initSync(sb, { onChange, onFlushed } = {}) {
     ctx.sb = sb;
     ctx.onChange = onChange || null;

@@ -1,7 +1,7 @@
 // State, persistence, realtime and helpers shared by every panel.
 // Nothing in here touches the DOM except through setStatus / the render callback.
 
-import { writeOrQueue, pendingTypes, nowStamp, withTimeout } from '../SharedJS/sync.js';
+import { writeOrQueue, pendingTypes, nowStamp, withTimeout, refreshQueue } from '../SharedJS/sync.js';
 
 export const TABLES = window.TABLES;
 export const RPC = window.RPC;
@@ -44,6 +44,12 @@ export function rebuildMemoryLookup(){
 
 let realtimeChannel = null;
 let realtimeDebounceTimer = null;
+
+// Loads can overlap (page load, realtime nudge, post-sync refresh) and their
+// responses can arrive out of order. A response older than one already applied
+// must be dropped, or stale server data would overwrite newer local state.
+let loadSeq = 0;
+let lastAppliedSeq = 0;
 
 // ---- Render hook ---------------------------------------------------------
 // main.js registers its render function here; panels call requestRender()
@@ -157,6 +163,10 @@ export function stopRealtime(){
     if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
 }
 
+// After edits that were waiting offline reach the server, re-pull so this
+// page shows the settled state.
+window.addEventListener('sync:flushed', () => { loadAll({ silent: true }); });
+
 // ---- Loading -------------------------------------------------------------
 
 // Creates a section locally and queues the insert. The id is generated here so
@@ -179,6 +189,15 @@ function ensurePermanentSections(){
         if(existingNames.includes(name)) continue;
         makeSection(name);
     }
+}
+
+// True when the local copy of a row was edited after the server's copy, so a
+// stale server response (or one that raced our own just-synced edit) must not
+// overwrite it. Rows without timestamps defer to the server.
+function isLocalNewer(local, server){
+    const l = Date.parse(local && local.updated_at);
+    const s = Date.parse(server && server.updated_at);
+    return !isNaN(l) && (isNaN(s) || l > s);
 }
 
 // Merges freshly-loaded server sections with anything still pending in the
@@ -219,7 +238,8 @@ function mergeItemsWithPendingWrites(serverItems){
     serverItems.forEach(item => {
         const types = pendingTypes(TABLES.LIST_ITEMS, item.id);
         if(types.has('delete')) return; // deleted locally, not yet synced — don't resurrect
-        const finalItem = (types.has('update') && previousById[item.id]) ? previousById[item.id] : item;
+        const prev = previousById[item.id];
+        const finalItem = (prev && (types.has('update') || isLocalNewer(prev, item))) ? prev : item;
         (next[finalItem.section_id] ||= []).push(finalItem);
     });
 
@@ -244,12 +264,14 @@ function mergeRecipesWithPendingWrites(serverRecipes){
 
     return serverRecipes.map(r => {
         const types = pendingTypes(TABLES.RECIPES, r.id);
-        return (types.has('update') && previousById[r.id]) ? previousById[r.id] : r;
+        const prev = previousById[r.id];
+        return (prev && (types.has('update') || isLocalNewer(prev, r))) ? prev : r;
     });
 }
 
 export async function loadAll(options = {}){
     const silent = !!(options && options.silent);
+    const mySeq = ++loadSeq;
 
     if(!silent && state.sections.length === 0 && loadFromLocalCache()){
         requestRender();
@@ -287,6 +309,10 @@ export async function loadAll(options = {}){
             console.error('List load errors:', loadErrors);
             throw loadErrors[0];
         }
+
+        if(mySeq < lastAppliedSeq) return; // a newer load already applied fresher data
+        lastAppliedSeq = mySeq;
+        refreshQueue(); // pick up edits queued by other tabs while we were fetching
 
         state.people = peopleResult.data || [];
         state.sections = mergeSectionsWithPendingWrites(sectionResult.data || []);
