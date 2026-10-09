@@ -1,10 +1,10 @@
-import { sb } from './Lists/lists-state.js';
+const sb = window.supabaseClient;
 
 // ---------- allergen / trigger tagging ----------
 // kind: 'allergen' (top allergens) or 'trigger' (common GI triggers)
 const TAGS = {
     dairy:        { kind: 'allergen', words: ['milk','cheese','butter','cream','yogurt','yoghurt','whey','casein','ghee','ice cream','sour cream','half and half'] },
-    gluten:       { kind: 'allergen', words: ['wheat','flour','bread','pasta','barley','rye','couscous','semolina','tortilla','noodle','breadcrumb','soy sauce','cracker'] },
+    gluten:       { kind: 'allergen', words: ['wheat','flour','bread','pasta','barley','rye','couscous','semolina','tortilla','noodle','breadcrumb','soy sauce','cracker','cake','cookie','muffin','pastry','pie','biscuit','scone','brownie','donut','doughnut','pancake','waffle','pizza','bagel','pretzel','bun','croissant','dumpling','cereal','granola','crust','dough','batter','macaroni','mac and cheese','spaghetti','lasagna','ravioli','pita','sandwich','burger','biscotti'] },
     egg:          { kind: 'allergen', words: ['egg','mayo','mayonnaise','meringue'] },
     soy:          { kind: 'allergen', words: ['soy','tofu','tempeh','edamame','miso'] },
     peanut:       { kind: 'allergen', words: ['peanut'] },
@@ -23,10 +23,34 @@ const TAGS = {
     acidic:       { kind: 'trigger', words: ['tomato','citrus','lemon','lime','orange','vinegar'] },
 };
 const ALL_TAGS = Object.keys(TAGS);
-const autoTag = name => {
-    const n = name.toLowerCase();
-    return ALL_TAGS.filter(t => TAGS[t].words.some(w => n.includes(w)));
-};
+// Whole-word matching (optional plural), so "steak" doesn't hit "tea" and "eggplant" doesn't hit "egg".
+const WORD_RES = Object.fromEntries(ALL_TAGS.map(t => [t,
+    new RegExp('\\b(?:' + TAGS[t].words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?:e?s)?\\b', 'i')]));
+const autoTag = name => ALL_TAGS.filter(t => WORD_RES[t].test(name));
+// Learned tags: same matching as groceries' aisleIdForItemText (exact -> phrase -> partial),
+// reading diet_item_memory (item_key -> tags) instead of aisles.
+const gk = t => window.groceryKey(t);
+const rebuildMemoryLookup = () => { state.memoryLookup = new Map(state.memory.map(m => [gk(m.item_key), m.tags])); };
+function tagsFor(name) {
+    const key = gk(name);
+    if (!key) return autoTag(name);
+    if (state.memoryLookup.has(key)) return state.memoryLookup.get(key);       // exact: your saved tags only
+    const longest = (a, b) => gk(b.item_key).length - gk(a.item_key).length;
+    const hit =
+        state.memory.filter(m => { const k = gk(m.item_key); return k && (key.includes(k) || k.includes(key)); }).sort(longest)[0] ||
+        state.memory.filter(m => window.groceryKeysMatch(name, m.item_key)).sort(longest)[0];
+    // Fuzzy hit: union with keyword guess so "garlic chicken" keeps garlic even if only "chicken" was saved.
+    return hit ? [...new Set([...hit.tags, ...autoTag(name)])] : autoTag(name);
+}
+async function rememberTags(name, tags) {
+    const key = gk(name); if (!key) return;
+    const row = { item_key: key, tags, updated_at: new Date().toISOString() };
+    const i = state.memory.findIndex(m => m.item_key === key);
+    i >= 0 ? (state.memory[i] = row) : state.memory.push(row);
+    rebuildMemoryLookup();
+    const { error } = await sb.from('diet_item_memory').upsert(row, { onConflict: 'item_key' });
+    if (error) console.error(error);
+}
 const chipClass = t => 'chip ' + (TAGS[t]?.kind || '');
 
 // ---------- helpers ----------
@@ -34,16 +58,19 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const fmt = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-const state = { ingredients: [], meals: [], symptoms: [], recipes: [], picked: new Set() };
+const state = { memory: [], memoryLookup: new Map(), ingredients: [], meals: [], symptoms: [], recipes: [], picked: new Set() };
 
 // ---------- load ----------
 async function loadAll() {
-    const [ing, meals, sym, rec] = await Promise.all([
+    const [ing, meals, sym, rec, mem] = await Promise.all([
         sb.from('diet_ingredients').select('*').order('name'),
         sb.from('diet_meals').select('*, diet_meal_ingredients(ingredient_id)').order('eaten_at', { ascending: false }).limit(200),
         sb.from('diet_symptoms').select('*').order('occurred_at', { ascending: false }).limit(200),
         sb.from('household_recipes').select('*').order('name'),   // read-only; GI tables never write here
+        sb.from('diet_item_memory').select('*'),
     ]);
+    state.memory = mem.data || [];
+    rebuildMemoryLookup();
     state.ingredients = ing.data || [];
     state.meals = meals.data || [];
     state.symptoms = sym.data || [];
@@ -58,7 +85,7 @@ async function addIngredient(name, extra = {}) {
     const existing = state.ingredients.find(i => i.name.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
     const { data, error } = await sb.from('diet_ingredients')
-        .insert({ name, tags: autoTag(name), ...extra }).select().single();
+        .insert({ name, tags: tagsFor(name), ...extra }).select().single();
     if (error) { console.error(error); return null; }
     state.ingredients.push(data);
     state.ingredients.sort((a, b) => a.name.localeCompare(b.name));
@@ -68,7 +95,9 @@ async function addIngredient(name, extra = {}) {
 async function updateIngredient(id, patch) {
     const { error } = await sb.from('diet_ingredients').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) return console.error(error);
-    Object.assign(state.ingredients.find(i => i.id === id), patch);
+    const ing = state.ingredients.find(i => i.id === id);
+    Object.assign(ing, patch);
+    if (patch.tags) await rememberTags(ing.name, patch.tags);   // tag edits are remembered by exact name
     renderAll();
 }
 
