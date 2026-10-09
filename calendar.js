@@ -237,11 +237,25 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         if(dateStr === selectedDate) classes.push('selected');
 
         const dotItems = [...inLayer('default'), ...inLayer('list')]
-            .sort((a, b) => !!b.priority - !!a.priority);
+            .sort((a, b) => {
+                const aOverdue = a.source === 'list' && dateStr < today;
+                const bOverdue = b.source === 'list' && dateStr < today;
+
+                return (
+                    Number(bOverdue) - Number(aOverdue) ||
+                    Number(!!b.priority) - Number(!!a.priority)
+                );
+            });
 
         const dots = dotItems.length
             ? `<div class="cal-day-dot-row">${dotItems.slice(0, 4)
-                .map(ev => `<span class="cal-day-dot${ev.priority ? ' priority' : ''}"></span>`)
+                .map(ev => {
+                    const overdue = ev.source === 'list' && dateStr < today;
+
+                    return `<span class="cal-day-dot${
+                        ev.priority || overdue ? ' priority' : ''
+                    }"></span>`;
+                })
                 .join('')}</div>`
             : '';
 

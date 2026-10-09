@@ -53,7 +53,6 @@ export function buildCategoryRow(row, { onUpdate, onDelete, deleteTitle = 'Delet
     r.notes.addEventListener('keydown', e => {
         if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); r.notes.blur(); }
     });
-    r.editNote.addEventListener('click', () => focusAtEnd(r.notes));
 
     r.delBtn.addEventListener('click', () => onDelete(row.id));
 
