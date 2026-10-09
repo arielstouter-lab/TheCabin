@@ -302,9 +302,9 @@ import { writeOrQueue, nowStamp, initSync } from '../SharedJS/sync.js';
     }
 
     function render(){
-        renderAisles();
         renderUnassigned();
         renderMappings();
+        renderAisles();
         renderMappingAisleSelect();
     }
 

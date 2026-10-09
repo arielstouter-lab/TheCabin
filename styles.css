@@ -312,6 +312,7 @@ select { cursor: pointer; }
   min-height: 1.2em;
   display: inline-block;
   cursor: text;
+  border: 1px solid var(--ochre);
  }
 
 .note-editable:empty::before {
