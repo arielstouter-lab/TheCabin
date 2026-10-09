@@ -314,6 +314,16 @@ select { cursor: pointer; }
 
 .note { color: var(--ink-soft); font-size: var(--text-sm); }
 
+.note-editable {
+  min-width: 120px;
+  min-height: 1.2em;
+  display: inline-block;
+ }
+
+.note-editable:empty::before {
+  content: attr(data-placeholder);
+}
+
 .recipe-note-cell { white-space: wrap; margin-bottom: 10px;}
 
 /* Tabs System */
@@ -759,6 +769,7 @@ body.cal-page {
 .lst-items summary {
   margin-bottom: 20px;
   color: var(--ink-soft);
+  cursor: pointer;
 }
 
 .summary-content {
