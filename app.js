@@ -292,34 +292,67 @@ function isStandaloneApp() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
+function getInstallInstructions() {
+  const ua = navigator.userAgent.toLowerCase();
+
+  if (/iphone|ipad|ipod/.test(ua)) {
+    return 'To install: tap Share, then Add to Home Screen.';
+  }
+
+  if (/firefox/.test(ua)) {
+    return 'Firefox desktop does not support the install prompt. Use your browser menu or try Chrome/Edge for one-click install.';
+  }
+
+  if (/duckduckgo/.test(ua)) {
+    return 'Use your browser menu and choose Add to Home screen, if available.';
+  }
+
+  if (/android/.test(ua)) {
+    return 'Use your browser menu and choose Install app or Add to Home screen.';
+  }
+
+  return 'Use your browser menu to install this app, or try Chrome/Edge for one-click install.';
+}
+
 function setupInstallPrompt() {
   const installButton = document.getElementById('installAppBtn');
-  if (!installButton || isStandaloneApp()) return;
+  if (!installButton) return;
 
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     deferredInstallPrompt = event;
-    installButton.hidden = false;
   });
 
   installButton.addEventListener('click', async () => {
-    if (!deferredInstallPrompt) return;
+    if (isStandaloneApp()) {
+      setStatus('The Cabin is already installed.', 'success');
+      return;
+    }
+
+    if (!deferredInstallPrompt) {
+      showToast(getInstallInstructions(), 'info', 6000);
+      return;
+    }
 
     deferredInstallPrompt.prompt();
 
     const choice = await deferredInstallPrompt.userChoice;
     if (choice.outcome === 'accepted') {
-      installButton.hidden = true;
+      setStatus('Installing The Cabin.', 'success');
+    } else {
+      setStatus('Install canceled.', 'info');
     }
 
     deferredInstallPrompt = null;
   });
 
   window.addEventListener('appinstalled', () => {
-    installButton.hidden = true;
     deferredInstallPrompt = null;
+    setStatus('The Cabin was installed.', 'success');
   });
 }
+
+setupInstallPrompt();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
