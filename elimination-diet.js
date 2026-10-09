@@ -1,3 +1,5 @@
+// Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
+// same shared scripts that lists.html does before this module.
 const sb = window.supabaseClient;
 
 // ---------- allergen / trigger tagging ----------
@@ -51,7 +53,7 @@ async function rememberTags(name, tags) {
     const { error } = await sb.from('diet_item_memory').upsert(row, { onConflict: 'item_key' });
     if (error) console.error(error);
 }
-const chipClass = t => 'chip ' + (TAGS[t]?.kind || '');
+const chipClass = t => 'tag-chip ' + (TAGS[t]?.kind || '');
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -124,16 +126,16 @@ function renderIngredients() {
     $('recipeSelect').innerHTML = '<option value="">Import from recipe…</option>' +
         state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('');
     $('ingList').innerHTML = state.ingredients.map(i => `
-    <div class="row" data-id="${i.id}">
+    <div class="diet-row" data-id="${i.id}">
       <label><input type="checkbox" class="freq" ${i.is_frequent ? 'checked' : ''}> ★</label>
       <strong>${esc(i.name)}</strong>
       <div>${ALL_TAGS.map(t => `<span class="${chipClass(t)} ${i.tags.includes(t) ? 'sel' : ''}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>
-      <button class="del">Delete</button>
+      <button type="button" class="button-inline button-ghost del">Delete</button>
     </div>`).join('') || '<p>No ingredients yet.</p>';
 }
 
 $('ingList').addEventListener('click', async e => {
-    const row = e.target.closest('.row'); if (!row) return;
+    const row = e.target.closest('.diet-row'); if (!row) return;
     const ing = state.ingredients.find(i => i.id === row.dataset.id);
     if (e.target.dataset.tag) {
         const t = e.target.dataset.tag;
@@ -147,7 +149,7 @@ $('ingList').addEventListener('click', async e => {
 });
 $('ingList').addEventListener('change', e => {
     if (!e.target.classList.contains('freq')) return;
-    updateIngredient(e.target.closest('.row').dataset.id, { is_frequent: e.target.checked });
+    updateIngredient(e.target.closest('.diet-row').dataset.id, { is_frequent: e.target.checked });
 });
 $('ingForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -162,10 +164,10 @@ function renderMealPicker() {
     const picked = state.ingredients.filter(i => state.picked.has(i.id) && !i.is_frequent);
     $('mealPicker').innerHTML =
         `<div><small>Frequent / selected (tap to toggle):</small><br>` +
-        [...frequent, ...picked].map(i => `<span class="chip ${state.picked.has(i.id) ? 'sel' : ''}" data-id="${i.id}">${esc(i.name)}</span>`).join('') +
-        `</div><input id="mealAdd" list="ingOptions" placeholder="Add any ingredient (new ones are created)" style="width:100%">
+        [...frequent, ...picked].map(i => `<span class="tag-chip ${state.picked.has(i.id) ? 'sel' : ''}" data-id="${i.id}">${esc(i.name)}</span>`).join('') +
+        `</div><input id="mealAdd" class="text-input" list="ingOptions" placeholder="Add any ingredient (new ones are created)" style="width:100%">
      <datalist id="ingOptions">${state.ingredients.map(i => `<option value="${esc(i.name)}">`).join('')}</datalist>
-     <select id="mealRecipe"><option value="">Add all from recipe…</option>${state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('')}</select>`;
+     <select id="mealRecipe" class="text-input"><option value="">Add all from recipe…</option>${state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('')}</select>`;
 }
 $('mealPicker').addEventListener('click', e => {
     const id = e.target.dataset.id; if (!id) return;
@@ -204,11 +206,11 @@ const mealTags = m => {
 };
 const mealHtml = m => {
     const { ings, tags } = mealTags(m);
-    return `<div class="row"><strong>${esc(m.label || 'Meal')}</strong> <small>${fmt(m.eaten_at)}</small>
+    return `<div class="diet-row"><strong>${esc(m.label || 'Meal')}</strong> <small>${fmt(m.eaten_at)}</small>
     <div>${ings.map(i => esc(i.name)).join(', ')}</div>
     <div>${tags.map(t => `<span class="${chipClass(t)}">${esc(t)}</span>`).join('')}</div>
     ${m.notes ? `<small>${esc(m.notes)}</small>` : ''}
-    <button data-del-meal="${m.id}">Delete</button></div>`;
+    <button type="button" class="button-inline button-ghost" data-del-meal="${m.id}">Delete</button></div>`;
 };
 $('mealList').addEventListener('click', async e => {
     const id = e.target.dataset.delMeal; if (!id || !confirm('Delete this meal?')) return;
@@ -225,10 +227,10 @@ $('symForm').addEventListener('submit', async e => {
     if (error) return console.error(error);
     $('symName').value = ''; $('symNotes').value = ''; loadAll();
 });
-const symHtml = s => `<div class="row"><strong>${esc(s.symptom)}</strong>
+const symHtml = s => `<div class="diet-row"><strong>${esc(s.symptom)}</strong>
   ${s.severity ? `<span class="sev">${s.severity}/10</span>` : ''} <small>${fmt(s.occurred_at)}</small>
   ${s.notes ? `<div><small>${esc(s.notes)}</small></div>` : ''}
-  <button data-del-sym="${s.id}">Delete</button></div>`;
+  <button type="button" class="button-inline button-ghost" data-del-sym="${s.id}">Delete</button></div>`;
 $('symList').addEventListener('click', async e => {
     const id = e.target.dataset.delSym; if (!id || !confirm('Delete this symptom?')) return;
     await sb.from('diet_symptoms').delete().eq('id', id); loadAll();
@@ -250,13 +252,27 @@ function renderTimeline() {
     $('timelineList').innerHTML = items.map(i => i.html).join('') || '<p>Nothing logged yet.</p>';
 }
 
-// ---------- tabs (hash routed, matching lists.html pattern) ----------
-function showTab() {
-    const tab = (location.hash || '#timeline').slice(1);
-    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
-    document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('active', a.hash === '#' + tab));
+// ---------- tabs (hash-routed, same pattern as creditcards.js) ----------
+const TAB_KEYS = ['timeline', 'meals', 'symptoms', 'ingredients'];
+const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
+
+function switchTab(tabKey) {
+    document.querySelectorAll('#elimination-tabs .tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabKey));
+    TAB_KEYS.forEach(key => {
+        const pane = document.getElementById(`tab-${key}`);
+        if (pane) pane.hidden = key !== tabKey;
+    });
 }
-window.addEventListener('hashchange', showTab);
+
+const tabsContainer = document.getElementById('elimination-tabs');
+if (tabsContainer) {
+    tabsContainer.addEventListener('click', e => {
+        const btn = e.target.closest('.tab');
+        if (btn && btn.dataset.tab) location.hash = btn.dataset.tab;
+    });
+    window.addEventListener('hashchange', () => switchTab(tabFromHash()));
+    switchTab(tabFromHash());
+}
 
 function renderAll() {
     renderIngredients(); renderMealPicker();
@@ -266,5 +282,9 @@ function renderAll() {
 }
 
 $('mealWhen').value = nowLocal(); $('symWhen').value = nowLocal();
-showTab();
-loadAll();
+
+if (window.initAppPage) {
+    window.initAppPage(loadAll);
+} else {
+    document.addEventListener('app:ready', loadAll, { once: true });
+}

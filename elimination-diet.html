@@ -9,19 +9,15 @@
     <script src="app.js" defer></script>
     <script type="module" src="elimination-diet.js"></script>
     <style>
-        body{font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:12px}
-        nav{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
-        nav a{padding:6px 12px;border:1px solid #bbb;border-radius:16px;text-decoration:none;color:inherit}
-        nav a.active{background:#333;color:#fff}
-        .panel{display:none}.panel.active{display:block}
-        form{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-        input,select,button,textarea{font:inherit;padding:6px}
-        .chip{display:inline-block;padding:2px 8px;margin:2px;border-radius:12px;background:#eee;font-size:.8em;cursor:pointer}
-        .chip.sel{background:#333;color:#fff}
-        .allergen{background:#fde2e2}.trigger{background:#fff0cc}
-        .row{padding:8px;border-bottom:1px solid #ddd}
-        .row small{color:#666}
-        .sev{font-weight:bold}
+        /* Page-specific only: tag chips and log rows. Everything else comes from styles.css. */
+        .tag-chip{display:inline-block;padding:2px 8px;margin:2px;border-radius:12px;background:#eee;font-size:.8em;cursor:pointer}
+        .tag-chip.allergen{background:#fde2e2}
+        .tag-chip.trigger{background:#fff0cc}
+        .tag-chip.sel{background:#333;color:#fff}
+        .diet-row{padding:8px 0;border-bottom:1px solid #ddd}
+        .diet-row small{color:#666}
+        .diet-row .sev{font-weight:bold}
+        .diet-picker{width:100%}
     </style>
 </head>
 
@@ -35,62 +31,132 @@
         <header class="topbar">
             <div class="text-center">
                 <h1>Log Food and Symptoms</h1>
+                <p>Log meals and symptoms with dates and times, tag ingredients with common allergens and triggers, and look for patterns.</p>
             </div>
         </header>
 
         <section class="content">
             <div class="tabs-container" id="elimination-tabs">
-                <nav id="tabs">
-                    <a href="#timeline">Timeline</a><a href="#meals">Meals</a>
-                    <a href="#symptoms">Symptoms</a><a href="#ingredients">Ingredients</a>
-                </nav>
+                <button type="button" class="tab" data-tab="timeline"><span>Timeline</span></button>
+                <button type="button" class="tab" data-tab="meals"><span>Meals</span></button>
+                <button type="button" class="tab" data-tab="symptoms"><span>Symptoms</span></button>
+                <button type="button" class="tab" data-tab="ingredients"><span>Ingredients</span></button>
+            </div>
+
+            <!-- Tab 1: Timeline -->
+            <div id="tab-timeline" class="tab-pane">
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Timeline</h2>
+                        <span class="note">Meals and symptoms together. Each symptom shows the tags from meals in the prior 6 hours.</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="timelineList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Meals -->
+            <div id="tab-meals" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Log a Meal</h2>
+                        <span class="note">Pick frequent ingredients, type any ingredient, or add everything from a recipe</span>
+                    </div>
+                    <div class="card-body">
+                        <form id="mealForm" class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="datetime-local" class="text-input" id="mealWhen" required />
+                                <input type="text" class="text-input" id="mealLabel" placeholder="Meal (e.g. Lunch)" />
+                                <input type="text" class="text-input note" id="mealNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <div id="mealPicker" class="diet-picker"></div>
+                            <button type="submit" class="button-inline">Add meal</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Meals</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="mealList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Symptoms -->
+            <div id="tab-symptoms" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Log a Symptom</h2>
+                        <span class="note">Severity is 1 (mild) to 10 (severe)</span>
+                    </div>
+                    <div class="card-body">
+                        <form id="symForm" class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="datetime-local" class="text-input" id="symWhen" required />
+                                <input type="text" class="text-input" id="symName" list="symOptions" placeholder="Symptom" required />
+                                <datalist id="symOptions">
+                                    <option>Bloating</option><option>Cramping</option><option>Nausea</option>
+                                    <option>Diarrhea</option><option>Constipation</option><option>Reflux</option>
+                                    <option>Gas</option><option>Pain</option>
+                                </datalist>
+                                <input type="number" class="text-input" id="symSev" min="1" max="10" value="3" placeholder="Severity" />
+                                <input type="text" class="text-input note" id="symNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button type="submit" class="button-inline">Add symptom</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Symptoms</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="symList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Ingredients -->
+            <div id="tab-ingredients" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Add Ingredients</h2>
+                        <span class="note">New ingredients are auto-tagged; tap chips below to correct them and the correction is remembered</span>
+                    </div>
+                    <div class="card-body">
+                        <form id="ingForm" class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="ingName" placeholder="Add ingredient by hand" required />
+                            </div>
+                            <button type="submit" class="button-inline">Add</button>
+                        </form>
+
+                        <form id="recipeImportForm" class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <select class="text-input" id="recipeSelect"><option value="">Import from recipe…</option></select>
+                            </div>
+                            <button type="submit" class="button-inline">Import ingredients</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Ingredients</h2>
+                        <span class="note">★ marks frequent ingredients, which show as one-tap chips when logging a meal</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="ingList"></div>
+                    </div>
+                </div>
             </div>
         </section>
-
     </main>
 </div>
-
-<section class="panel" id="panel-timeline"><div id="timelineList"></div></section>
-
-<section class="panel" id="panel-meals">
-    <form id="mealForm">
-        <input type="datetime-local" id="mealWhen" required>
-        <input id="mealLabel" placeholder="Meal (e.g. Lunch)">
-        <div id="mealPicker" style="width:100%"></div>
-        <input id="mealNotes" placeholder="Notes" style="flex:1">
-        <button>Add meal</button>
-    </form>
-    <div id="mealList"></div>
-</section>
-
-<section class="panel" id="panel-symptoms">
-    <form id="symForm">
-        <input type="datetime-local" id="symWhen" required>
-        <input id="symName" list="symOptions" placeholder="Symptom" required>
-        <datalist id="symOptions">
-            <option>Bloating</option><option>Cramping</option><option>Nausea</option>
-            <option>Diarrhea</option><option>Constipation</option><option>Reflux</option>
-            <option>Gas</option><option>Pain</option>
-        </datalist>
-        <label>Severity <input type="number" id="symSev" min="1" max="10" value="3" style="width:4em"></label>
-        <input id="symNotes" placeholder="Notes" style="flex:1">
-        <button>Add symptom</button>
-    </form>
-    <div id="symList"></div>
-</section>
-
-<section class="panel" id="panel-ingredients">
-    <form id="ingForm">
-        <input id="ingName" placeholder="Add ingredient by hand" required>
-        <button>Add</button>
-    </form>
-    <form id="recipeImportForm">
-        <select id="recipeSelect"><option value="">Import from recipe…</option></select>
-        <button>Import ingredients</button>
-    </form>
-    <div id="ingList"></div>
-</section>
-
-<script type="module" src="gi.js"></script>
 </body>
 </html>
