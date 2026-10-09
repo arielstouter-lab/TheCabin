@@ -666,7 +666,7 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
 
 .cal-day-dot.priority { background: var(--ochre); }
 
-.cal-day-dot.overdue{ background: var(--danger); }
+.cal-day-dot.overdue{ background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 35%, var(--card)); }
 
 .compact-list { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: var(--text-base); }
 
