@@ -76,8 +76,10 @@ function renderRecipeList(listEl, query){
         return nameMatch || ingredients.some(ing => ing.toLowerCase().includes(q));
     });
 
-    if(filtered.length){
-        listEl.append(...filtered.map(buildRecipeCard));
+    const sorted = [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    if(sorted.length){
+        listEl.append(...sorted.map(buildRecipeCard));
     } else {
         listEl.append(emptyState(q ? 'No recipes match your search.' : 'No recipes found.'));
     }

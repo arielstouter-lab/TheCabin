@@ -59,6 +59,11 @@ function buildChecklistItem(item) {
 }
 
 function renderGroupedListPanel(sec) {
+    const openAisles = new Set();
+    document.querySelectorAll('#lst-panel details[data-aisle-id]').forEach(d => {
+        if (d.open) openAisles.add(d.dataset.aisleId);
+    });
+
     const frag = cloneFragment('tpl-list-panel');
     const r = refs(frag);
     r.title.textContent = sec.name;
@@ -95,6 +100,10 @@ function renderGroupedListPanel(sec) {
         // Render each collapsible section with checkbox items
         sortedGroups.forEach(([aisleId, groupItems]) => {
             const details = document.createElement('details');
+            details.dataset.aisleId = aisleId;
+            if (openAisles.has(aisleId)) {
+                details.open = true;
+            }
 
             const summary = document.createElement('summary');
             let tagName = 'Unassigned';
@@ -103,12 +112,16 @@ function renderGroupedListPanel(sec) {
                 if (aisle) tagName = aisle.name;
             }
 
-            const uncheckedCount = groupItems.filter(i => !i.checked).length;
-            summary.textContent = `${tagName} (${uncheckedCount}/${groupItems.length})`;
+            const sortedItems = [
+                ...groupItems.filter(i => !i.checked).sort((a, b) => String(a.text || '').localeCompare(String(b.text || ''))),
+                ...groupItems.filter(i => i.checked).sort((a, b) => String(a.text || '').localeCompare(String(b.text || '')))
+            ];
+            const uncheckedCount = sortedItems.filter(i => !i.checked).length;
+            summary.textContent = `${tagName} (${uncheckedCount}/${sortedItems.length})`;
 
             details.append(summary);
 
-            groupItems.forEach(item => {
+            sortedItems.forEach(item => {
                 details.append(buildChecklistItem(item));
             });
 

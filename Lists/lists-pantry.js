@@ -35,6 +35,11 @@ function buildPantryItem(item){
 }
 
 export function renderPantryPanel(sec){
+    const openAisles = new Set();
+    document.querySelectorAll('#lst-panel details[data-aisle-id]').forEach(d => {
+        if(d.open) openAisles.add(d.dataset.aisleId);
+    });
+
     const frag = cloneFragment('tpl-pantry-panel');
     const r = refs(frag);
     r.title.textContent = sec.name;
@@ -78,6 +83,10 @@ export function renderPantryPanel(sec){
 
         sortedGroups.forEach(([aisleId, groupItems]) => {
             const details = document.createElement('details');
+            details.dataset.aisleId = aisleId;
+            if(openAisles.has(aisleId)){
+                details.open = true;
+            }
 
             const summary = document.createElement('summary');
 
@@ -99,8 +108,8 @@ export function renderPantryPanel(sec){
             details.append(summary);
 
             groupItems
-                .sort((a,b) =>
-                    a.created_at < b.created_at ? -1 : 1
+                .sort((a, b) =>
+                    String(a.text || '').localeCompare(String(b.text || ''))
                 )
                 .forEach(item => {
                     details.append(buildPantryItem(item));

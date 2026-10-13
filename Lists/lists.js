@@ -79,7 +79,7 @@ window.initDragAndDrop(panelEl, {
     canDrag: el => !el.classList.contains('checked'),
     onReorder: (fromIndex, toIndex) => {
         const sec = currentSection();
-        if(sec && !isPantry(sec) && !isRecipes(sec)){
+        if(sec && !isPantry(sec) && !isRecipes(sec) && !isGroceries(sec) && !sec.tags_enabled){
             reorderItems(sec.id, fromIndex, toIndex);
         }
     }

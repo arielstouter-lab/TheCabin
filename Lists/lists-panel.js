@@ -48,6 +48,7 @@ async function handleDeleteSection(sec){
 
 function buildItem(item, index, sec){
     const grocery = isGroceries(sec);
+    const tagged = grocery || sec.tags_enabled;
     const row = cloneEl('tpl-list-item');
     const r = refs(row);
 
@@ -55,7 +56,7 @@ function buildItem(item, index, sec){
     row.dataset.itemRow = item.id;
     row.classList.toggle('priority', !!item.priority);
     row.classList.toggle('checked', !!item.checked);
-    if(item.checked){
+    if(item.checked || tagged){
         row.removeAttribute('draggable');
         r.handle.remove();
     }

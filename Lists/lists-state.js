@@ -586,7 +586,12 @@ export async function deleteTag(aisleId){
 
 function aisleSortValue(aisleId){
     const aisle = state.groceryAisles.find(a => a.id === aisleId);
-    return aisle ? aisle.sort_order : 9999;
+    return aisle ? (aisle.sort_order ?? 9999) : 9999;
+}
+
+function aisleNameValue(aisleId){
+    const aisle = state.groceryAisles.find(a => a.id === aisleId);
+    return aisle ? aisle.name : 'Unassigned';
 }
 
 function compareBySortOrder(a, b){
@@ -621,10 +626,13 @@ export function sortItems(items){
 
 export function sortGroceryItems(items){
     return uncheckedThenChecked(items, (a, b) => {
-        const byOrder = compareBySortOrder(a, b);
-        if(byOrder !== 0) return byOrder;
-        const aisleDiff = aisleSortValue(a.aisle_id) - aisleSortValue(b.aisle_id);
-        if(aisleDiff !== 0) return aisleDiff;
+        const sortA = aisleSortValue(a.aisle_id);
+        const sortB = aisleSortValue(b.aisle_id);
+        if(sortA !== sortB) return sortA - sortB;
+        const nameA = aisleNameValue(a.aisle_id);
+        const nameB = aisleNameValue(b.aisle_id);
+        const aisleNameDiff = nameA.localeCompare(nameB);
+        if(aisleNameDiff !== 0) return aisleNameDiff;
         return String(a.text || '').localeCompare(String(b.text || ''));
     });
 }
