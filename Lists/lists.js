@@ -39,22 +39,23 @@ function renderTabs(){
 function renderPanel(){
     const panelEl = document.getElementById('lst-panel');
     const sec = currentSection();
-    panelEl.replaceChildren();
 
     if(!sec){
         activeSlug = null;
-        panelEl.append(emptyState('No tabs yet — add one above.'));
+        panelEl.replaceChildren(emptyState('No tabs yet — add one above.'));
         renderTabs();
         return;
     }
 
     activeSlug = sectionSlug(sec);
 
+    // Build the new panel BEFORE clearing the old one: the Pantry panel reads
+    // which <details> are currently open from the live DOM while it renders.
     const frag = isPantry(sec) ? renderPantryPanel(sec)
         : isRecipes(sec) ? renderRecipesPanel(sec)
             : renderListPanel(sec); // handles both Groceries and custom tabs
 
-    panelEl.append(frag);
+    panelEl.replaceChildren(frag);
     renderTabs();
 }
 
