@@ -69,7 +69,7 @@ function renderGroupedListPanel(sec) {
     r.title.textContent = sec.name;
 
     const manageBtn = cloneEl('tpl-manage-link');
-    manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
+    manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}&return=moving.html`;
     r.head.append(manageBtn);
 
     const items = [...(state.itemsBySection[sec.id] || [])];

@@ -47,7 +47,7 @@ export function renderPantryPanel(sec){
     const manageBtn = cloneEl('tpl-manage-link');
 
     manageBtn.href =
-        `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
+        `managegroceries.html?section=${encodeURIComponent(sec.id)}&return=${encodeURIComponent('lists.html#pantry')}`;
 
     manageBtn.textContent = 'Manage Tags';
 

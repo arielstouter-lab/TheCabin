@@ -5,7 +5,7 @@
 
 import {
     state, sb, TABLES, RPC, isGroceries, isPermanent,
-    sortItems, sortGroceryItems, aisleIdForItemText,
+    sortItems, sortGroceryItems, aisleIdForItemText, sectionSlug,
     createListItem, updateListItem, deleteListItem, deleteListItems,
     deleteSection, updateSectionTagsEnabled,
     personName, dueClass, saveToLocalCache, requestRender
@@ -178,7 +178,7 @@ export function buildTagsControls(container, sec){
 
     if(isGroceries(sec)){
         const manageBtn = cloneEl('tpl-manage-link');
-        manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
+        manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}&return=${encodeURIComponent(`lists.html#${sectionSlug(sec)}`)}`;
         wrap.append(manageBtn);
         return wrap;
     }
@@ -203,7 +203,7 @@ export function buildTagsControls(container, sec){
 
     if(sec.tags_enabled){
         const manageBtn = cloneEl('tpl-manage-link');
-        manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}`;
+        manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}&return=${encodeURIComponent(`lists.html#${sectionSlug(sec)}`)}`;
         wrap.append(manageBtn);
     }
 

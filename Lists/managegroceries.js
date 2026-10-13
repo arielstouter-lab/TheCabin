@@ -49,6 +49,7 @@ import { writeOrQueue, nowStamp, initSync } from '../SharedJS/sync.js';
             aisles = aisleResult.data || [];
             itemMemory = memoryResult.data || [];
 
+
             if(groceries){
                 const itemResult = await sb.from(TABLES.LIST_ITEMS)
                     .select('*')
@@ -312,7 +313,30 @@ import { writeOrQueue, nowStamp, initSync } from '../SharedJS/sync.js';
 
     document.getElementById('done-btn').addEventListener('click', () => {
         sessionStorage.setItem('reloadOnReturn', 'true');
-        history.back();
+        const params = new URLSearchParams(location.search);
+        const returnUrl = params.get('return');
+        if (returnUrl) {
+            location.href = returnUrl;
+            return;
+        }
+        if (groceries && groceries.name && groceries.name.toLowerCase() === 'moving') {
+            location.href = 'moving.html';
+            return;
+        }
+        if (document.referrer) {
+            try {
+                const ref = new URL(document.referrer);
+                if (ref.origin === location.origin && (ref.pathname.includes('moving.html') || ref.pathname.includes('lists.html'))) {
+                    location.href = ref.pathname + ref.search + ref.hash;
+                    return;
+                }
+            } catch (e) {}
+        }
+        if (window.history.length > 1) {
+            history.back();
+            return;
+        }
+        location.href = 'lists.html';
     });
 
     document.getElementById('mg-add-aisle').addEventListener('click', async () => {
