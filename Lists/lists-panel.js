@@ -8,8 +8,7 @@ import {
     sortItems, sortGroceryItems, aisleIdForItemText,
     createListItem, updateListItem, deleteListItem, deleteListItems,
     deleteSection, updateSectionTagsEnabled,
-    personName, dueClass, saveToLocalCache, requestRender,
-    findItemById
+    personName, dueClass, saveToLocalCache, requestRender
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
 
@@ -21,43 +20,10 @@ function makeChip(text, extraClass){
 }
 
 // ---- Row actions ---------------------------------------------------------
-function sortFor(sec, items){
-    return (isGroceries(sec) || sec.tags_enabled) ? sortGroceryItems(items) : sortItems(items);
-}
 
-// Returns false if a targeted update isn't possible (caller falls back to a full render).
-function moveRow(sec, item){
-    const list = document.querySelector('#lst-panel [data-ref="items"]');
-    if(!list) return false;
-    const sel = id => `[data-item-row="${CSS.escape(id)}"]`;
-    const oldRow = list.querySelector(sel(item.id));
-    if(!oldRow) return false;
-
-    const sorted = sortFor(sec, state.itemsBySection[sec.id] || []);
-    const idx = sorted.findIndex(i => i.id === item.id);
-    const nextItem = sorted[idx + 1];
-    const nextRow = nextItem ? list.querySelector(sel(nextItem.id)) : null;
-
-    const newRow = buildItem(item, idx, sec);
-    oldRow.remove();
-    list.insertBefore(newRow, nextRow);
-
-    // Drag-and-drop reads data-index, so keep it matching DOM order.
-    list.querySelectorAll('[data-item-row]').forEach((row, i) => { row.dataset.index = String(i); });
-    return true;
-}
-
-function toggleChecked(sec, id, checked){
-    const write = updateListItem(id, { checked }); // local state updates synchronously
-    const item = findItemById(id);
-
-    // "Clear checked" only exists when something is checked, so crossing
-    // 0 <-> 1 checked needs a full render to add/remove the button.
-    const count = (state.itemsBySection[sec.id] || []).filter(i => i.checked).length;
-    const buttonChanges = (checked && count === 1) || (!checked && count === 0);
-
-    if(buttonChanges || !item || !moveRow(sec, item)) requestRender();
-    return write;
+async function toggleChecked(sec, id, checked){
+    await updateListItem(id, { checked });
+    requestRender();
 }
 
 async function deleteItem(sec, id){
