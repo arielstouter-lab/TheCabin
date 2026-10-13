@@ -87,6 +87,13 @@ window.initDragAndDrop(panelEl, {
 
 window.addEventListener('beforeunload', stopRealtime);
 
+window.addEventListener('pageshow', () => {
+    if (sessionStorage.getItem('reloadOnReturn')) {
+        sessionStorage.removeItem('reloadOnReturn');
+        location.reload();
+    }
+});
+
 // Grocery writes that fail (or happen while offline) are queued and retried
 // automatically on reconnect; this surfaces how many are still waiting.
 initSync(sb, {

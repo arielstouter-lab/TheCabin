@@ -177,6 +177,13 @@ async function render() {
 onStateChange(render);
 window.addEventListener('beforeunload', stopRealtime);
 
+window.addEventListener('pageshow', () => {
+    if (sessionStorage.getItem('reloadOnReturn')) {
+        sessionStorage.removeItem('reloadOnReturn');
+        location.reload();
+    }
+});
+
 initSync(sb, {
     onChange: n => {
         if (window.setStatus) {

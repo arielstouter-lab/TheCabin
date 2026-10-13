@@ -310,6 +310,11 @@ import { writeOrQueue, nowStamp, initSync } from '../SharedJS/sync.js';
 
     // ---- Event wiring ------------------------------------------------
 
+    document.getElementById('done-btn').addEventListener('click', () => {
+        sessionStorage.setItem('reloadOnReturn', 'true');
+        history.back();
+    });
+
     document.getElementById('mg-add-aisle').addEventListener('click', async () => {
         const input = document.getElementById('mg-new-aisle-name');
         await addAisle(input.value);
