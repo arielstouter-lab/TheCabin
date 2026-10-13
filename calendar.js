@@ -37,6 +37,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
     let selectedDate;                             // 'YYYY-MM-DD'
     let eventsByDate = {};                        // 'YYYY-MM-DD' -> [event rows]
     let projectedMoonDays = new Set();            // 'YYYY-MM-DD' strings
+    const pendingListInserts = {};
 
     // ---------- helpers ----------
     const $ = id => document.getElementById(id);
@@ -119,16 +120,29 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
     // load time and never copied into the events table. Checked or deleted items
     // (including ones whose write is still queued) are left out.
     function addListItems(rows){
-        rows.forEach(row => {
-            const op = getPendingOp(TABLES.LIST_ITEMS, row.id);
-            if(op && op.type === 'delete') return;
-            const item = (op && op.type === 'update') ? { ...row, ...op.payload } : row;
-            if(item.checked || !item.due_date) return;
+        const serverIds = new Set(rows.map(r => r.id));
+        const push = item => {
             (eventsByDate[item.due_date] ||= []).push({
                 id: item.id, title: item.text, event_date: item.due_date,
                 layer: 'list', source: 'list', sort_order: 0,
                 priority: !!item.priority
             });
+        };
+
+        rows.forEach(row => {
+            const op = getPendingOp(TABLES.LIST_ITEMS, row.id);
+            if(op && op.type === 'delete') return;
+            const item = (op && op.type === 'update') ? { ...row, ...op.payload } : row;
+            if(item.checked || !item.due_date) return;
+            push(item);
+        });
+
+        // locally-added items whose insert hasn't synced yet
+        Object.values(pendingListInserts).forEach(item => {
+            const op = getPendingOp(TABLES.LIST_ITEMS, item.id);
+            if(serverIds.has(item.id) || !op){ delete pendingListInserts[item.id]; return; }
+            const d = parseDate(item.due_date);
+            if(d.getFullYear() === viewYear && d.getMonth() === viewMonth) push(item);
         });
     }
 
@@ -171,16 +185,33 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         const select = $('cal-event-layer');
         if(!select) return;
         try{
-            const { data, error } = await sb.from(TABLES.EVENTS).select('layer');
-            if(error) throw error;
+            const [events, sections] = await Promise.all([
+                sb.from(TABLES.EVENTS).select('layer'),
+                sb.from(TABLES.LIST_SECTIONS).select('id, name').order('name')
+            ]);
+            if(events.error) throw events.error;
+            if(sections.error) throw sections.error;
 
-            const layers = [...new Set((data || []).map(row => row.layer).filter(Boolean))].sort();
+            const layers = [...new Set((events.data || []).map(r => r.layer).filter(Boolean))].sort();
             const current = select.value;
 
-            select.replaceChildren(new Option('Default', ''), ...layers.map(layer => new Option(layer, layer)));
-            if(layers.includes(current)) select.value = current;
+            const group = (label, options) => {
+                const g = document.createElement('optgroup');
+                g.label = label;
+                g.append(...options);
+                return g;
+            };
+
+            select.replaceChildren(
+                new Option('Default (event)', 'layer:'),
+                group('List (checkable)', (sections.data || [])
+                    .filter(s => (s.name || '').toLowerCase() !== 'pantry')   // pantry items can't have dates
+                    .map(s => new Option(s.name, `list:${s.id}`))),
+                group('Calendar', layers.map(l => new Option(l, `layer:${l}`)))
+            );
+            if([...select.options].some(o => o.value === current)) select.value = current;
         } catch(err){
-            console.error('Failed to load layer options', err);
+            console.error('Failed to load add targets', err);
         }
     }
 
@@ -529,18 +560,52 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
     $('cal-add-event').addEventListener('click', async () => {
         const input = $('cal-new-event');
         const title = input.value.trim();
-        if(!title) return;
+        const target = $('cal-event-layer').value;
+        if(!title || !target) return;
 
-        const layer = $('cal-event-layer').value || null;
-        const events = eventsByDate[selectedDate] || [];
-        const sort_order = Math.max(0, events.length, ...events.map(ev => Number(ev.sort_order) || 0)) + 1;
-
-        // Client-generated id so the event shows up immediately even offline;
-        // the same id ships with the queued insert, so the eventual server
-        // row lines up with this one instead of creating a duplicate.
         const id = crypto.randomUUID();
         const updated_at = nowStamp();
-        const basePayload = { event_date: selectedDate, title, sort_order, layer };
+        const [kind, ...rest] = target.split(':');
+        const key = rest.join(':');
+
+        // ----- list section: checkable item due on the selected day -----
+        if(kind === 'list'){
+            const item = { id, text: title, due_date: selectedDate, section_id: key,
+                checked: false, priority: false, updated_at };
+            pendingListInserts[id] = item;
+
+            (eventsByDate[selectedDate] ||= []).push({
+                id, title, event_date: selectedDate, layer: 'list',
+                source: 'list', sort_order: 0, priority: false
+            });
+
+            // keep the Lists page's offline cache in step
+            try{
+                const raw = localStorage.getItem(LISTS_CACHE_KEY);
+                if(raw){
+                    const data = JSON.parse(raw);
+                    data.itemsBySection ||= {};
+                    (data.itemsBySection[key] ||= []).push(item);
+                    localStorage.setItem(LISTS_CACHE_KEY, JSON.stringify(data));
+                }
+            } catch(e){}
+
+            saveToLocalCache();
+            input.value = '';
+            render();
+
+            try {
+                await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'insert', id, payload: item });
+            } catch (err) {
+                console.error('Failed to add list item:', err);
+            }
+            return;
+        }
+
+        // ----- default / calendar layer: regular event, no checkbox -----
+        const events = eventsByDate[selectedDate] || [];
+        const sort_order = Math.max(0, events.length, ...events.map(ev => Number(ev.sort_order) || 0)) + 1;
+        const basePayload = { event_date: selectedDate, title, sort_order, layer: key || null };
         const localEvent = { id, ...basePayload, updated_at };
 
         (eventsByDate[selectedDate] ||= []).push(localEvent);
