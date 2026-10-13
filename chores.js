@@ -1,4 +1,4 @@
-import { cloneEl, refs, emptyState } from './SharedJS/dom.js';
+import { cloneEl, refs, emptyState, bindEvents } from './SharedJS/dom.js';
 
 const DEFAULT_DISLIKE = 5;
 const sb = window.supabaseClient;
@@ -333,10 +333,8 @@ function refreshPeopleTotalsAndTickets(){
   renderBeam();
 }
 
-document.addEventListener('input', (e) => {
-  const t = e.target;
-
-  if(t.matches('input[data-field][data-chore]')){
+bindEvents(document, {
+  'input input[data-field][data-chore]': (e, t) => {
     const chore = state.chores.find(c => c.id === t.dataset.chore);
     if(!chore) return;
     if(t.dataset.field === 'name') chore.name = t.value;
@@ -349,9 +347,8 @@ document.addEventListener('input', (e) => {
               name: chore.name, times_per_week: chore.timesPerWeek, minutes: chore.minutes
             }).eq('id', chore.id)
     );
-  }
-
-  if(t.matches('input[data-dislike-chore][data-dislike-person]')){
+  },
+  'input input[data-dislike-chore][data-dislike-person]': (e, t) => {
     const choreId = t.dataset.dislikeChore;
     const personId = t.dataset.dislikePerson;
     const chore = state.chores.find(c => c.id === choreId);
@@ -364,9 +361,8 @@ document.addEventListener('input', (e) => {
     debounceSave(`dislike-${choreId}-${personId}`, () =>
             sb.from(TABLES.CHORE_DISLIKES).upsert({chore_id: choreId, person_id: personId, dislike: val})
     );
-  }
-
-  if(t.matches('input[data-split-chore][data-split-person]')){
+  },
+  'input input[data-split-chore][data-split-person]': (e, t) => {
     const choreId = t.dataset.splitChore;
     const personId = t.dataset.splitPerson;
     const pct = Math.min(100, Math.max(0, parseInt(t.value,10) || 0));
@@ -377,9 +373,8 @@ document.addEventListener('input', (e) => {
     debounceSave(`split-${choreId}-${personId}`, () =>
             sb.from(TABLES.CHORE_ASSIGNMENTS).upsert({chore_id: choreId, person_id: personId, pct})
     );
-  }
-
-  if(t.matches('input[data-person-name]')){
+  },
+  'input input[data-person-name]': (e, t) => {
     const p = state.people.find(p => p.id === t.dataset.personName);
     if(!p) return;
     p.name = t.value;
@@ -389,13 +384,8 @@ document.addEventListener('input', (e) => {
     debounceSave(`person-name-${p.id}`, () =>
             sb.from(TABLES.PEOPLE).update({name: p.name}).eq('id', p.id)
     );
-  }
-});
-
-document.addEventListener('click', async (e) => {
-  const t = e.target;
-
-  if(t.matches('[data-del-chore]')){
+  },
+  'click [data-del-chore]': async (e, t) => {
     const id = t.getAttribute('data-del-chore');
     state.chores = state.chores.filter(c => c.id !== id);
     delete state.assignments[id];
@@ -403,9 +393,8 @@ document.addEventListener('click', async (e) => {
     try{
       await sb.from(TABLES.CHORES).delete().eq('id', id);
     } catch(err){ setStatus('Could not delete chore.'); }
-  }
-
-  if(t.matches('[data-del-person]')){
+  },
+  'click [data-del-person]': async (e, t) => {
     if(state.people.length <= 1){ setStatus('Keep at least one person.'); return; }
     const id = t.getAttribute('data-del-person');
     state.people = state.people.filter(p => p.id !== id);
@@ -417,9 +406,8 @@ document.addEventListener('click', async (e) => {
     try{
       await sb.from(TABLES.PEOPLE).delete().eq('id', id);
     } catch(err){ setStatus('Could not delete person.'); }
-  }
-
-  if(t.id === 'cl-add-chore'){
+  },
+  'click #cl-add-chore': async () => {
     const input = document.getElementById('cl-new-chore-name');
     const name = input.value.trim();
     if(!name) return;
@@ -451,9 +439,8 @@ document.addEventListener('click', async (e) => {
     } catch(err){
       setStatus('Could not add chore.');
     }
-  }
-
-  if(t.id === 'cl-add-person'){
+  },
+  'click #cl-add-person': async () => {
     const input = document.getElementById('cl-new-person-name');
     const name = input.value.trim();
     if(!name) return;
@@ -482,9 +469,8 @@ document.addEventListener('click', async (e) => {
     } catch(err){
       setStatus('Could not add person.');
     }
-  }
-
-  if(t.id === 'cl-auto-balance'){
+  },
+  'click #cl-auto-balance': async () => {
     try {
       await autoBalance();
       setStatus('Balanced.');
@@ -492,9 +478,8 @@ document.addEventListener('click', async (e) => {
       console.error(err);
       setStatus('Failed to auto-balance.');
     }
-  }
-
-  if(t.id === 'cl-clear-assign'){
+  },
+  'click #cl-clear-assign': async () => {
     const first = state.people[0];
     state.chores.forEach(c => {
       state.assignments[c.id] = first ? {[first.id]: 100} : {};
@@ -515,13 +500,12 @@ document.addEventListener('click', async (e) => {
     } catch(err){
       setStatus('Reset locally, but could not save.');
     }
-  }
-});
-
-document.addEventListener('keydown', (e) => {
-  if(e.key === 'Enter'){
-    if(e.target.id === 'cl-new-chore-name') document.getElementById('cl-add-chore').click();
-    if(e.target.id === 'cl-new-person-name') document.getElementById('cl-add-person').click();
+  },
+  'keydown #cl-new-chore-name': (e) => {
+    if(e.key === 'Enter') document.getElementById('cl-add-chore').click();
+  },
+  'keydown #cl-new-person-name': (e) => {
+    if(e.key === 'Enter') document.getElementById('cl-add-person').click();
   }
 });
 

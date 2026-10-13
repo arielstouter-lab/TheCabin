@@ -1,3 +1,5 @@
+import { bindEvents } from './SharedJS/dom.js';
+
 // Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
 // same shared scripts that lists.html does before this module.
 const sb = window.supabaseClient;
@@ -123,7 +125,7 @@ async function updateIngredient(id, patch) {
 // Recipe ingredient formats vary; handles array, JSON-ish array, or newline/comma text.
 function parseRecipeIngredients(r) {
     const raw = r.ingredients ?? r.ingredient_list ?? '';
-    const list = Array.isArray(raw) ? raw : String(raw).split(/\n|,/);
+    const list = Array.isArray(raw) ? raw : String(raw).split(/[\n,]/);
     return list
         .map(s => (typeof s === 'string' ? s : s?.name || ''))
         .map(s => s.replace(/^[\s\-•*\d./]+/, '')                                   // leading qty/bullet
@@ -155,41 +157,6 @@ function renderIngredients() {
     </div>`).join('') || '<p>No ingredients yet.</p>';
 }
 
-$('ingList').addEventListener('click', async e => {
-    const row = e.target.closest('.diet-row'); if (!row) return;
-    const ing = state.ingredients.find(i => i.id === row.dataset.id);
-    if (!ing) return;
-    if (e.target.dataset.tag) {
-        const t = e.target.dataset.tag;
-        await updateIngredient(ing.id, { tags: ing.tags.includes(t) ? ing.tags.filter(x => x !== t) : [...ing.tags, t] });
-    } else if (e.target.classList.contains('del')) {
-        if (!confirm(`Delete ${ing.name}? It will be removed from logged meals too.`)) return;
-        try {
-            await sb.from('diet_ingredients').delete().eq('id', ing.id);
-            state.ingredients = state.ingredients.filter(i => i.id !== ing.id);
-            await loadAll();
-        } catch (err) {
-            console.error('Failed to delete ingredient:', err);
-        }
-    }
-});
-$('ingList').addEventListener('change', async e => {
-    if (!e.target.classList.contains('freq')) return;
-    const row = e.target.closest('.diet-row');
-    if (row) {
-        await updateIngredient(row.dataset.id, { is_frequent: e.target.checked });
-    }
-});
-$('ingForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    await addIngredient($('ingName').value, { is_frequent: false });
-    $('ingName').value = ''; renderAll();
-});
-$('recipeImportForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    await importRecipe($('recipeSelect').value);
-});
-
 // ---------- meals ----------
 function renderMealPicker() {
     const frequent = state.ingredients.filter(i => i.is_frequent);
@@ -201,24 +168,6 @@ function renderMealPicker() {
      <datalist id="ingOptions">${state.ingredients.map(i => `<option value="${esc(i.name)}">`).join('')}</datalist>
      <select id="mealRecipe" class="text-input"><option value="">Add all from recipe…</option>${state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('')}</select>`;
 }
-$('mealPicker').addEventListener('click', e => {
-    const id = e.target.dataset.id; if (!id) return;
-    state.picked.has(id) ? state.picked.delete(id) : state.picked.add(id);
-    renderMealPicker();
-});
-$('mealPicker').addEventListener('change', async e => {
-    if (e.target.id === 'mealAdd' && e.target.value.trim()) {
-        const ing = await addIngredient(e.target.value);
-        if (ing) state.picked.add(ing.id);
-        renderAll();
-    }
-    if (e.target.id === 'mealRecipe' && e.target.value) {
-        const r = state.recipes.find(x => String(x.id) === e.target.value);
-        for (const n of parseRecipeIngredients(r)) { const ing = await addIngredient(n, { source_recipe_id: r.id }); if (ing) state.picked.add(ing.id); }
-        if (!$('mealLabel').value) $('mealLabel').value = r.name || r.title || '';
-        renderAll();
-    }
-});
 // ---------- edit state: click a meal or symptom row to load it into its form ----------
 let editMealId = null, editSymId = null;
 const toLocalInput = iso => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -243,7 +192,6 @@ function startEditMeal(id) {
     location.hash = 'meals';
     $('mealForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-$('mealCancel').addEventListener('click', () => { resetMealForm(); renderAll(); });
 
 function setSymMode() {
     const editing = !!editSymId;
@@ -265,57 +213,7 @@ function startEditSym(id) {
     location.hash = 'symptoms';
     $('symForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-$('symCancel').addEventListener('click', () => { resetSymForm(); renderAll(); });
 
-// One delegated handler for every list (Timeline, Meals, Symptoms): delete buttons and row clicks.
-document.addEventListener('click', async e => {
-    const del = e.target.closest('[data-del-meal], [data-del-sym]');
-    if (del) {
-        const isMeal = !!del.dataset.delMeal, id = del.dataset.delMeal || del.dataset.delSym;
-        if (!confirm(isMeal ? 'Delete this meal?' : 'Delete this symptom?')) return;
-        try {
-            const { error } = await sb.from(isMeal ? 'diet_meals' : 'diet_symptoms').delete().eq('id', id);
-            if (error) return console.error(error);
-            if (isMeal && editMealId === id) resetMealForm();
-            if (!isMeal && editSymId === id) resetSymForm();
-            await loadAll();
-        } catch (err) {
-            console.error('Failed to delete item:', err);
-        }
-        return;
-    }
-    if (e.target.closest('button, a, input, select, label, textarea')) return;
-    const row = e.target.closest('.diet-row[data-meal-id], .diet-row[data-sym-id]');
-    if (!row) return;
-    row.dataset.mealId ? startEditMeal(row.dataset.mealId) : startEditSym(row.dataset.symId);
-});
-
-// ---------- meals ----------
-$('mealForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    try {
-        const fields = { eaten_at: new Date($('mealWhen').value).toISOString(), label: $('mealLabel').value || null, notes: $('mealNotes').value || null };
-        if (editMealId) {
-            const { error } = await sb.from('diet_meals').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editMealId);
-            if (error) return console.error(error);
-            const m = state.meals.find(m => m.id === editMealId);
-            const current = new Set(m ? m.diet_meal_ingredients.map(x => x.ingredient_id) : []);
-            const removed = [...current].filter(i => !state.picked.has(i));
-            const added = [...state.picked].filter(i => !current.has(i));
-            if (removed.length) await sb.from('diet_meal_ingredients').delete().eq('meal_id', editMealId).in('ingredient_id', removed);
-            if (added.length) await sb.from('diet_meal_ingredients').insert(added.map(ingredient_id => ({ meal_id: editMealId, ingredient_id })));
-        } else {
-            const { data: meal, error } = await sb.from('diet_meals').insert(fields).select().single();
-            if (error) return console.error(error);
-            if (state.picked.size)
-                await sb.from('diet_meal_ingredients').insert([...state.picked].map(ingredient_id => ({ meal_id: meal.id, ingredient_id })));
-        }
-        resetMealForm();
-        await loadAll();
-    } catch (err) {
-        console.error('Failed to save meal:', err);
-    }
-});
 const mealTags = m => {
     const ids = m.diet_meal_ingredients.map(x => x.ingredient_id);
     const ings = ids.map(id => state.ingredients.find(i => i.id === id)).filter(Boolean);
@@ -331,22 +229,6 @@ const mealHtml = m => {
     ${m.notes ? `<small>${esc(m.notes)}</small>` : ''}</div>`;
 };
 
-// ---------- symptoms ----------
-$('symForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    try {
-        const fields = { occurred_at: new Date($('symWhen').value).toISOString(), symptom: $('symName').value.trim(),
-            severity: +$('symSev').value || null, notes: $('symNotes').value || null };
-        const { error } = editSymId
-            ? await sb.from('diet_symptoms').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editSymId)
-            : await sb.from('diet_symptoms').insert(fields);
-        if (error) return console.error(error);
-        resetSymForm();
-        await loadAll();
-    } catch (err) {
-        console.error('Failed to save symptom:', err);
-    }
-});
 const symHtml = (s, hint = '') => `<div class="diet-row${editSymId === s.id ? ' editing' : ''}" data-sym-id="${s.id}">
   <div class="diet-row-top"><span><strong>${esc(s.symptom)}</strong>
     ${s.severity ? `<span class="sev">${s.severity}/10</span>` : ''} <small>${fmt(s.occurred_at)}</small></span>
@@ -381,13 +263,135 @@ function switchTab(tabKey) {
     });
 }
 
-const tabsContainer = document.getElementById('elimination-tabs');
-if (tabsContainer) {
-    tabsContainer.addEventListener('click', e => {
-        const btn = e.target.closest('.tab');
-        if (btn && btn.dataset.tab) location.hash = btn.dataset.tab;
-    });
-    window.addEventListener('hashchange', () => switchTab(tabFromHash()));
+// ---------- declarative event map ----------
+bindEvents(document, {
+    'click #ingList [data-tag]': async (e, tagEl) => {
+        const row = tagEl.closest('.diet-row'); if (!row) return;
+        const ing = state.ingredients.find(i => i.id === row.dataset.id);
+        if (!ing) return;
+        const t = tagEl.dataset.tag;
+        await updateIngredient(ing.id, { tags: ing.tags.includes(t) ? ing.tags.filter(x => x !== t) : [...ing.tags, t] });
+    },
+    'click #ingList .del': async (e, delBtn) => {
+        const row = delBtn.closest('.diet-row'); if (!row) return;
+        const ing = state.ingredients.find(i => i.id === row.dataset.id);
+        if (!ing) return;
+        if (!confirm(`Delete ${ing.name}? It will be removed from logged meals too.`)) return;
+        try {
+            await sb.from('diet_ingredients').delete().eq('id', ing.id);
+            state.ingredients = state.ingredients.filter(i => i.id !== ing.id);
+            await loadAll();
+        } catch (err) {
+            console.error('Failed to delete ingredient:', err);
+        }
+    },
+    'change #ingList .freq': async (e, checkEl) => {
+        const row = checkEl.closest('.diet-row');
+        if (row) {
+            await updateIngredient(row.dataset.id, { is_frequent: checkEl.checked });
+        }
+    },
+    'submit #ingForm': async (e) => {
+        e.preventDefault();
+        await addIngredient($('ingName').value, { is_frequent: false });
+        $('ingName').value = '';
+        renderAll();
+    },
+    'submit #recipeImportForm': async (e) => {
+        e.preventDefault();
+        await importRecipe($('recipeSelect').value);
+    },
+    'click #mealPicker [data-id]': (e, chip) => {
+        const id = chip.dataset.id; if (!id) return;
+        state.picked.has(id) ? state.picked.delete(id) : state.picked.add(id);
+        renderMealPicker();
+    },
+    'change #mealAdd': async (e, input) => {
+        if (input.value.trim()) {
+            const ing = await addIngredient(input.value);
+            if (ing) state.picked.add(ing.id);
+            renderAll();
+        }
+    },
+    'change #mealRecipe': async (e, select) => {
+        if (select.value) {
+            const r = state.recipes.find(x => String(x.id) === select.value);
+            if (r) {
+                for (const n of parseRecipeIngredients(r)) {
+                    const ing = await addIngredient(n, { source_recipe_id: r.id });
+                    if (ing) state.picked.add(ing.id);
+                }
+                if (!$('mealLabel').value) $('mealLabel').value = r.name || r.title || '';
+                renderAll();
+            }
+        }
+    },
+    'click #mealCancel': () => { resetMealForm(); renderAll(); },
+    'click #symCancel': () => { resetSymForm(); renderAll(); },
+    'click [data-del-meal], [data-del-sym]': async (e, del) => {
+        const isMeal = !!del.dataset.delMeal, id = del.dataset.delMeal || del.dataset.delSym;
+        if (!confirm(isMeal ? 'Delete this meal?' : 'Delete this symptom?')) return;
+        try {
+            const { error } = await sb.from(isMeal ? 'diet_meals' : 'diet_symptoms').delete().eq('id', id);
+            if (error) return console.error(error);
+            if (isMeal && editMealId === id) resetMealForm();
+            if (!isMeal && editSymId === id) resetSymForm();
+            await loadAll();
+        } catch (err) {
+            console.error('Failed to delete item:', err);
+        }
+    },
+    'click .diet-row[data-meal-id], .diet-row[data-sym-id]': (e, row) => {
+        if (e.target.closest('button, a, input, select, label, textarea')) return;
+        row.dataset.mealId ? startEditMeal(row.dataset.mealId) : startEditSym(row.dataset.symId);
+    },
+    'submit #mealForm': async (e) => {
+        e.preventDefault();
+        try {
+            const fields = { eaten_at: new Date($('mealWhen').value).toISOString(), label: $('mealLabel').value || null, notes: $('mealNotes').value || null };
+            if (editMealId) {
+                const { error } = await sb.from('diet_meals').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editMealId);
+                if (error) return console.error(error);
+                const m = state.meals.find(m => m.id === editMealId);
+                const current = new Set(m ? m.diet_meal_ingredients.map(x => x.ingredient_id) : []);
+                const removed = [...current].filter(i => !state.picked.has(i));
+                const added = [...state.picked].filter(i => !current.has(i));
+                if (removed.length) await sb.from('diet_meal_ingredients').delete().eq('meal_id', editMealId).in('ingredient_id', removed);
+                if (added.length) await sb.from('diet_meal_ingredients').insert(added.map(ingredient_id => ({ meal_id: editMealId, ingredient_id })));
+            } else {
+                const { data: meal, error } = await sb.from('diet_meals').insert(fields).select().single();
+                if (error) return console.error(error);
+                if (state.picked.size)
+                    await sb.from('diet_meal_ingredients').insert([...state.picked].map(ingredient_id => ({ meal_id: meal.id, ingredient_id })));
+            }
+            resetMealForm();
+            await loadAll();
+        } catch (err) {
+            console.error('Failed to save meal:', err);
+        }
+    },
+    'submit #symForm': async (e) => {
+        e.preventDefault();
+        try {
+            const fields = { occurred_at: new Date($('symWhen').value).toISOString(), symptom: $('symName').value.trim(),
+                severity: +$('symSev').value || null, notes: $('symNotes').value || null };
+            const { error } = editSymId
+                ? await sb.from('diet_symptoms').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editSymId)
+                : await sb.from('diet_symptoms').insert(fields);
+            if (error) return console.error(error);
+            resetSymForm();
+            await loadAll();
+        } catch (err) {
+            console.error('Failed to save symptom:', err);
+        }
+    },
+    'click #elimination-tabs .tab': (e, btn) => {
+        if (btn.dataset.tab) location.hash = btn.dataset.tab;
+    }
+});
+
+window.addEventListener('hashchange', () => switchTab(tabFromHash()));
+if (document.getElementById('elimination-tabs')) {
     switchTab(tabFromHash());
 }
 

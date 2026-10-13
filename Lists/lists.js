@@ -5,7 +5,7 @@ import {
     state, sb, loadAll, orderedSections, sectionSlug, findSectionBySlug,
     isPantry, isRecipes, isGroceries, createSection, onStateChange, stopRealtime
 } from './lists-state.js';
-import { cloneEl, refs, emptyState } from '../SharedJS/dom.js';
+import { cloneEl, refs, emptyState, bindEvents } from '../SharedJS/dom.js';
 import { renderListPanel, reorderItems } from './lists-panel.js';
 import { renderPantryPanel } from './lists-pantry.js';
 import { renderRecipesPanel } from './lists-recipes.js';
@@ -30,8 +30,8 @@ function renderTabs(){
         const r = refs(btn);
         r.label.textContent = sec.name;
         const slug = sectionSlug(sec);
+        btn.dataset.slug = slug;
         btn.classList.toggle('active', slug === activeSlug);
-        btn.addEventListener('click', () => { location.hash = slug; });
         tabsEl.append(btn);
     });
 }
@@ -62,16 +62,24 @@ function renderPanel(){
 onStateChange(renderPanel);
 window.addEventListener('hashchange', renderPanel);
 
-document.getElementById('lst-add-section').addEventListener('click', async () => {
-    const input = document.getElementById('lst-new-section-name');
-    const name = input.value.trim();
-    if(!name) return;
-    try{
-        const data = await createSection(name);
-        input.value = '';
-        location.hash = sectionSlug(data); // custom tabs are keyed by id, not name
-    } catch(e){
-        setStatus(e.message || 'Could not add tab.');
+bindEvents(document, {
+    'click #lst-tabs [data-slug]': (e, btn) => {
+        location.hash = btn.dataset.slug;
+    },
+    'click #lst-add-section': async () => {
+        const input = document.getElementById('lst-new-section-name');
+        const name = input?.value.trim();
+        if(!name) return;
+        try{
+            const data = await createSection(name);
+            if (input) input.value = '';
+            location.hash = sectionSlug(data); // custom tabs are keyed by id, not name
+        } catch(e){
+            setStatus(e.message || 'Could not add tab.');
+        }
+    },
+    'keydown #lst-new-section-name': (e) => {
+        if(e.key === 'Enter') document.getElementById('lst-add-section')?.click();
     }
 });
 

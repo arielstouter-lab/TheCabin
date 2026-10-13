@@ -8,7 +8,7 @@
 //
 // Math lives in debt-engine.js; this file is UI + Supabase only.
 
-import { cloneEl, refs } from '../SharedJS/dom.js';
+import { cloneEl, refs, bindEvents } from '../SharedJS/dom.js';
 import { renderSummaryCards } from '../SharedJS/summary-card.js';
 import {
     amortizedPayment, minimumPayment, amortizationSchedule, scheduledBalanceAt,
@@ -1086,41 +1086,38 @@ function renderPlanTable(model, res, isMinOnly) {
 export function initDebts(d) {
     deps = { ...deps, ...d };
 
-    $('debtMonthSelect')?.addEventListener('change', e => { selectedMonth = e.target.value || null; renderDebts(); });
-    $('debtNewSnapshotBtn')?.addEventListener('click', () => createSnapshot($('debtNewMonth').value).catch(console.error));
-    $('debtDeleteMonthBtn')?.addEventListener('click', () => deleteMonth(resolveMonth()).catch(console.error));
-    $('debtStrategySelect')?.addEventListener('change', e => saveStrategy(e.target.value).catch(console.error));
+    const submitAdd = () => {
+        const name = $('newDebtName')?.value.trim();
+        if (!name) { status('Debt name is required.'); return; }
+        addDebt({ name, kind: $('newDebtKind')?.value, balance: num($('newDebtBalance')?.value), apr: num($('newDebtApr')?.value) }).catch(console.error);
+        ['newDebtName', 'newDebtBalance', 'newDebtApr'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+        const kindEl = $('newDebtKind');
+        if (kindEl) kindEl.value = 'card';
+        $('newDebtName')?.focus();
+    };
 
-    const addBtn = $('addDebtBtn');
-    if (addBtn) {
-        const submit = () => {
-            const name = $('newDebtName').value.trim();
-            if (!name) { status('Debt name is required.'); return; }
-            addDebt({ name, kind: $('newDebtKind').value, balance: num($('newDebtBalance').value), apr: num($('newDebtApr').value) }).catch(console.error);
-            ['newDebtName', 'newDebtBalance', 'newDebtApr'].forEach(id => { $(id).value = ''; });
-            $('newDebtKind').value = 'card';
-            $('newDebtName').focus();
-        };
-        addBtn.addEventListener('click', submit);
-        ['newDebtName', 'newDebtBalance', 'newDebtApr'].forEach(id => {
-            $(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
-        });
-    }
-
-    const moneyMode = $('debtMoneyMode');
-    const moneyAmount = $('debtMoneyAmount');
-    if (moneyMode && moneyAmount) {
-        moneyMode.addEventListener('change', () => {
+    bindEvents(document, {
+        'change #debtMonthSelect': (e, select) => { selectedMonth = select.value || null; renderDebts(); },
+        'click #debtNewSnapshotBtn': () => createSnapshot($('debtNewMonth')?.value).catch(console.error),
+        'click #debtDeleteMonthBtn': () => deleteMonth(resolveMonth()).catch(console.error),
+        'change #debtStrategySelect': (e, select) => saveStrategy(select.value).catch(console.error),
+        'click #addDebtBtn': submitAdd,
+        'keydown #newDebtName': (e) => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } },
+        'keydown #newDebtBalance': (e) => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } },
+        'keydown #newDebtApr': (e) => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } },
+        'change #debtMoneyMode': (e, moneyMode) => {
             const month = resolveMonth();
             if (!month) return;
             if (moneyMode.value === 'default') saveMoney(month, null).catch(console.error);
-            else saveMoney(month, numOrNull(moneyAmount.value) ?? Math.max(0, Math.round(num(deps.getNetBalance())))).catch(console.error);
-        });
-        moneyAmount.addEventListener('change', () => {
+            else saveMoney(month, numOrNull($('debtMoneyAmount')?.value) ?? Math.max(0, Math.round(num(deps.getNetBalance())))).catch(console.error);
+        },
+        'change #debtMoneyAmount': (e, moneyAmount) => {
             const month = resolveMonth();
             const amount = numOrNull(moneyAmount.value);
             if (month && amount != null) saveMoney(month, Math.max(0, amount)).catch(console.error);
-        });
-        moneyAmount.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); moneyAmount.blur(); } });
-    }
+        },
+        'keydown #debtMoneyAmount': (e, moneyAmount) => {
+            if (e.key === 'Enter') { e.preventDefault(); moneyAmount.blur(); }
+        }
+    });
 }

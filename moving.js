@@ -3,7 +3,7 @@ import {
     updateListItem, deleteListItem, onStateChange, stopRealtime,
     isStateTrusted
 } from './Lists/lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState } from './SharedJS/dom.js';
+import { cloneFragment, cloneEl, refs, emptyState, bindEvents } from './SharedJS/dom.js';
 import { initSync } from './SharedJS/sync.js';
 
 const SECTION_NAME = 'Moving';
@@ -42,18 +42,6 @@ function buildChecklistItem(item) {
 
     r.text.textContent = item.text;
     r.checkbox.checked = !!item.checked;
-
-    // Local state changes synchronously inside updateListItem/deleteListItem,
-    // so render right away instead of waiting on the network.
-    r.checkbox.addEventListener('change', () => {
-        updateListItem(item.id, { checked: r.checkbox.checked }).catch(console.error);
-        render();
-    });
-
-    r.del.addEventListener('click', () => {
-        deleteListItem(item.id).catch(console.error);
-        render();
-    });
 
     return row;
 }
@@ -129,36 +117,54 @@ function renderGroupedListPanel(sec) {
         });
     }
 
-    // Add item handler
-    async function addNewItem() {
-        const text = r.newText.value.trim();
-        if (!text) return;
+    return frag;
+}
 
-        // The item is in local state the moment this call starts; the network
-        // write happens in the background (and is queued if there's no signal).
-        createListItem({
-            section_id: sec.id,
-            text,
-            checked: false
-        }).catch(console.error);
+// Add item handler
+async function addNewItem() {
+    const sec = await ensureMovingSection();
+    if (!sec) return;
+    const input = document.querySelector('#lst-panel [data-ref="newText"]');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
 
-        await render();
+    // The item is in local state the moment this call starts; the network
+    // write happens in the background (and is queued if there's no signal).
+    createListItem({
+        section_id: sec.id,
+        text,
+        checked: false
+    }).catch(console.error);
 
-        // Keep the keyboard open so several items can be added in a row.
-        const input = document.querySelector('#lst-panel [data-ref="newText"]');
-        if (input) input.focus();
-    }
+    await render();
 
-    r.addBtn.addEventListener('click', addNewItem);
-    r.newText.addEventListener('keydown', e => {
+    // Keep the keyboard open so several items can be added in a row.
+    const nextInput = document.querySelector('#lst-panel [data-ref="newText"]');
+    if (nextInput) nextInput.focus();
+}
+
+bindEvents(document, {
+    'change #lst-panel [data-ref="checkbox"]': (e, checkbox) => {
+        const row = checkbox.closest('[data-item-row]');
+        if (!row) return;
+        updateListItem(row.dataset.itemRow, { checked: checkbox.checked }).catch(console.error);
+        render();
+    },
+    'click #lst-panel [data-ref="del"]': (e, btn) => {
+        const row = btn.closest('[data-item-row]');
+        if (!row) return;
+        deleteListItem(row.dataset.itemRow).catch(console.error);
+        render();
+    },
+    'click #lst-panel [data-ref="addBtn"]': () => addNewItem(),
+    'keydown #lst-panel [data-ref="newText"]': (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             addNewItem();
         }
-    });
-
-    return frag;
-}
+    }
+});
 
 async function render() {
     const panelEl = document.getElementById('lst-panel');

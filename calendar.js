@@ -1,4 +1,5 @@
 import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.js';
+import { bindEvents } from './SharedJS/dom.js';
 
 (function(){
     const sb = window.supabaseClient;
@@ -528,142 +529,124 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
     }
 
     // ---------- event listeners ----------
-    $('cal-prev').addEventListener('click', () => changeMonth(-1));
-    $('cal-next').addEventListener('click', () => changeMonth(1));
-
-    $('cal-days').addEventListener('click', e => {
-        const cell = e.target.closest('.cal-day');
-        if(cell) selectDate(cell.dataset.date);
-    });
-
-    $('moon-lookback')?.addEventListener('change', () => {
-        updateMoonPanel();
-        renderGrid();
-    });
-
-    // overlay buttons: toggle the layer and its stats panel
-    document.addEventListener('click', e => {
-        const btn = e.target.closest('.cal-overlay-btn');
-        if(!btn) return;
-
-        const layer = btn.dataset.layer;
-        const nowVisible = !visibleLayers.has(layer);
-        if(nowVisible) visibleLayers.add(layer); else visibleLayers.delete(layer);
-
-        btn.classList.toggle('active', nowVisible);
-        $(LAYER_PANELS[layer])?.classList.toggle('hidden', !nowVisible);
-        render();
-    });
-
     initDragAndDrop($('cal-events'), { onReorder: reorderEvents });
 
-    $('cal-add-event').addEventListener('click', async () => {
-        const input = $('cal-new-event');
-        const title = input.value.trim();
-        const target = $('cal-event-layer').value;
-        if(!title || !target) return;
+    bindEvents(document, {
+        'click #cal-prev': () => changeMonth(-1),
+        'click #cal-next': () => changeMonth(1),
+        'click .cal-day': (e, cell) => selectDate(cell.dataset.date),
+        'change #moon-lookback': () => {
+            updateMoonPanel();
+            renderGrid();
+        },
+        'click .cal-overlay-btn': (e, btn) => {
+            const layer = btn.dataset.layer;
+            const nowVisible = !visibleLayers.has(layer);
+            if(nowVisible) visibleLayers.add(layer); else visibleLayers.delete(layer);
 
-        const id = crypto.randomUUID();
-        const updated_at = nowStamp();
-        const [kind, ...rest] = target.split(':');
-        const key = rest.join(':');
+            btn.classList.toggle('active', nowVisible);
+            $(LAYER_PANELS[layer])?.classList.toggle('hidden', !nowVisible);
+            render();
+        },
+        'keydown #cal-new-event': (e) => {
+            if(e.key === 'Enter') $('cal-add-event').click();
+        },
+        'click #cal-add-event': async () => {
+            const input = $('cal-new-event');
+            const title = input.value.trim();
+            const target = $('cal-event-layer').value;
+            if(!title || !target) return;
 
-        // ----- list section: checkable item due on the selected day -----
-        if(kind === 'list'){
-            const item = { id, text: title, due_date: selectedDate, section_id: key,
-                checked: false, priority: false, updated_at };
-            pendingListInserts[id] = item;
+            const id = crypto.randomUUID();
+            const updated_at = nowStamp();
+            const [kind, ...rest] = target.split(':');
+            const key = rest.join(':');
 
-            (eventsByDate[selectedDate] ||= []).push({
-                id, title, event_date: selectedDate, layer: 'list',
-                source: 'list', sort_order: 0, priority: false
-            });
+            // ----- list section: checkable item due on the selected day -----
+            if(kind === 'list'){
+                const item = { id, text: title, due_date: selectedDate, section_id: key,
+                    checked: false, priority: false, updated_at };
+                pendingListInserts[id] = item;
 
-            // keep the Lists page's offline cache in step
-            try{
-                const raw = localStorage.getItem(LISTS_CACHE_KEY);
-                if(raw){
-                    const data = JSON.parse(raw);
-                    data.itemsBySection ||= {};
-                    (data.itemsBySection[key] ||= []).push(item);
-                    localStorage.setItem(LISTS_CACHE_KEY, JSON.stringify(data));
+                (eventsByDate[selectedDate] ||= []).push({
+                    id, title, event_date: selectedDate, layer: 'list',
+                    source: 'list', sort_order: 0, priority: false
+                });
+
+                // keep the Lists page's offline cache in step
+                try{
+                    const raw = localStorage.getItem(LISTS_CACHE_KEY);
+                    if(raw){
+                        const data = JSON.parse(raw);
+                        data.itemsBySection ||= {};
+                        (data.itemsBySection[key] ||= []).push(item);
+                        localStorage.setItem(LISTS_CACHE_KEY, JSON.stringify(data));
+                    }
+                } catch(e){}
+
+                saveToLocalCache();
+                input.value = '';
+                render();
+
+                try {
+                    await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'insert', id, payload: item });
+                } catch (err) {
+                    console.error('Failed to add list item:', err);
                 }
-            } catch(e){}
+                return;
+            }
 
+            // ----- default / calendar layer: regular event, no checkbox -----
+            const events = eventsByDate[selectedDate] || [];
+            const sort_order = Math.max(0, events.length, ...events.map(ev => Number(ev.sort_order) || 0)) + 1;
+            const basePayload = { event_date: selectedDate, title, sort_order, layer: key || null };
+            const localEvent = { id, ...basePayload, updated_at };
+
+            (eventsByDate[selectedDate] ||= []).push(localEvent);
             saveToLocalCache();
             input.value = '';
             render();
 
             try {
-                await writeOrQueue(sb, { table: TABLES.LIST_ITEMS, type: 'insert', id, payload: item });
+                await writeOrQueue(sb, {
+                    table: TABLES.EVENTS, type: 'insert', id,
+                    payload: { id, ...basePayload, updated_at }
+                });
             } catch (err) {
-                console.error('Failed to add list item:', err);
+                console.error('Failed to add event:', err);
             }
-            return;
-        }
+        },
+        'click [data-del-event]': async (e, btn) => {
+            const id = btn.dataset.delEvent;
+            eventsByDate[selectedDate] = (eventsByDate[selectedDate] || [])
+                .filter(ev => String(ev.id) !== id);
+            saveToLocalCache();
+            render();
 
-        // ----- default / calendar layer: regular event, no checkbox -----
-        const events = eventsByDate[selectedDate] || [];
-        const sort_order = Math.max(0, events.length, ...events.map(ev => Number(ev.sort_order) || 0)) + 1;
-        const basePayload = { event_date: selectedDate, title, sort_order, layer: key || null };
-        const localEvent = { id, ...basePayload, updated_at };
+            try {
+                await writeOrQueue(sb, { table: TABLES.EVENTS, type: 'delete', id });
+            } catch (err) {
+                console.error('Failed to delete event:', err);
+            }
+        },
+        'change .cal-event-check': async (e, box) => {
+            const id = box.dataset.checkItem;
+            const updated_at = nowStamp();
 
-        (eventsByDate[selectedDate] ||= []).push(localEvent);
-        saveToLocalCache();
-        input.value = '';
-        render();
+            eventsByDate[selectedDate] = (eventsByDate[selectedDate] || [])
+                .filter(ev => String(ev.id) !== id);
+            patchListsCache(id, { checked: true, updated_at });
+            saveToLocalCache();
+            render();
 
-        try {
-            await writeOrQueue(sb, {
-                table: TABLES.EVENTS, type: 'insert', id,
-                payload: { id, ...basePayload, updated_at }
-            });
-        } catch (err) {
-            console.error('Failed to add event:', err);
-        }
-    });
-
-    $('cal-new-event').addEventListener('keydown', e => {
-        if(e.key === 'Enter') $('cal-add-event').click();
-    });
-
-    $('cal-events-wrap').addEventListener('click', async e => {
-        const btn = e.target.closest('[data-del-event]');
-        if(!btn) return;
-
-        const id = btn.dataset.delEvent;
-        eventsByDate[selectedDate] = (eventsByDate[selectedDate] || [])
-            .filter(ev => String(ev.id) !== id);
-        saveToLocalCache();
-        render();
-
-        try {
-            await writeOrQueue(sb, { table: TABLES.EVENTS, type: 'delete', id });
-        } catch (err) {
-            console.error('Failed to delete event:', err);
-        }
-    });
-
-    $('cal-events-wrap').addEventListener('change', async e => {
-        const box = e.target.closest('.cal-event-check');
-        if(!box) return;
-
-        const id = box.dataset.checkItem;
-        const updated_at = nowStamp();
-
-        eventsByDate[selectedDate] = (eventsByDate[selectedDate] || [])
-            .filter(ev => String(ev.id) !== id);
-        patchListsCache(id, { checked: true, updated_at });
-        saveToLocalCache();
-        render();
-
-        try {
-            await writeOrQueue(sb, {
-                table: TABLES.LIST_ITEMS, type: 'update', id,
-                payload: { checked: true, updated_at }
-            });
-        } catch (err) {
-            console.error('Failed to update check item:', err);
+            try {
+                await writeOrQueue(sb, {
+                    table: TABLES.LIST_ITEMS, type: 'update', id,
+                    payload: { checked: true, updated_at }
+                });
+            } catch (err) {
+                console.error('Failed to update check item:', err);
+            }
         }
     });
 
