@@ -90,12 +90,22 @@ function createRecognition() {
 
     recognition.onresult = (event) => {
         markSignal();
-        let text = '';
-        for (let i = 0; i < event.results.length; i++) {
-            text += event.results[i][0].transcript;
+
+        let interim = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const t = event.results[i][0].transcript.trim();
+            if (!t) continue;
+
+            if (event.results[i].isFinal) {
+                baseText += (baseText ? ' ' : '') + t;   // lock it in
+            } else {
+                interim += (interim ? ' ' : '') + t;
+            }
         }
-        voiceText.textContent = (baseText ? baseText + ' ' : '') + text;
-        localStorage.setItem('voiceTranscript', voiceText.textContent);
+
+        voiceText.value = baseText + (baseText && interim ? ' ' : '') + interim;
+        localStorage.setItem('voiceTranscript', voiceText.value);
     };
 }
 
