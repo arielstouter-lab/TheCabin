@@ -36,6 +36,22 @@ function renderTabs(){
     });
 }
 
+// Open/closed state of <details> sections, remembered per tab across re-renders.
+const detailsState = new Map(); // `${slug}::${key}` -> boolean
+
+function detailsKey(d){
+    return d.dataset.key
+        || d.querySelector(':scope > summary')?.textContent.trim()
+        || '';
+}
+
+function restoreDetails(panelEl){
+    panelEl.querySelectorAll('details').forEach(d => {
+        const k = `${activeSlug}::${detailsKey(d)}`;
+        if(detailsState.has(k)) d.open = detailsState.get(k);
+    });
+}
+
 function renderPanel(){
     const panelEl = document.getElementById('lst-panel');
     const sec = currentSection();
@@ -55,6 +71,7 @@ function renderPanel(){
             : renderListPanel(sec); // handles both Groceries and custom tabs
 
     panelEl.append(frag);
+    restoreDetails(panelEl);
     renderTabs();
 }
 
@@ -75,6 +92,13 @@ document.getElementById('lst-add-section').addEventListener('click', async () =>
 });
 
 const panelEl = document.getElementById('lst-panel');
+
+panelEl.addEventListener('toggle', e => {
+    const d = e.target;
+    if(!(d instanceof HTMLDetailsElement)) return;
+    detailsState.set(`${activeSlug}::${detailsKey(d)}`, d.open);
+}, true);
+
 window.initDragAndDrop(panelEl, {
     canDrag: el => !el.classList.contains('checked'),
     onReorder: (fromIndex, toIndex) => {
