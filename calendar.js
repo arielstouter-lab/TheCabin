@@ -203,11 +203,11 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
             };
 
             select.replaceChildren(
-                new Option('Default (event)', 'layer:'),
+                new Option('Default', 'layer:'),
+                group('Calendar', layers.map(l => new Option(l, `layer:${l}`))),
                 group('List (checkable)', (sections.data || [])
                     .filter(s => (s.name || '').toLowerCase() !== 'pantry')   // pantry items can't have dates
-                    .map(s => new Option(s.name, `list:${s.id}`))),
-                group('Calendar', layers.map(l => new Option(l, `layer:${l}`)))
+                    .map(s => new Option(s.name, `list:${s.id}`)))
             );
             if([...select.options].some(o => o.value === current)) select.value = current;
         } catch(err){
