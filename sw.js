@@ -18,6 +18,8 @@ const STATIC_ASSETS = [
     'weather.html',
     'weather.js',
     'creditcards.html',
+    'elimination-diet.html',
+    'elimination-diet.js',
     'lists.html',
     'managegroceries.html',
     'settings.html',
@@ -160,7 +162,7 @@ async function cdnCacheFirst(event) {
     try {
         const response = await fetch(req);
         if (response && (response.ok || response.type === 'opaque')) {
-            cache.put(req.url, response.clone());
+            await cache.put(req.url, response.clone());
         }
         return response;
     } catch (e) {

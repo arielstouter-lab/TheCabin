@@ -610,24 +610,24 @@ function buildDebtRow(it) {
         ? `Interest ${fmt$(it.interest)} + PMI ${fmt$(it.pmiNow)}`
         : (it.rateNow !== it.apr ? `Promo rate ${it.rateNow}% applies next month` : '');
     
-    r.name.addEventListener('change', () => updateDebt(d.id, { name: r.name.value.trim() || d.name }));
-    r.kind.addEventListener('change', () => updateDebt(d.id, { kind: r.kind.value }));
-    r.inBudget.addEventListener('change', () => updateDebt(d.id, { in_budget: r.inBudget.checked }));
+    r.name.addEventListener('change', () => updateDebt(d.id, { name: r.name.value.trim() || d.name }).catch(console.error));
+    r.kind.addEventListener('change', () => updateDebt(d.id, { kind: r.kind.value }).catch(console.error));
+    r.inBudget.addEventListener('change', () => updateDebt(d.id, { in_budget: r.inBudget.checked }).catch(console.error));
 
 
     r.promoApr.addEventListener('change', () => {
         const rate = numOrNull(r.promoApr.value);
         // Clearing the rate removes the promo; entering one starts it today unless a start date is saved
-        if (rate == null) updateSnap(s.id, { promo_apr: null, promo_start: null, promo_end: null });
-        else updateSnap(s.id, { promo_apr: rate, promo_start: s.promo_start || r.promoStart.value || todayIso() });
+        if (rate == null) updateSnap(s.id, { promo_apr: null, promo_start: null, promo_end: null }).catch(console.error);
+        else updateSnap(s.id, { promo_apr: rate, promo_start: s.promo_start || r.promoStart.value || todayIso() }).catch(console.error);
     });
-    r.promoStart.addEventListener('change', () => updateSnap(s.id, { promo_start: r.promoStart.value || null }));
-    r.promoEnd.addEventListener('change', () => updateSnap(s.id, { promo_end: r.promoEnd.value || null }));
+    r.promoStart.addEventListener('change', () => updateSnap(s.id, { promo_start: r.promoStart.value || null }).catch(console.error));
+    r.promoEnd.addEventListener('change', () => updateSnap(s.id, { promo_end: r.promoEnd.value || null }).catch(console.error));
 
-    r.balance.addEventListener('change', () => updateSnap(s.id, { balance: num(r.balance.value) }));
-    r.apr.addEventListener('change', () => updateSnap(s.id, { apr: num(r.apr.value) }));
-    r.override.addEventListener('change', () => updateSnap(s.id, { payment_override: numOrNull(r.override.value) }));
-    r.delBtn.addEventListener('click', () => deleteDebt(d.id, d.name));
+    r.balance.addEventListener('change', () => updateSnap(s.id, { balance: num(r.balance.value) }).catch(console.error));
+    r.apr.addEventListener('change', () => updateSnap(s.id, { apr: num(r.apr.value) }).catch(console.error));
+    r.override.addEventListener('change', () => updateSnap(s.id, { payment_override: numOrNull(r.override.value) }).catch(console.error));
+    r.delBtn.addEventListener('click', () => deleteDebt(d.id, d.name).catch(console.error));
     return tr;
 }
 
@@ -704,11 +704,11 @@ function buildLoanCard(it) {
     r.ltv.value = d.target_ltv ?? 79;
     fillRowSelect(r.payRow, d.payment_row_id);
 
-    r.principal.addEventListener('change', () => updateDebt(d.id, { original_principal: numOrNull(r.principal.value) }));
-    r.term.addEventListener('change', () => updateDebt(d.id, { term_months: r.term.value ? Math.round(num(r.term.value)) : null }));
-    r.origin.addEventListener('change', () => updateDebt(d.id, { origination_date: r.origin.value || null }));
-    r.firstPay.addEventListener('change', () => updateDebt(d.id, { first_payment_month: isYm(r.firstPay.value) ? r.firstPay.value : null }));
-    r.payRow.addEventListener('change', () => updateDebt(d.id, { payment_row_id: r.payRow.value || null }));
+    r.principal.addEventListener('change', () => updateDebt(d.id, { original_principal: numOrNull(r.principal.value) }).catch(console.error));
+    r.term.addEventListener('change', () => updateDebt(d.id, { term_months: r.term.value ? Math.round(num(r.term.value)) : null }).catch(console.error));
+    r.origin.addEventListener('change', () => updateDebt(d.id, { origination_date: r.origin.value || null }).catch(console.error));
+    r.firstPay.addEventListener('change', () => updateDebt(d.id, { first_payment_month: isYm(r.firstPay.value) ? r.firstPay.value : null }).catch(console.error));
+    r.payRow.addEventListener('change', () => updateDebt(d.id, { payment_row_id: r.payRow.value || null }).catch(console.error));
 
     r.pmiRowWrap.hidden = !isMortgage;
     r.homeValueWrap.hidden = !isMortgage;
@@ -718,13 +718,13 @@ function buildLoanCard(it) {
         fillRowSelect(r.pmiRow, d.pmi_row_id);
 
         r.pmiRow.addEventListener('change', () =>
-            updateDebt(d.id, { pmi_row_id: r.pmiRow.value || null }));
+            updateDebt(d.id, { pmi_row_id: r.pmiRow.value || null }).catch(console.error));
 
         r.homeValue.addEventListener('change', () =>
-            updateDebt(d.id, { home_value: numOrNull(r.homeValue.value) }));
+            updateDebt(d.id, { home_value: numOrNull(r.homeValue.value) }).catch(console.error));
 
         r.ltv.addEventListener('change', () =>
-            updateDebt(d.id, { target_ltv: num(r.ltv.value) || 79 }));
+            updateDebt(d.id, { target_ltv: num(r.ltv.value) || 79 }).catch(console.error));
     }
 
     // --- read-outs
@@ -942,7 +942,7 @@ function renderCascadeOrder(model, container) {
             } else {
                 nextOrder = [...currentOrder.slice(0, i), val];
             }
-            saveCustomOrder(nextOrder);
+            saveCustomOrder(nextOrder).catch(console.error);
         });
 
         container.append(row);
@@ -1087,16 +1087,16 @@ export function initDebts(d) {
     deps = { ...deps, ...d };
 
     $('debtMonthSelect')?.addEventListener('change', e => { selectedMonth = e.target.value || null; renderDebts(); });
-    $('debtNewSnapshotBtn')?.addEventListener('click', () => createSnapshot($('debtNewMonth').value));
-    $('debtDeleteMonthBtn')?.addEventListener('click', () => deleteMonth(resolveMonth()));
-    $('debtStrategySelect')?.addEventListener('change', e => saveStrategy(e.target.value));
+    $('debtNewSnapshotBtn')?.addEventListener('click', () => createSnapshot($('debtNewMonth').value).catch(console.error));
+    $('debtDeleteMonthBtn')?.addEventListener('click', () => deleteMonth(resolveMonth()).catch(console.error));
+    $('debtStrategySelect')?.addEventListener('change', e => saveStrategy(e.target.value).catch(console.error));
 
     const addBtn = $('addDebtBtn');
     if (addBtn) {
         const submit = () => {
             const name = $('newDebtName').value.trim();
             if (!name) { status('Debt name is required.'); return; }
-            addDebt({ name, kind: $('newDebtKind').value, balance: num($('newDebtBalance').value), apr: num($('newDebtApr').value) });
+            addDebt({ name, kind: $('newDebtKind').value, balance: num($('newDebtBalance').value), apr: num($('newDebtApr').value) }).catch(console.error);
             ['newDebtName', 'newDebtBalance', 'newDebtApr'].forEach(id => { $(id).value = ''; });
             $('newDebtKind').value = 'card';
             $('newDebtName').focus();
@@ -1113,13 +1113,13 @@ export function initDebts(d) {
         moneyMode.addEventListener('change', () => {
             const month = resolveMonth();
             if (!month) return;
-            if (moneyMode.value === 'default') saveMoney(month, null);
-            else saveMoney(month, numOrNull(moneyAmount.value) ?? Math.max(0, Math.round(num(deps.getNetBalance()))));
+            if (moneyMode.value === 'default') saveMoney(month, null).catch(console.error);
+            else saveMoney(month, numOrNull(moneyAmount.value) ?? Math.max(0, Math.round(num(deps.getNetBalance())))).catch(console.error);
         });
         moneyAmount.addEventListener('change', () => {
             const month = resolveMonth();
             const amount = numOrNull(moneyAmount.value);
-            if (month && amount != null) saveMoney(month, Math.max(0, amount));
+            if (month && amount != null) saveMoney(month, Math.max(0, amount)).catch(console.error);
         });
         moneyAmount.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); moneyAmount.blur(); } });
     }

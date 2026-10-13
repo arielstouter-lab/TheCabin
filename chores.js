@@ -258,8 +258,7 @@ function renderChores(){
       const chip = cloneEl('tpl-cl-split-chip');
       const cr = refs(chip);
       cr.name.textContent = p.name;
-      const pct = (state.assignments[c.id] && state.assignments[c.id][p.id]) || 0;
-      cr.input.value = pct;
+      cr.input.value = (state.assignments[c.id] && state.assignments[c.id][p.id]) || 0;
       cr.input.dataset.splitChore = c.id;
       cr.input.dataset.splitPerson = p.id;
       r.splitRow.insertBefore(chip, r.splitTotal);
@@ -486,8 +485,13 @@ document.addEventListener('click', async (e) => {
   }
 
   if(t.id === 'cl-auto-balance'){
-    await autoBalance();
-    setStatus('Balanced.');
+    try {
+      await autoBalance();
+      setStatus('Balanced.');
+    } catch(err) {
+      console.error(err);
+      setStatus('Failed to auto-balance.');
+    }
   }
 
   if(t.id === 'cl-clear-assign'){
@@ -541,7 +545,7 @@ function debounceReload(){
     if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
       return;
     }
-    load();
+    load().catch(console.error);
   }, 400);
 }
 

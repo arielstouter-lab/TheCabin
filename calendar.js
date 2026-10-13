@@ -205,9 +205,9 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
     }
 
     function refreshAll(){
-        loadMonth();
-        loadLayerOptions();
-        refreshStats();
+        loadMonth().catch(console.error);
+        loadLayerOptions().catch(console.error);
+        refreshStats().catch(console.error);
     }
 
     // ---------- calendar grid ----------
@@ -359,12 +359,16 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         saveToLocalCache();
         renderEventsPanel();
 
-        await Promise.all(defaults.map(ev =>
-            writeOrQueue(sb, {
-                table: TABLES.EVENTS, type: 'update', id: ev.id,
-                payload: { sort_order: ev.sort_order, updated_at }
-            })
-        ));
+        try {
+            await Promise.all(defaults.map(ev =>
+                writeOrQueue(sb, {
+                    table: TABLES.EVENTS, type: 'update', id: ev.id,
+                    payload: { sort_order: ev.sort_order, updated_at }
+                })
+            ));
+        } catch (err) {
+            console.error('Failed to save reordered events:', err);
+        }
     }
 
     function selectDate(dateStr){
@@ -373,7 +377,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         if(date.getFullYear() !== viewYear || date.getMonth() !== viewMonth){
             viewYear = date.getFullYear();
             viewMonth = date.getMonth();
-            loadMonth();
+            loadMonth().catch(console.error);
         } else {
             render();
         }
@@ -384,7 +388,7 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         const date = new Date(viewYear, viewMonth + delta, 1);
         viewYear = date.getFullYear();
         viewMonth = date.getMonth();
-        loadMonth();
+        loadMonth().catch(console.error);
     }
 
     // ---------- moon stats + projection ----------
@@ -544,10 +548,14 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         input.value = '';
         render();
 
-        await writeOrQueue(sb, {
-            table: TABLES.EVENTS, type: 'insert', id,
-            payload: { id, ...basePayload, updated_at }
-        });
+        try {
+            await writeOrQueue(sb, {
+                table: TABLES.EVENTS, type: 'insert', id,
+                payload: { id, ...basePayload, updated_at }
+            });
+        } catch (err) {
+            console.error('Failed to add event:', err);
+        }
     });
 
     $('cal-new-event').addEventListener('keydown', e => {
@@ -564,7 +572,11 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         saveToLocalCache();
         render();
 
-        await writeOrQueue(sb, { table: TABLES.EVENTS, type: 'delete', id });
+        try {
+            await writeOrQueue(sb, { table: TABLES.EVENTS, type: 'delete', id });
+        } catch (err) {
+            console.error('Failed to delete event:', err);
+        }
     });
 
     $('cal-events-wrap').addEventListener('change', async e => {
@@ -580,10 +592,14 @@ import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.
         saveToLocalCache();
         render();
 
-        await writeOrQueue(sb, {
-            table: TABLES.LIST_ITEMS, type: 'update', id,
-            payload: { checked: true, updated_at }
-        });
+        try {
+            await writeOrQueue(sb, {
+                table: TABLES.LIST_ITEMS, type: 'update', id,
+                payload: { checked: true, updated_at }
+            });
+        } catch (err) {
+            console.error('Failed to update check item:', err);
+        }
     });
 
     window.addEventListener('beforeunload', () => {
