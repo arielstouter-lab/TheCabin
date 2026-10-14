@@ -1,6 +1,6 @@
 import {
     state, sb, loadAll, createSection, createListItem,
-    updateListItem, deleteListItem, onStateChange, stopRealtime,
+    updateListItem, deleteListItem, deleteListItems, onStateChange, stopRealtime,
     isStateTrusted
 } from './Lists/lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState, bindEvents } from './SharedJS/dom.js';
@@ -64,6 +64,8 @@ function renderMovingPanel(sec) {
 
     const items = state.itemsBySection[sec.id] || [];
 
+    r.clearBtn.hidden = !items.some(i => i.checked);
+
     if (!items.length) {
         r.items.append(emptyState(r.items.dataset.empty));
         return frag;
@@ -85,6 +87,19 @@ function renderMovingPanel(sec) {
     }));
 
     return frag;
+}
+
+//Delete all checked items
+function clearCheckedItems() {
+    if (!movingSection) return;
+    const ids = (state.itemsBySection[movingSection.id] || [])
+        .filter(i => i.checked)
+        .map(i => i.id);
+    if (!ids.length) return;
+    if (!confirm(`Remove ${ids.length} checked item${ids.length === 1 ? '' : 's'}?`)) return;
+
+    deleteListItems(ids).catch(console.error);
+    render();
 }
 
 // Add item handler
@@ -130,7 +145,8 @@ bindEvents(document, {
             e.preventDefault();
             addNewItem();
         }
-    }
+    },
+    'click #lst-panel [data-ref="clearBtn"]': () => clearCheckedItems(),
 });
 
 async function render() {
