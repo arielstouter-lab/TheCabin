@@ -10,6 +10,13 @@
     <script type="module" src="moving.js" defer></script>
 </head>
 
+<!--
+  Template conventions (JS only fills values, toggles `hidden`, and attaches listeners):
+    data-ref="x"        element JS needs a handle on (refs())
+    hidden              optional element, shown by JS when it applies
+    data-empty="..."    empty-state text, passed through by JS
+-->
+
 <body class="app-page">
 <div class="app-shell">
     <main class="main-content">
@@ -24,19 +31,30 @@
         </header>
 
         <section class="content">
-            <div class="card" id="lst-panel"></div>
+            <div class="card" id="lst-panel"
+                 data-offline-empty="Connect once to download your list — after that it works offline."></div>
         </section>
 
-        <!-- ============ Templates ============ -->
-        <template id="tpl-list-panel">
-            <div class="card-head" data-ref="head">
+        <!-- ============ Panel ============ -->
+        <template id="tpl-moving-panel">
+            <div class="card-head">
                 <h2 class="card-title" data-ref="title"></h2>
+                <div class="card-actions">
+                    <a href="managegroceries.html" class="button-inline" data-ref="manageLink">Manage tags</a>
+                </div>
             </div>
-            <div class="lst-items" data-ref="items"></div>
+            <div class="lst-items" data-ref="items" data-empty="No moving items yet."></div>
             <div class="lst-add-item">
                 <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
                 <button class="button-inline" data-ref="addBtn">Add</button>
             </div>
+        </template>
+
+        <!-- Collapsible tag group (same template as the Pantry page) -->
+        <template id="tpl-aisle-group">
+            <details>
+                <summary data-ref="summary"></summary>
+            </details>
         </template>
 
         <template id="tpl-list-item">
@@ -51,16 +69,9 @@
             </div>
         </template>
 
+        <!-- ============ Shared small pieces ============ -->
         <template id="tpl-empty">
             <p class="empty-state"></p>
-        </template>
-
-        <template id="tpl-manage-link">
-            <a href="managegroceries.html" class="button-inline">Manage tags</a>
-        </template>
-
-        <template id="tpl-clear-checked">
-            <button type="button" class="button-inline" data-ref="clearBtn">Clear checked</button>
         </template>
     </main>
 </div>

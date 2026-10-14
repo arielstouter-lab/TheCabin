@@ -5,6 +5,9 @@ import {
 } from './Lists/lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState, bindEvents } from './SharedJS/dom.js';
 import { initSync } from './SharedJS/sync.js';
+import { syncStatusHandler } from './SharedJS/ui.js';
+import { manageHref } from './Lists/lists-ui.js';
+import { openAisleIds, groupByAisle, buildAisleGroup } from './Lists/lists-aisles.js';
 
 const SECTION_NAME = 'Moving';
 
@@ -33,6 +36,10 @@ function ensureMovingSection() {
     return sectionPromise;
 }
 
+// ---- Row + panel builders ------------------------------------------------
+
+const byText = (a, b) => String(a.text || '').localeCompare(String(b.text || ''));
+
 function buildChecklistItem(item) {
     const row = cloneEl('tpl-list-item');
     const r = refs(row);
@@ -46,76 +53,36 @@ function buildChecklistItem(item) {
     return row;
 }
 
-function renderGroupedListPanel(sec) {
-    const openAisles = new Set();
-    document.querySelectorAll('#lst-panel details[data-aisle-id]').forEach(d => {
-        if (d.open) openAisles.add(d.dataset.aisleId);
-    });
+function renderMovingPanel(sec) {
+    const open = openAisleIds();          // remember open groups across re-renders
 
-    const frag = cloneFragment('tpl-list-panel');
+    const frag = cloneFragment('tpl-moving-panel');
     const r = refs(frag);
+
     r.title.textContent = sec.name;
+    r.manageLink.href = manageHref(sec, 'moving.html');
 
-    const manageBtn = cloneEl('tpl-manage-link');
-    manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}&return=moving.html`;
-    r.head.append(manageBtn);
-
-    const items = [...(state.itemsBySection[sec.id] || [])];
+    const items = state.itemsBySection[sec.id] || [];
 
     if (!items.length) {
-        r.items.append(emptyState('No moving items yet.'));
-    } else {
-        // Group items by tag/aisle
-        const grouped = new Map();
-        items.forEach(item => {
-            const aisleId = item.aisle_id || 'unassigned';
-            if (!grouped.has(aisleId)) grouped.set(aisleId, []);
-            grouped.get(aisleId).push(item);
-        });
-
-        // Sort groups matching aisle sort order
-        const sortedGroups = Array.from(grouped.entries()).sort(([idA], [idB]) => {
-            const aisleA = idA === 'unassigned' ? null : state.groceryAisles.find(a => a.id === idA);
-            const aisleB = idB === 'unassigned' ? null : state.groceryAisles.find(a => a.id === idB);
-            const sortA = aisleA ? (aisleA.sort_order ?? 9999) : 9999;
-            const sortB = aisleB ? (aisleB.sort_order ?? 9999) : 9999;
-            if (sortA !== sortB) return sortA - sortB;
-            const nameA = aisleA ? aisleA.name : 'Unassigned';
-            const nameB = aisleB ? aisleB.name : 'Unassigned';
-            return nameA.localeCompare(nameB);
-        });
-
-        // Render each collapsible section with checkbox items
-        sortedGroups.forEach(([aisleId, groupItems]) => {
-            const details = document.createElement('details');
-            details.dataset.aisleId = aisleId;
-            if (openAisles.has(aisleId)) {
-                details.open = true;
-            }
-
-            const summary = document.createElement('summary');
-            let tagName = 'Unassigned';
-            if (aisleId !== 'unassigned') {
-                const aisle = state.groceryAisles.find(a => a.id === aisleId);
-                if (aisle) tagName = aisle.name;
-            }
-
-            const sortedItems = [
-                ...groupItems.filter(i => !i.checked).sort((a, b) => String(a.text || '').localeCompare(String(b.text || ''))),
-                ...groupItems.filter(i => i.checked).sort((a, b) => String(a.text || '').localeCompare(String(b.text || '')))
-            ];
-            const uncheckedCount = sortedItems.filter(i => !i.checked).length;
-            summary.textContent = `${tagName} (${uncheckedCount}/${sortedItems.length})`;
-
-            details.append(summary);
-
-            sortedItems.forEach(item => {
-                details.append(buildChecklistItem(item));
-            });
-
-            r.items.append(details);
-        });
+        r.items.append(emptyState(r.items.dataset.empty));
+        return frag;
     }
+
+    // One collapsible group per tag; unchecked items first, then checked, each A-Z.
+    r.items.append(...groupByAisle(items).map(({ aisleId, name, items: groupItems }) => {
+        const sorted = [
+            ...groupItems.filter(i => !i.checked).sort(byText),
+            ...groupItems.filter(i => i.checked).sort(byText)
+        ];
+        const unchecked = sorted.filter(i => !i.checked).length;
+        return buildAisleGroup(
+            aisleId,
+            `${name} (${unchecked}/${sorted.length})`,
+            sorted.map(buildChecklistItem),
+            open.has(aisleId)
+        );
+    }));
 
     return frag;
 }
@@ -173,11 +140,11 @@ async function render() {
     const sec = await ensureMovingSection();
     if (!sec) {
         // First-ever load with no signal and nothing cached yet.
-        panelEl.replaceChildren(emptyState('Connect once to download your list — after that it works offline.'));
+        panelEl.replaceChildren(emptyState(panelEl.dataset.offlineEmpty));
         return;
     }
 
-    panelEl.replaceChildren(renderGroupedListPanel(sec));
+    panelEl.replaceChildren(renderMovingPanel(sec));
 }
 
 onStateChange(render);
@@ -190,14 +157,8 @@ window.addEventListener('pageshow', () => {
     }
 });
 
-initSync(sb, {
-    onChange: n => {
-        if (window.setStatus) {
-            window.setStatus(n ? `${n} change${n === 1 ? '' : 's'} pending sync…` : '');
-        }
-    }
-    // After offline edits sync, lists-state re-pulls automatically ('sync:flushed').
-});
+// After offline edits sync, lists-state re-pulls automatically ('sync:flushed').
+initSync(sb, { onChange: syncStatusHandler() });
 
 async function init() {
     await loadAll();   // renders cached data first, then the fresh copy

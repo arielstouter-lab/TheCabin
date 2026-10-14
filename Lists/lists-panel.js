@@ -1,23 +1,18 @@
-// Groceries and user-created tabs share this panel. The only differences:
-//  - Groceries sorts by aisle, remembers aisles per item, and links to "Manage groceries"
-//  - Custom tabs use manual sort order and can be deleted
-//  - All mutations route through unified state action helpers with offline sync.
+// Groceries and user-created tabs. Each has its own template in lists.html:
+//  - tpl-groceries-panel: sorts by aisle, remembers aisles per item, always links to "Manage tags"
+//  - tpl-custom-panel:    manual sort order unless tags are on, tags toggle, deletable
+// Both share the row template (tpl-list-item) and the logic below.
+// All mutations route through unified state action helpers with offline sync.
 
 import {
-    state, sb, TABLES, RPC, isGroceries, isPermanent,
-    sortItems, sortGroceryItems, aisleIdForItemText, sectionSlug,
+    state, sb, RPC, isGroceries, isPermanent,
+    sortItems, sortGroceryItems, aisleIdForItemText,
     createListItem, updateListItem, deleteListItem, deleteListItems,
     deleteSection, updateSectionTagsEnabled,
     personName, dueClass, saveToLocalCache, requestRender
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
-
-function makeChip(text, extraClass){
-    const chip = cloneEl('tpl-chip');
-    chip.textContent = text;
-    if(extraClass) chip.classList.add(extraClass);
-    return chip;
-}
+import { makeChip, manageHref, fillPersonOptions, setStatus } from './lists-ui.js';
 
 // ---- Row actions ---------------------------------------------------------
 
@@ -47,8 +42,7 @@ async function handleDeleteSection(sec){
 // ---- Row + panel builders ------------------------------------------------
 
 function buildItem(item, index, sec){
-    const grocery = isGroceries(sec);
-    const tagged = grocery || sec.tags_enabled;
+    const tagged = isGroceries(sec) || sec.tags_enabled;
     const row = cloneEl('tpl-list-item');
     const r = refs(row);
 
@@ -65,12 +59,12 @@ function buildItem(item, index, sec){
     r.checkbox.checked = !!item.checked;
 
     const chips = [];
-    if(item.priority) chips.push(makeChip('High priority', 'priority-chip'));
-    if(item.assigned_to && personName(item.assigned_to)) chips.push(makeChip(personName(item.assigned_to)));
-    if(item.due_date) chips.push(makeChip(item.due_date, dueClass(item.due_date)));
-    if((grocery || sec.tags_enabled) && item.aisle_id){
+    if(item.priority) chips.push(makeChip('High priority', 'priority'));
+    if(item.assigned_to && personName(item.assigned_to)) chips.push(makeChip(personName(item.assigned_to), 'assigned'));
+    if(item.due_date) chips.push(makeChip(item.due_date, 'due', dueClass(item.due_date)));
+    if(tagged && item.aisle_id){
         const aisle = state.groceryAisles.find(a => a.id === item.aisle_id);
-        if(aisle) chips.push(makeChip(aisle.name, 'aisle-chip'));
+        if(aisle) chips.push(makeChip(aisle.name, 'aisle'));
     }
     if(chips.length) r.meta.append(...chips);
     else r.meta.remove();
@@ -116,29 +110,48 @@ async function clearCheckedItems(sec){
     requestRender();
 }
 
-// Returns a DocumentFragment; main.js puts it in the panel.
-export function renderListPanel(sec){
+// Header controls live in the template; this only sets visibility, href and listeners.
+// Refs missing from a template (e.g. tagsToggle on the groceries panel) are simply undefined.
+function wireHeader(sec, r){
     const grocery = isGroceries(sec);
     const tagged = grocery || sec.tags_enabled;
-    const frag = cloneFragment('tpl-list-panel');
-    const r = refs(frag);
+    const hasChecked = (state.itemsBySection[sec.id] || []).some(i => i.checked);
 
     r.title.textContent = sec.name;
 
-    const hasChecked = (state.itemsBySection[sec.id] || []).some(i => i.checked);
-    if(hasChecked){
-        const clearBtn = cloneEl('tpl-clear-checked');
-        clearBtn.addEventListener('click', () => clearCheckedItems(sec));
-        r.head.append(clearBtn);
+    r.clearBtn.hidden = !hasChecked;
+    r.clearBtn.addEventListener('click', () => clearCheckedItems(sec));
+
+    r.manageLink.hidden = !tagged;
+    r.manageLink.href = manageHref(sec);
+
+    if(r.tagsToggle){
+        r.tagsToggle.checked = !!sec.tags_enabled;
+        r.tagsToggle.addEventListener('change', async () => {
+            try{
+                await updateSectionTagsEnabled(sec.id, r.tagsToggle.checked);
+                requestRender();
+            } catch(err){
+                console.error(err);
+                setStatus('Could not save tags setting.');
+            }
+        });
     }
 
-    buildTagsControls(r.head, sec);
-
-    if(!isPermanent(sec)){
-        const delBtn = cloneEl('tpl-delete-tab');
-        delBtn.addEventListener('click', () => handleDeleteSection(sec));
-        r.head.append(delBtn);
+    if(r.deleteTab){
+        r.deleteTab.hidden = isPermanent(sec);
+        r.deleteTab.addEventListener('click', () => handleDeleteSection(sec));
     }
+}
+
+// Returns a DocumentFragment; lists.js puts it in the panel.
+export function renderListPanel(sec){
+    const grocery = isGroceries(sec);
+    const tagged = grocery || sec.tags_enabled;
+    const frag = cloneFragment(grocery ? 'tpl-groceries-panel' : 'tpl-custom-panel');
+    const r = refs(frag);
+
+    wireHeader(sec, r);
 
     const source = state.itemsBySection[sec.id] || [];
     const items = tagged
@@ -147,15 +160,10 @@ export function renderListPanel(sec){
     if(items.length){
         r.items.append(...items.map((item, index) => buildItem(item, index, sec)));
     } else {
-        r.items.append(emptyState('Nothing here yet.'));
+        r.items.append(emptyState(r.items.dataset.empty));
     }
 
-    state.people.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name;
-        r.newPerson.append(opt);
-    });
+    fillPersonOptions(r.newPerson, state.people);
 
     r.addBtn.addEventListener('click', () => addItem(sec, r, grocery));
     r.newText.addEventListener('keydown', e => {
@@ -167,49 +175,6 @@ export function renderListPanel(sec){
 
     return frag;
 }
-
-//Manage toggle function
-export function buildTagsControls(container, sec){
-    if(!sec && container){
-        sec = container;
-        container = null;
-    }
-    const wrap = container || document.createDocumentFragment();
-
-    if(isGroceries(sec)){
-        const manageBtn = cloneEl('tpl-manage-link');
-        manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}&return=${encodeURIComponent(`lists.html#${sectionSlug(sec)}`)}`;
-        wrap.append(manageBtn);
-        return wrap;
-    }
-
-    const toggleWrap = cloneEl('tpl-tags-toggle');
-    const toggle = refs(toggleWrap).toggle;
-
-    toggle.checked = !!sec.tags_enabled;
-
-    toggle.addEventListener('change', async () => {
-        try{
-            const enabled = toggle.checked;
-            await updateSectionTagsEnabled(sec.id, enabled);
-            requestRender();
-        }catch(err){
-            console.error(err);
-            setStatus('Could not save tags setting.');
-        }
-    });
-
-    wrap.append(toggleWrap);
-
-    if(sec.tags_enabled){
-        const manageBtn = cloneEl('tpl-manage-link');
-        manageBtn.href = `managegroceries.html?section=${encodeURIComponent(sec.id)}&return=${encodeURIComponent(`lists.html#${sectionSlug(sec)}`)}`;
-        wrap.append(manageBtn);
-    }
-
-    return wrap;
-}
-
 
 // ---- Drag-and-drop reordering -------------------------------------------
 // Not yet routed through the offline queue (it's a single bulk RPC call,

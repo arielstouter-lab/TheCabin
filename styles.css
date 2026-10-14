@@ -96,10 +96,10 @@ textarea { font: inherit; }
     text-align: left;
     &:focus { outline: none; border-color: var(--primary); }
   }
-  &.due-soon { border-color: var(--ochre); color: var(--ochre); }
-  &.overdue { border-color: var(--danger); color: var(--danger); }
-  &.priority-chip { background: var(--danger); color: var(--white); border-color: var(--danger); font-weight: 600; }
-  &.aisle-chip { margin-left: auto; background: var(--card); color: var(--ink-soft); border-color: var(--line); white-space: nowrap; }
+  &[data-state="due-soon"] { border-color: var(--ochre); color: var(--ochre); }
+  &[data-state="overdue"] { border-color: var(--danger); color: var(--danger); }
+  &[data-kind="priority"] { background: var(--danger); color: var(--white); border-color: var(--danger); font-weight: 600; }
+  &[data-kind="aisle"] { margin-left: auto; background: var(--card); color: var(--ink-soft); border-color: var(--line); white-space: nowrap; }
 }
 
 .chiplg input[type=number] { --chip-w: 58px; }
@@ -401,6 +401,8 @@ select { cursor: pointer; }
 
 .card-head { display: flex; align-items: center; justify-content: space-between; padding: 0 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 10px; gap: 10px; }
 
+.card-actions { display: flex; align-items: center; gap: 8px}
+
 .card-title { font-family: var(--font-serif), serif; font-weight: 600; font-size: var(--text-xl); margin: 0; }
 
 .card-search { padding: 10px 14px 4px; }
@@ -523,6 +525,8 @@ select { cursor: pointer; }
   &:focus { opacity: 0.7; }
 }
 
+[hidden] { display: none; !important}
+
 .hidden {
   display: none;
 }
@@ -635,12 +639,11 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
   z-index: -1;
 }
 
-.flow-spotting { background: var(--flowlight); opacity: 0.4; }
-.flow-light    { background: var(--flowlight); opacity: 0.5; }
-.flow-medium   { background: var(--flowmedium); opacity: 0.6; }
-.flow-heavy    { background: var(--flowheavy); opacity: 0.7; }
-
-.flow-projected {
+.cal-day-flow[data-flow="spotting"] { background: var(--flowlight); opacity: 0.4; }
+.cal-day-flow[data-flow="light"] { background: var(--flowlight); opacity: 0.5; }
+.cal-day-flow[data-flow= "medium"] { background: var(--flowmedium); opacity: 0.6; }
+.cal-day-flow[data-flow="heavy"] { background: var(--flowheavy); opacity: 0.7; }
+.cal-day-flow[data-flow="projected"] {
   background: color-mix(in srgb, var(--flowlight) 30%, transparent);
   outline: 1px dashed color-mix(in srgb, var(--flowheavy) 70%, transparent);
 }
@@ -665,9 +668,9 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
 
 .cal-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft); }
 
-.cal-day-dot.priority { background: var(--ochre); }
+.cal-day-dot[data-state="priority"] { background: var(--ochre); }
 
-.cal-day-dot.overdue{ background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 35%, var(--card)); }
+.cal-day-dot[data-state="overdue"] { background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 35%, var(--card)); }
 
 .compact-list { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: var(--text-base); }
 

@@ -7,6 +7,8 @@ import {
     requestRender, addIngredientsToGroceries
 } from './lists-state.js';
 import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
+import { fillSlots, bindStepper, manageHref } from './lists-ui.js';
+import { openAisleIds, groupByAisle, buildAisleGroup } from './lists-aisles.js';
 
 async function deleteItem(id){
     await deleteListItem(id);
@@ -20,14 +22,13 @@ async function setQuantity(id, qty){
 
 function buildPantryItem(item){
     const row = cloneEl('tpl-pantry-item');
+    fillSlots(row);                       // stepper must be in place before refs()
     const r = refs(row);
     row.dataset.itemRow = item.id;
 
     r.text.textContent = item.text;
-    r.qtyVal.textContent = String(item.quantity ?? 1);
+    bindStepper(r, () => item.quantity ?? 1, qty => setQuantity(item.id, qty));
 
-    r.qtyDown.addEventListener('click', () => setQuantity(item.id, Math.max(1, (item.quantity ?? 1) - 1)));
-    r.qtyUp.addEventListener('click', () => setQuantity(item.id, Math.max(1, (item.quantity ?? 1) + 1)));
     r.addToGroceries.addEventListener('click', () => addIngredientsToGroceries([item.text]));
     r.del.addEventListener('click', () => deleteItem(item.id));
 
@@ -35,101 +36,38 @@ function buildPantryItem(item){
 }
 
 export function renderPantryPanel(sec){
-    const openAisles = new Set();
-    document.querySelectorAll('#lst-panel details[data-aisle-id]').forEach(d => {
-        if(d.open) openAisles.add(d.dataset.aisleId);
-    });
+    const open = openAisleIds();          // remember open aisles across re-renders
 
     const frag = cloneFragment('tpl-pantry-panel');
+    fillSlots(frag);                      // new-item stepper
     const r = refs(frag);
+
     r.title.textContent = sec.name;
+    r.manageLink.href = manageHref(sec);
 
-    const manageBtn = cloneEl('tpl-manage-link');
-
-    manageBtn.href =
-        `managegroceries.html?section=${encodeURIComponent(sec.id)}&return=${encodeURIComponent('lists.html#pantry')}`;
-
-    manageBtn.textContent = 'Manage Tags';
-
-    r.head.append(manageBtn);
-
-    const items = [...(state.itemsBySection[sec.id] || [])];
-
-    const grouped = new Map();
-
-    items.forEach(item => {
-        const aisleId = item.aisle_id || 'unassigned';
-
-        if(!grouped.has(aisleId)){
-            grouped.set(aisleId, []);
-        }
-
-        grouped.get(aisleId).push(item);
-    });
+    const items = state.itemsBySection[sec.id] || [];
 
     if(!items.length){
-        r.items.append(emptyState('Nothing in the pantry yet.'));
+        r.items.append(emptyState(r.items.dataset.empty));
     } else {
-        const sortedGroups = Array.from(grouped.entries()).sort(([aisleIdA], [aisleIdB]) => {
-            const aisleA = aisleIdA === 'unassigned' ? null : state.groceryAisles.find(a => a.id === aisleIdA);
-            const aisleB = aisleIdB === 'unassigned' ? null : state.groceryAisles.find(a => a.id === aisleIdB);
-            const sortA = aisleA ? (aisleA.sort_order ?? 9999) : 9999;
-            const sortB = aisleB ? (aisleB.sort_order ?? 9999) : 9999;
-            if(sortA !== sortB) return sortA - sortB;
-            const nameA = aisleA ? aisleA.name : 'Unassigned';
-            const nameB = aisleB ? aisleB.name : 'Unassigned';
-            return nameA.localeCompare(nameB);
-        });
-
-        sortedGroups.forEach(([aisleId, groupItems]) => {
-            const details = document.createElement('details');
-            details.dataset.aisleId = aisleId;
-            if(openAisles.has(aisleId)){
-                details.open = true;
-            }
-
-            const summary = document.createElement('summary');
-
-            let sectionName = 'Unassigned';
-
-            if(aisleId !== 'unassigned'){
-                const aisle = state.groceryAisles.find(
-                    a => a.id === aisleId
-                );
-
-                if(aisle){
-                    sectionName = aisle.name;
-                }
-            }
-
-            summary.textContent =
-                `${sectionName} (${groupItems.length})`;
-
-            details.append(summary);
-
-            groupItems
-                .sort((a, b) =>
-                    String(a.text || '').localeCompare(String(b.text || ''))
-                )
-                .forEach(item => {
-                    details.append(buildPantryItem(item));
-                });
-
-            r.items.append(details);
-        });
+        r.items.append(...groupByAisle(items).map(({ aisleId, name, items: groupItems }) => {
+            const sorted = [...groupItems].sort((a, b) =>
+                String(a.text || '').localeCompare(String(b.text || ''))
+            );
+            return buildAisleGroup(
+                aisleId,
+                `${name} (${sorted.length})`,
+                sorted.map(buildPantryItem),
+                open.has(aisleId)
+            );
+        }));
     }
 
-
-    // The "new item" quantity stepper is local UI state, not saved until Add is clicked.
+    // The "new item" stepper is local UI state, not saved until Add is clicked.
     let newQty = 1;
-    r.newQtyVal.textContent = String(newQty);
-    r.newQtyDown.addEventListener('click', () => {
-        newQty = Math.max(1, newQty - 1);
-        r.newQtyVal.textContent = String(newQty);
-    });
-    r.newQtyUp.addEventListener('click', () => {
-        newQty = Math.max(1, newQty + 1);
-        r.newQtyVal.textContent = String(newQty);
+    bindStepper(r, () => newQty, qty => {
+        newQty = qty;
+        r.stepVal.textContent = String(newQty);
     });
 
     async function addNewItem(){

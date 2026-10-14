@@ -10,6 +10,14 @@
     <script type="module" src="calendar.js"></script>
 </head>
 
+<!--
+  Template conventions (JS only fills values, toggles `hidden`, and attaches listeners):
+    data-ref="x"             element JS needs a handle on (refs())
+    hidden                   optional element, shown by JS when it applies
+    data-flow / data-state   day-cell flow tint / dot state, styled in CSS
+    data-kind / data-state   chip variant / chip state, styled in CSS
+-->
+
 <body class="app-page cal-page">
 <div class="app-shell">
     <main class="main-content">
@@ -25,6 +33,7 @@
         </header>
 
         <section class="content">
+
             <div class="split-grid">
                 <div class="card">
                     <div class="card-head">
@@ -64,29 +73,23 @@
 
                     <div id="cal-events-wrap">
                         <div class="cal-events" id="cal-events"></div>
-                        <hr class="cal-events-divider hidden" id="cal-events-divider">
+                        <hr class="cal-events-divider" id="cal-events-divider" hidden>
                         <div class="cal-events" id="cal-events-pinned"></div>
-                        <p class="empty-state hidden" id="cal-events-empty">No events yet.</p>
+                        <p class="empty-state" id="cal-events-empty" hidden>No events yet.</p>
                     </div>
-
-                    <template id="cal-event-template">
-                        <div class="compact-list">
-                            <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
-                            <span class="cal-event-title"></span>
-                            <button class="icon-delete" title="Remove">✕</button>
-                        </div>
-                    </template>
 
                     <div class="add-item">
                         <label for="cal-new-event" class="visually-hidden">New event</label>
                         <input type="text" id="cal-new-event" class="text-input" placeholder="Add an item for this day" />
                         <select id="cal-event-layer">
                             <option value="layer:">Default</option>
+                            <optgroup label="Calendar" id="cal-layer-group"></optgroup>
+                            <optgroup label="List (checkable)" id="cal-list-group"></optgroup>
                         </select>
                         <button class="button-inline" id="cal-add-event">Add</button>
                     </div>
 
-                    <div id="moon-panel" class="card-head hidden">
+                    <div id="moon-panel" class="card-head" hidden>
 
                         <h2 class="card-title">Period Statistics</h2>
                         <div class="card-body" style="font-size: var(--text-md)">
@@ -107,7 +110,7 @@
                         </div>
                     </div>
 
-                    <div id="o-panel" class="card-head hidden">
+                    <div id="o-panel" class="card-head" hidden>
                         <h2 class="card-title">Denial Statistics</h2>
                         <div class="card-body" style="font-size: var(--text-md)">
 
@@ -119,6 +122,39 @@
                 </div>
             </div>
         </section>
+
+        <!-- ============ Month grid ============ -->
+        <!-- One cell. data-flow (on flow): spotting | light | medium | heavy | projected -->
+        <template id="tpl-cal-day">
+            <div class="cal-day">
+                <div class="cal-day-flow" data-ref="flow" hidden></div>
+                <span class="cal-day-num" data-ref="num"></span>
+                <div class="cal-day-dot-row" data-ref="dots" hidden></div>
+                <span class="cal-day-o" data-ref="o" hidden>💥</span>
+            </div>
+        </template>
+
+        <!-- data-state: overdue | priority (none = plain dot) -->
+        <template id="tpl-cal-dot">
+            <span class="cal-day-dot"></span>
+        </template>
+
+        <!-- ============ Events panel ============ -->
+        <!-- Used for calendar events and checkable list items; JS unhides what applies. -->
+        <template id="tpl-cal-event">
+            <div class="compact-list">
+                <input type="checkbox" class="cal-event-check" data-ref="check" hidden />
+                <span class="drag-handle" title="Drag to reorder" data-ref="handle" hidden>⋮⋮</span>
+                <span class="cal-event-title" data-ref="title"><span data-ref="prefix" hidden>Flow: </span><span data-ref="text"></span></span>
+                <span class="cal-event-chips" data-ref="chips" hidden></span>
+                <button class="icon-delete" title="Remove" data-ref="del" hidden>✕</button>
+            </div>
+        </template>
+
+        <!-- ============ Shared small pieces ============ -->
+        <template id="tpl-chip">
+            <span class="chip" data-kind="default"></span>
+        </template>
     </main>
 </div>
 </body>

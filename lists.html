@@ -10,6 +10,15 @@
     <script type="module" src="Lists/lists.js" defer></script>
 </head>
 
+<!--
+  Template conventions (JS only fills values, toggles `hidden`, and attaches listeners):
+    data-ref="x"        element JS needs a handle on (refs())
+    hidden              optional element, shown by JS when it applies
+    data-empty="..."    empty-state text, passed through by JS
+    data-slot="name"    placeholder replaced by <template id="tpl-name"> (fillSlots())
+    data-kind / data-state   chip variant / chip state, styled in CSS
+-->
+
 <body class="app-page">
 <div class="app-shell">
     <main class="main-content">
@@ -31,150 +40,182 @@
                 <button class="button-inline" id="lst-add-section">Add tab</button>
             </div>
 
+
             <div class="tabs-container" id="lst-tabs">
 
             </div>
             <div class="card" id="lst-panel"></div>
         </section>
 
-            <!-- ============ Tabs ============ -->
-            <template id="tpl-tab">
-                <button type="button" class="tab">
-                    <span class="tab-label" data-ref="label"></span>
-                </button>
-            </template>
+        <!-- ============ Tabs ============ -->
+        <template id="tpl-tab">
+            <button type="button" class="tab">
+                <span class="tab-label" data-ref="label"></span>
+            </button>
+        </template>
 
-            <!-- ============ Shared small pieces ============ -->
-            <template id="tpl-empty">
-                <p class="empty-state"></p>
-            </template>
+        <!-- ============ Shared small pieces ============ -->
+        <template id="tpl-empty">
+            <p class="empty-state"></p>
+        </template>
 
-            <template id="tpl-chip">
-                <span class="chip"></span>
-            </template>
+        <!-- One chip template. data-kind: priority | assigned | due | aisle. data-state: due-date state. -->
+        <template id="tpl-chip">
+            <span class="chip" data-kind="default"></span>
+        </template>
 
-            <template id="tpl-clear-checked">
-                <button type="button" class="button-inline" data-ref="clearBtn">Clear checked</button>
-            </template>
+        <template id="tpl-person-option">
+            <option></option>
+        </template>
 
-            <template id="tpl-manage-link">
-                <a href="managegroceries.html" class="button-inline">Manage tags</a>
-            </template>
+        <!-- Quantity stepper, dropped into any <div data-slot="stepper"></div> -->
+        <template id="tpl-stepper">
+            <div class="stepper">
+                <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="stepDown">−</button>
+                <span class="stepper-val" data-ref="stepVal">1</span>
+                <button type="button" class="stepper-btn" title="Increase quantity" data-ref="stepUp">+</button>
+            </div>
+        </template>
 
-            <template id="tpl-delete-tab">
-                <button type="button" class="icon-delete" title="Remove tab">✕</button>
-            </template>
-
-            <template id="tpl-tags-toggle">
-                <label class="tags-toggle">
-                    <input type="checkbox" role="switch" data-ref="toggle" />
-                    <span>Tags</span>
-                </label>
-            </template>
-
-            <!-- ============ Groceries / custom tabs (lists-panel.js) ============ -->
-            <template id="tpl-list-panel">
-                <div class="card-head" data-ref="head">
-                    <h2 class="card-title" data-ref="title"></h2>
+        <!-- ============ Groceries (lists-panel.js) ============ -->
+        <template id="tpl-groceries-panel">
+            <div class="card-head">
+                <h2 class="card-title" data-ref="title"></h2>
+                <div class="card-actions">
+                    <button type="button" class="button-inline" data-ref="clearBtn" hidden>Clear checked</button>
+                    <a href="managegroceries.html" class="button-inline" data-ref="manageLink">Manage tags</a>
                 </div>
-                <div class="lst-items" data-ref="items"></div>
-                <div class="lst-add-item">
-                    <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
-                    <div class="lst-add-row2">
-                        <select data-ref="newPerson">
-                            <option value="">Unassigned</option>
-                        </select>
-                        <input type="date" placeholder="Date" data-ref="newDue" />
-                        <label class="lst-priority-toggle">
-                            <input type="checkbox" data-ref="newPriority" /> High priority
-                        </label>
-                        <button class="button-inline" data-ref="addBtn">Add</button>
+            </div>
+            <div class="lst-items" data-ref="items" data-empty="Nothing here yet."></div>
+            <div class="lst-add-item">
+                <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
+                <div class="lst-add-row2">
+                    <select data-ref="newPerson">
+                        <option value="">Unassigned</option>
+                    </select>
+                    <input type="date" placeholder="Date" data-ref="newDue" />
+                    <label class="lst-priority-toggle">
+                        <input type="checkbox" data-ref="newPriority" /> High priority
+                    </label>
+                    <button class="button-inline" data-ref="addBtn">Add</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- ============ Custom tabs (lists-panel.js) ============ -->
+        <template id="tpl-custom-panel">
+            <div class="card-head">
+                <h2 class="card-title" data-ref="title"></h2>
+                <div class="card-actions">
+                    <button type="button" class="button-inline" data-ref="clearBtn" hidden>Clear checked</button>
+                    <label class="tags-toggle">
+                        <input type="checkbox" role="switch" data-ref="tagsToggle" />
+                        <span>Tags</span>
+                    </label>
+                    <a href="managegroceries.html" class="button-inline" data-ref="manageLink" hidden>Manage tags</a>
+                    <button type="button" class="icon-delete" title="Remove tab" data-ref="deleteTab" hidden>✕</button>
+                </div>
+            </div>
+            <div class="lst-items" data-ref="items" data-empty="Nothing here yet."></div>
+            <div class="lst-add-item">
+                <input type="text" class="text-input" placeholder="Add an item" data-ref="newText" />
+                <div class="lst-add-row2">
+                    <select data-ref="newPerson">
+                        <option value="">Unassigned</option>
+                    </select>
+                    <input type="date" placeholder="Date" data-ref="newDue" />
+                    <label class="lst-priority-toggle">
+                        <input type="checkbox" data-ref="newPriority" /> High priority
+                    </label>
+                    <button class="button-inline" data-ref="addBtn">Add</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- Row used by both Groceries and custom tabs -->
+        <template id="tpl-list-item">
+            <div class="lst-item draggable-item" draggable="true">
+                <div class="lst-item-top">
+                    <span class="drag-handle" title="Drag to reorder" data-ref="handle">⋮⋮</span>
+                    <label class="lst-check-label">
+                        <input type="checkbox" data-ref="checkbox" />
+                        <span class="lst-item-text" data-ref="text"></span>
+                    </label>
+                    <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+                </div>
+                <div class="lst-item-meta" data-ref="meta"></div>
+            </div>
+        </template>
+
+        <!-- ============ Pantry (lists-pantry.js) ============ -->
+        <template id="tpl-pantry-panel">
+            <div class="card-head">
+                <h2 class="card-title" data-ref="title"></h2>
+                <div class="card-actions">
+                    <a href="managegroceries.html" class="button-inline" data-ref="manageLink">Manage tags</a>
+                </div>
+            </div>
+            <div class="lst-items" data-ref="items" data-empty="Nothing in the pantry yet."></div>
+            <div class="lst-add-item">
+                <input type="text" class="text-input" placeholder="Add a pantry item" data-ref="newText" />
+                <div class="lst-add-row2">
+                    <div data-slot="stepper"></div>
+                    <button class="button-inline" data-ref="addBtn">Add</button>
+                </div>
+            </div>
+        </template>
+
+        <template id="tpl-aisle-group">
+            <details>
+                <summary data-ref="summary"></summary>
+            </details>
+        </template>
+
+        <template id="tpl-pantry-item">
+            <div class="lst-item lst-item-row">
+                <span class="lst-item-text" data-ref="text"></span>
+                <div class="lst-actions">
+                    <div data-slot="stepper"></div>
+                    <button type="button" class="button-inline" data-ref="addToGroceries">Add to groceries</button>
+                    <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- ============ Recipes (lists-recipes.js) ============ -->
+        <template id="tpl-recipes-panel">
+            <div class="card-head">
+                <h2 class="card-title" data-ref="title"></h2>
+            </div>
+            <div class="recipe-search-row">
+                <input type="text" class="text-input" placeholder="Search recipes or ingredients..." data-ref="search" />
+            </div>
+            <div class="lst-items" data-ref="list"></div>
+        </template>
+
+        <template id="tpl-recipe-card">
+            <details>
+                <summary>
+                    <div class="summary-content">
+                        <div class="card-title" data-ref="name"></div>
+                        <button type="button" class="button-inline" data-ref="addAll">Add full recipe</button>
                     </div>
+                </summary>
+                <div class="recipe-note-cell">
+                    <span class="note note-editable" contenteditable="true" data-placeholder="Notes" data-ref="notes"></span>
+                    <span class="note note-editable" contenteditable="true" data-placeholder="URL" data-ref="url"></span>
+                    <a class="recipe-url-link" target="_blank" rel="noopener noreferrer" title="Open link" hidden data-ref="urlLink">↗</a>
                 </div>
-            </template>
+                <div class="recipe-ingredients" data-ref="ingredients"></div>
+            </details>
+        </template>
 
-            <template id="tpl-list-item">
-                <div class="lst-item draggable-item" draggable="true">
-                    <div class="lst-item-top">
-                        <span class="drag-handle" title="Drag to reorder" data-ref="handle">⋮⋮</span>
-                        <label class="lst-check-label">
-                            <input type="checkbox" data-ref="checkbox" />
-                            <span class="lst-item-text" data-ref="text"></span>
-                        </label>
-                        <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
-                    </div>
-                    <div class="lst-item-meta" data-ref="meta"></div>
-                </div>
-            </template>
-
-            <!-- ============ Pantry (lists-pantry.js) ============ -->
-            <template id="tpl-pantry-panel">
-                <div class="card-head" data-ref="head">
-                    <h2 class="card-title" data-ref="title"></h2>
-                </div>
-                <div class="lst-items" data-ref="items"></div>
-                <div class="lst-add-item">
-                    <input type="text" class="text-input" placeholder="Add a pantry item" data-ref="newText" />
-                    <div class="lst-add-row2">
-                        <div class="stepper">
-                            <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="newQtyDown">−</button>
-                            <span class="stepper-val" data-ref="newQtyVal">1</span>
-                            <button type="button" class="stepper-btn" title="Increase quantity" data-ref="newQtyUp">+</button>
-                        </div>
-                        <button class="button-inline" data-ref="addBtn">Add</button>
-                    </div>
-                </div>
-            </template>
-
-            <template id="tpl-pantry-item">
-                <div class="lst-item lst-item-row">
-                    <span class="lst-item-text" data-ref="text"></span>
-                    <div class="lst-actions">
-                        <div class="stepper">
-                            <button type="button" class="stepper-btn" title="Decrease quantity" data-ref="qtyDown">−</button>
-                            <span class="stepper-val" data-ref="qtyVal"></span>
-                            <button type="button" class="stepper-btn" title="Increase quantity" data-ref="qtyUp">+</button>
-                        </div>
-                        <button type="button" class="button-inline" data-ref="addToGroceries">Add to groceries</button>
-                        <button type="button" class="icon-delete" title="Remove" data-ref="del">✕</button>
-                    </div>
-                </div>
-            </template>
-
-            <!-- ============ Recipes (lists-recipes.js) ============ -->
-            <template id="tpl-recipes-panel">
-                <div class="card-head">
-                    <h2 class="card-title" data-ref="title"></h2>
-                </div>
-                <div class="recipe-search-row">
-                    <input type="text" class="text-input" placeholder="Search recipes or ingredients..." data-ref="search" />
-                </div>
-                <div class="lst-items" data-ref="list"></div>
-            </template>
-
-            <template id="tpl-recipe-card">
-                <details>
-                    <summary>
-                        <div class="summary-content">
-                            <div class="card-title" data-ref="name"></div>
-                            <button type="button" class="button-inline" data-ref="addAll">Add full recipe</button>
-                        </div>
-                    </summary>
-                    <div class="recipe-note-cell">
-                        <span class="note note-editable" contenteditable="true" data-placeholder="Notes" data-ref="notes"></span>
-                        <span class="note note-editable" contenteditable="true" data-placeholder="URL" data-ref="url"></span>
-                        <a class="recipe-url-link" target="_blank" rel="noopener noreferrer" title="Open link" hidden data-ref="urlLink">↗</a>
-                    </div>
-                    <div class="recipe-ingredients" data-ref="ingredients"></div>
-                </details>
-            </template>
-
-            <template id="tpl-recipe-ingredient">
-                <div class="lst-item lst-item-row">
-                    <span class="lst-item-text" data-ref="text"></span>
-                    <button type="button" class="button-inline" data-ref="addBtn">Add to groceries</button>
-                </div>
-            </template>
+        <template id="tpl-recipe-ingredient">
+            <div class="lst-item lst-item-row">
+                <span class="lst-item-text" data-ref="text"></span>
+                <button type="button" class="button-inline" data-ref="addBtn">Add to groceries</button>
+            </div>
+        </template>
     </main>
 </div>
 </body>
