@@ -84,7 +84,7 @@ import { writeOrQueue, nowStamp, initSync } from '../SharedJS/sync.js';
           <div class="lst-item draggable-item" draggable="true" data-index="${index}" data-item-row="${aisle.id}">
             <div class="lst-item-top">
               <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
-              <input type="text" class="text-input aisle-name-input" data-aisle-name="${aisle.id}" value="${escapeHtml(aisle.name)}" />
+              <input type="text" class="text-input" data-aisle-name="${aisle.id}" value="${escapeHtml(aisle.name)}" />
               <button class="icon-delete" data-del-aisle="${aisle.id}" title="Remove aisle">✕</button>
             </div>
           </div>`).join('') : '<p class="empty-state">No aisles yet — add one below.</p>';

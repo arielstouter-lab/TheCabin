@@ -44,6 +44,7 @@
 
             <!-- Tab 1: Budget -->
             <div id="tab-budget" class="tab-pane">
+
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Credit Card Spending</h2>
@@ -642,7 +643,7 @@
             <div id="tab-projection" class="tab-pane" hidden>
                 <div class="card">
                     <div class="card-head">
-                        <h2 class="card-title">Budget Projection</h2>
+                        <h2 class="card-title">New Projection</h2>
                         <span class="note">
                             Future budget snapshot overrides
                         </span>
@@ -656,7 +657,6 @@
                             </div>
 
                             <div class="picker">
-                                <label for="projectionNewMonth">New Projection</label>
                                 <input type="month" id="projectionNewMonth" class="text-input"/>
                             </div>
 
@@ -664,9 +664,14 @@
                                 Copy Forward
                             </button>
                         </div>
-                        <div id="projectionSummaryGrid" class="summary-grid"></div>
                     </div>
+                </div>
 
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Credit Card Spending</h2>
+                        <span class="note">Monthly credit card spend per category, used by credit card comparison</span>
+                    </div>
                     <div class="card-body">
                         <div class="table-wrap">
                             <table class="cc-table">
@@ -677,15 +682,133 @@
                                     <th class="col-num">Amount</th>
                                     <th>Notes</th>
                                     <th class="col-num">Monthly Spend</th>
-                                    <th></th>
+                                    <th class="col-action"></th>
                                 </tr>
                                 </thead>
                                 <tbody id="projectionGridBody"></tbody>
                             </table>
                         </div>
+                        <p id="projectionGridEmpty" class="empty-state" hidden>No credit card categories yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newCategory" placeholder="Category (e.g. Dining, Gas)" />
+                                <select class="text-input" id="newCategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newCategoryAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input note" id="newCategoryNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="addCategoryBtn">Add category</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Bank Account Spending</h2>
+                        <span class="note">Non-card monthly expenses</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="projectionSpendGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="projectionSpendGridEmpty" class="empty-state" hidden>No bank account expenses yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newBankCategory" placeholder="Expense (e.g. Rent, Utilities)" />
+                                <select class="text-input" id="newBankCategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newBankCategoryAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input note" id="newBankCategoryNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="addBankCategoryBtn">Add expense</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Income</h2>
+                        <span class="note">Monthly income sources (e.g. primary salary, side income)</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Income Source</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Amount</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="projectionIncomeGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="projectionIncomeGridEmpty" class="empty-state" hidden>No income sources yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newIncomeSource" placeholder="Income source (e.g. Salary, Consulting)" />
+                                <select class="text-input" id="newIncomeFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newIncomeAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input note" id="newIncomeNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="addIncomeBtn">Add income</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Monthly Budget Balance</h2>
+                        <span class="note">Total Income &minus; Total Spending = Net Balance</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="projectionSummaryGrid" class="summary-grid"></div>
                     </div>
                 </div>
             </div>
+
+
+
+
+
+</div>
 
             <!-- ============ Templates ============ -->
 
