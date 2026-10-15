@@ -633,8 +633,55 @@
 
                 <!-- One card per mortgage debt -->
                 <div id="mortgageCards"></div>
+            </div>
 
+            <!-- Tab 5: Budget Projection -->
+            <div id="tab-projection" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Budget Projection</h2>
+                        <span class="note">
+                            Future budget snapshot overrides
+                        </span>
+                    </div>
 
+                    <div class="card-body">
+                        <div class="cc-add-form">
+                            <div class="picker">
+                                <label for="projectionMonthSelect">Projection Month</label>
+                                <select id="projectionMonthSelect"></select>
+                            </div>
+
+                            <div class="picker">
+                                <label for="projectionNewMonth">New Projection</label>
+                                <input type="month" id="projectionNewMonth" class="text-input"/>
+                            </div>
+
+                            <button type="button" class="button-inline" id="projectionNewSnapshotBtn">
+                                Copy Forward
+                            </button>
+                        </div>
+                        <div id="projectionSummaryGrid" class="summary-grid"></div>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody id="projectionGridBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- ============ Templates ============ -->

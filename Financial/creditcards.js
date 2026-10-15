@@ -10,6 +10,7 @@ const CATEGORIES_TABLE = TABLES.CATEGORIES;
 const CARDS_TABLE = TABLES.CREDIT_CARDS;
 const REWARDS_TABLE = TABLES.CARD_REWARDS;
 const TAX_TABLE = TABLES.INCOME_TAX;
+const BUDGET_SNAPSHOT_TABLE = TABLES.BUDGET_SNAPSHOTS;
 
 const COL_CAT_ID = 'id';
 const COL_CAT_CATEGORY = 'category';
@@ -42,6 +43,8 @@ let categoryRows = [];
 let cardsRows = [];
 let rewardRows = [];
 let taxRows = [];
+let budgetSnapshotRows = [];
+let selectedProjectionMonth = null;
 
 let realtimeChannel = null;
 let realtimeDebounceTimer = null;
@@ -55,6 +58,417 @@ function computeMonthlySpend(amount, frequency) {
         default: return val;
     }
 }
+
+function projectionMonths() {
+
+    return [
+        ...new Set(
+            budgetSnapshotRows.map(x => x.month)
+        )
+    ]
+        .sort()
+        .reverse();
+}
+
+function getProjectedRows(month) {
+
+    if (!month)
+        return categoryRows;
+
+    return categoryRows.map(row => {
+
+        const snapshot =
+            budgetSnapshotRows.find(x =>
+                String(x.category_id) === String(row.id)
+                && x.month === month
+            );
+
+        if (!snapshot)
+            return row;
+
+        return {
+            ...row,
+            amount: snapshot.amount,
+            monthly_spend:
+                computeMonthlySpend(
+                    snapshot.amount,
+                    row.frequency
+                )
+        };
+    });
+}
+
+async function createBudgetSnapshot(month) {
+
+    if (!sb) return;
+
+    const rows = categoryRows.map(row => ({
+        category_id: row.id,
+        month,
+        amount: row.amount
+    }));
+
+    try {
+
+        const { data, error } =
+            await sb
+                .from(BUDGET_SNAPSHOT_TABLE)
+                .upsert(
+                    rows,
+                    {
+                        onConflict:
+                            'category_id,month'
+                    }
+                )
+                .select();
+
+        if (error) throw error;
+
+        budgetSnapshotRows.push(
+            ...(data || [])
+        );
+
+        selectedProjectionMonth =
+            month;
+
+        render();
+    }
+    catch (err) {
+        console.error(err);
+    }
+}
+
+async function updateBudgetSnapshotRow(
+    categoryId,
+    patch
+) {
+
+    if (
+        !selectedProjectionMonth ||
+        !sb
+    ) {
+        return false;
+    }
+
+    try {
+
+        let row =
+            budgetSnapshotRows.find(
+                x =>
+                    String(x.category_id) ===
+                    String(categoryId)
+                    &&
+                    x.month ===
+                    selectedProjectionMonth
+            );
+
+        if (!row) {
+
+            const sourceRow =
+                categoryRows.find(
+                    r =>
+                        String(r.id) ===
+                        String(categoryId)
+                );
+
+            const payload = {
+
+                category_id:
+                categoryId,
+
+                month:
+                selectedProjectionMonth,
+
+                amount:
+                    patch.amount ??
+                    sourceRow.amount
+            };
+
+            const {
+                data,
+                error
+            } =
+                await sb
+                    .from(
+                        BUDGET_SNAPSHOT_TABLE
+                    )
+                    .insert([payload])
+                    .select()
+                    .single();
+
+            if (error) throw error;
+
+            budgetSnapshotRows.push(
+                data
+            );
+
+            row = data;
+        }
+
+        Object.assign(
+            row,
+            patch
+        );
+
+        const {
+            error
+        } =
+            await sb
+                .from(
+                    BUDGET_SNAPSHOT_TABLE
+                )
+                .update(patch)
+                .eq(
+                    'id',
+                    row.id
+                );
+
+        if (error) throw error;
+
+        renderProjectionTab();
+
+        return true;
+
+    } catch (err) {
+
+        console.error(err);
+
+        setStatus(
+            'Could not save projection.'
+        );
+
+        return false;
+    }
+}
+
+function renderProjectionGrid(
+    projectedRows
+) {
+
+    const body =
+        document.getElementById(
+            'projectionGridBody'
+        );
+
+    if (!body)
+        return;
+
+    body.replaceChildren();
+
+    projectedRows.forEach(
+        row => {
+
+            body.append(
+
+                buildCategoryRow(
+                    row,
+                    {
+                        deleteTitle:
+                            'Projection row',
+
+                        onDelete:
+                            () => {},
+
+                        onUpdate:
+                            (
+                                id,
+                                patch
+                            ) =>
+                                updateBudgetSnapshotRow(
+                                    id,
+                                    patch
+                                )
+                    }
+                )
+
+            );
+        }
+    );
+}
+
+function renderProjectionTab() {
+
+    const monthSelect = document.getElementById('projectionMonthSelect');
+    const summaryGrid = document.getElementById('projectionSummaryGrid');
+
+    if (!monthSelect || !summaryGrid) {return;}
+
+    const months = projectionMonths();
+
+    monthSelect.replaceChildren();
+
+    if (!months.length) {
+
+        const option =
+            document.createElement('option');
+        option.value = '';
+        option.textContent =
+            'No projections yet';
+        monthSelect.append(option);
+        summaryGrid.replaceChildren();
+        return;
+    }
+
+    months.forEach(month => {
+
+        const option =
+            document.createElement('option');
+
+        option.value = month;
+        option.textContent = month;
+
+        monthSelect.append(option);
+    });
+
+    if (!selectedProjectionMonth || !months.includes(selectedProjectionMonth)) {selectedProjectionMonth = months[0];}
+
+    monthSelect.value = selectedProjectionMonth;
+
+    const projectedRows = getProjectedRows(selectedProjectionMonth);
+
+    renderProjectionGrid(projectedRows);
+
+    const projectedIncome =
+        projectedRows
+            .filter(
+                row =>
+                    row.account_type ===
+                    'income'
+            )
+            .reduce(
+                (sum, row) =>
+                    sum +
+                    (row.monthly_spend || 0),
+                0
+            );
+
+    const projectedCreditCardSpend =
+        projectedRows
+            .filter(
+                row =>
+                    row.account_type ===
+                    'credit_cards'
+            )
+            .reduce(
+                (sum, row) =>
+                    sum +
+                    (row.monthly_spend || 0),
+                0
+            );
+
+    const projectedBankSpend =
+        projectedRows
+            .filter(
+                row =>
+                    row.account_type ===
+                    'bank'
+            )
+            .reduce(
+                (sum, row) =>
+                    sum +
+                    (row.monthly_spend || 0),
+                0
+            );
+
+    const projectedRentalProfit =
+        RENTAL_PROPERTIES.reduce(
+            (sum, property) =>
+                sum +
+                getRentalProfit(property),
+            0
+        );
+
+    const projectedTotalIncome =
+        projectedIncome +
+        projectedRentalProfit;
+
+    const projectedTotalSpending =
+        projectedCreditCardSpend +
+        projectedBankSpend;
+
+    const projectedNetBalance =
+        projectedTotalIncome -
+        projectedTotalSpending;
+
+    renderSummaryCards(
+        summaryGrid,
+        [
+            {
+                label:
+                    'Projected Income',
+
+                value:
+                    fmt$(
+                        projectedTotalIncome
+                    ),
+
+                foot:
+                    `${fmt$(
+                        projectedTotalIncome * 12
+                    )}/yr`
+            },
+
+            {
+                label:
+                    'Projected Spending',
+
+                value:
+                    fmt$(
+                        projectedTotalSpending
+                    ),
+
+                foot:
+                    `Credit Cards ${fmt$(
+                        projectedCreditCardSpend
+                    )}/mo · Bank ${fmt$(
+                        projectedBankSpend
+                    )}/mo`
+            },
+
+            {
+                label:
+                    'Projected Rental Profit',
+
+                value:
+                    fmt$(
+                        projectedRentalProfit
+                    ),
+
+                foot:
+                    `${fmt$(
+                        projectedRentalProfit * 12
+                    )}/yr`
+            },
+
+            {
+                label:
+                    projectedNetBalance >= 0
+                        ? 'Projected Surplus'
+                        : 'Projected Deficit',
+
+                value:
+                    fmt$(
+                        projectedNetBalance
+                    ),
+
+                statusClass:
+                    projectedNetBalance >= 0
+                        ? 'surplus'
+                        : 'deficit',
+
+                foot:
+                    `Income ${fmt$(
+                        projectedTotalIncome
+                    )} − Spending ${fmt$(
+                        projectedTotalSpending
+                    )} = ${fmt$(
+                        projectedNetBalance
+                    )}/mo`
+            }
+        ]
+    );
+}
+
 
 // -------------------------------------------------------------------
 // Unified category-row normalization + derived views
@@ -436,6 +850,8 @@ function render() {
     renderComparison();
     renderRentals();
     renderDebts();
+    renderProjectionTab();
+
     restoreDetailsState(open, document);
 }
 
@@ -800,6 +1216,53 @@ function renderComparison() {
     }
 }
 
+const projectionMonthSelect =
+    document.getElementById(
+        'projectionMonthSelect'
+    );
+
+if (projectionMonthSelect) {
+
+    projectionMonthSelect.addEventListener(
+        'change',
+        () => {
+
+            selectedProjectionMonth =
+                projectionMonthSelect.value;
+
+            renderProjectionTab();
+        }
+    );
+}
+
+const projectionNewSnapshotBtn =
+    document.getElementById(
+        'projectionNewSnapshotBtn'
+    );
+
+if (projectionNewSnapshotBtn) {
+
+    projectionNewSnapshotBtn.addEventListener(
+        'click',
+        () => {
+
+            const month =
+                document.getElementById(
+                    'projectionNewMonth'
+                )?.value;
+
+            if (!month) {
+                setStatus(
+                    'Choose a projection month.'
+                );
+                return;
+            }
+
+            createBudgetSnapshot(month);
+        }
+    );
+}
+
 // -------------------------------------------------------------------
 // Supabase load — categories, cards, rewards, tax
 // -------------------------------------------------------------------
@@ -936,6 +1399,25 @@ async function loadIncomeTax() {
     }
 }
 
+async function loadBudgetSnapshots() {
+    if (!sb) return;
+
+    try {
+        const {data, error} =
+            await sb
+                .from(BUDGET_SNAPSHOT_TABLE)
+                .select('*')
+                .order('month');
+
+        if (error) throw error;
+
+        budgetSnapshotRows = data || [];
+    } catch (err) {
+        console.error(err);
+        budgetSnapshotRows = [];
+    }
+}
+
 async function updateTaxRow(streamName, patch) {
     let row = taxRows.find(r => (r[COL_TAX_STREAM] || r.income_stream) === streamName);
     if (!row) {
@@ -976,6 +1458,7 @@ function setupRealtime() {
         .on('postgres_changes', { event: '*', schema: 'public', table: CARDS_TABLE }, () => debounceReload())
         .on('postgres_changes', { event: '*', schema: 'public', table: REWARDS_TABLE }, () => debounceReload())
         .on('postgres_changes', { event: '*', schema: 'public', table: TAX_TABLE }, () => debounceReload())
+        .on('postgres_changes', { event: '*', schema: 'public', table: BUDGET_SNAPSHOT_TABLE }, () => debounceReload())
         .subscribe();
 }
 
@@ -984,7 +1467,14 @@ function debounceReload() {
     realtimeDebounceTimer = setTimeout(async () => {
         const activeEl = document.activeElement;
         if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName)) return;
-        await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax(), loadDebtData()]);
+        await Promise.all([
+            loadSpendingCategories(),
+            loadCards(),
+            loadRewards(),
+            loadIncomeTax(),
+            loadDebtData(),
+            loadBudgetSnapshots()
+        ]);
         render();
     }, 400);
 }
@@ -994,7 +1484,14 @@ window.addEventListener('beforeunload', () => {
 });
 
 async function loadAll() {
-    await Promise.all([loadSpendingCategories(), loadCards(), loadRewards(), loadIncomeTax(), loadDebtData()]);
+    await Promise.all([
+        loadSpendingCategories(),
+        loadCards(),
+        loadRewards(),
+        loadIncomeTax(),
+        loadDebtData(),
+        loadBudgetSnapshots()
+    ]);
     render();
     setupRealtime();
 }
@@ -1116,7 +1613,7 @@ if (cardBSelect) cardBSelect.addEventListener('change', renderComparison);
 // -------------------------------------------------------------------
 // Tabs — hash-routed
 // -------------------------------------------------------------------
-const TAB_KEYS = ['budget', 'comparison', 'rental', 'debt'];
+const TAB_KEYS = ['budget', 'comparison', 'rental', 'debt', 'projection'];
 const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
 
 function switchTab(tabKey) {

@@ -22,7 +22,8 @@ window.TABLES = Object.freeze({
   DEBTS: 'financial_debts',
   DEBT_SNAPSHOTS: 'financial_debt_snapshots',
   DEBT_MONTH_MONEY: 'financial_debt_month_money',
-  DEBT_SETTINGS: 'financial_debt_settings'
+  DEBT_SETTINGS: 'financial_debt_settings',
+  BUDGET_SNAPSHOTS: 'financial_budget_snapshots'
 });
 
 window.RPC = Object.freeze({
