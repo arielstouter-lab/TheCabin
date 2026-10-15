@@ -290,6 +290,25 @@ async function updateBudgetSnapshotRow(categoryId, patch) {
     }
 }
 
+async function deleteBudgetSnapshot(month) {
+    if (!month || !sb) return;
+    if (!confirm(`Delete the budget projection for ${month}?`)) return;
+
+    try {
+        const { error } = await sb.from(BUDGET_SNAPSHOT_TABLE).delete().eq('month', month);
+        if (error) throw error;
+
+        budgetSnapshotRows = budgetSnapshotRows.filter(r => r.month !== month);
+        if (selectedProjectionMonth === month) selectedProjectionMonth = null;
+        renderProjectionTab();
+        setStatus('Deleted projection snapshot.');
+    } catch (err) {
+        console.error('Could not delete budget snapshot:', err);
+        setStatus('Could not delete snapshot.');
+    }
+}
+
+
 // -------------------------------------------------------------------
 // Category Grid Renderer (declarative by [data-account-type])
 // -------------------------------------------------------------------
@@ -907,6 +926,9 @@ function renderProjectionTab() {
     const months = projectionMonths();
     monthSelect.replaceChildren();
 
+    const deleteBtn = document.getElementById('projectionDeleteMonthBtn');
+    if (deleteBtn) deleteBtn.disabled = !months.length || !selectedProjectionMonth;
+
     if (!months.length) {
         const option = document.createElement('option');
         option.value = '';
@@ -1315,6 +1337,17 @@ if (projectionNewSnapshotBtn) {
             return;
         }
         createBudgetSnapshot(month);
+    });
+}
+
+const projectionDeleteMonthBtn = document.getElementById('projectionDeleteMonthBtn');
+if (projectionDeleteMonthBtn) {
+    projectionDeleteMonthBtn.addEventListener('click', () => {
+        if (!selectedProjectionMonth) {
+            setStatus('No projection month selected.');
+            return;
+        }
+        deleteBudgetSnapshot(selectedProjectionMonth);
     });
 }
 
