@@ -1,6 +1,5 @@
 import { cloneEl, refs } from '../SharedJS/dom.js';
 import { buildCategoryRow } from './category-row.js';
-import { renderSummaryCards } from '../SharedJS/summary-card.js';
 import { initDebts, loadDebtData, renderDebts } from './debts.js';
 import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../SharedJS/ui.js';
 
@@ -38,7 +37,7 @@ const RENTAL_PROPERTIES = ['San Jacinto', 'County Line'];
 
 // Unified store for every row in income_expense_categories — credit card
 // spend, bank spend, income, and rental (income + spending) all live here,
-// distinguished by account_type/type/property. Replaces four parallel arrays.
+// distinguished by account_type/type/property.
 let categoryRows = [];
 let cardsRows = [];
 let rewardRows = [];
@@ -49,6 +48,9 @@ let selectedProjectionMonth = null;
 let realtimeChannel = null;
 let realtimeDebounceTimer = null;
 
+// -------------------------------------------------------------------
+// Calculation Helpers
+// -------------------------------------------------------------------
 function computeMonthlySpend(amount, frequency) {
     const val = parseFloat(amount) || 0;
     switch (String(frequency || 'monthly').toLowerCase()) {
@@ -58,417 +60,6 @@ function computeMonthlySpend(amount, frequency) {
         default: return val;
     }
 }
-
-function projectionMonths() {
-
-    return [
-        ...new Set(
-            budgetSnapshotRows.map(x => x.month)
-        )
-    ]
-        .sort()
-        .reverse();
-}
-
-function getProjectedRows(month) {
-
-    if (!month)
-        return categoryRows;
-
-    return categoryRows.map(row => {
-
-        const snapshot =
-            budgetSnapshotRows.find(x =>
-                String(x.category_id) === String(row.id)
-                && x.month === month
-            );
-
-        if (!snapshot)
-            return row;
-
-        return {
-            ...row,
-            amount: snapshot.amount,
-            monthly_spend:
-                computeMonthlySpend(
-                    snapshot.amount,
-                    row.frequency
-                )
-        };
-    });
-}
-
-async function createBudgetSnapshot(month) {
-
-    if (!sb) return;
-
-    const rows = categoryRows.map(row => ({
-        category_id: row.id,
-        month,
-        amount: row.amount
-    }));
-
-    try {
-
-        const { data, error } =
-            await sb
-                .from(BUDGET_SNAPSHOT_TABLE)
-                .upsert(
-                    rows,
-                    {
-                        onConflict:
-                            'category_id,month'
-                    }
-                )
-                .select();
-
-        if (error) throw error;
-
-        budgetSnapshotRows.push(
-            ...(data || [])
-        );
-
-        selectedProjectionMonth =
-            month;
-
-        render();
-    }
-    catch (err) {
-        console.error(err);
-    }
-}
-
-async function updateBudgetSnapshotRow(
-    categoryId,
-    patch
-) {
-
-    if (
-        !selectedProjectionMonth ||
-        !sb
-    ) {
-        return false;
-    }
-
-    try {
-
-        let row =
-            budgetSnapshotRows.find(
-                x =>
-                    String(x.category_id) ===
-                    String(categoryId)
-                    &&
-                    x.month ===
-                    selectedProjectionMonth
-            );
-
-        if (!row) {
-
-            const sourceRow =
-                categoryRows.find(
-                    r =>
-                        String(r.id) ===
-                        String(categoryId)
-                );
-
-            const payload = {
-
-                category_id:
-                categoryId,
-
-                month:
-                selectedProjectionMonth,
-
-                amount:
-                    patch.amount ??
-                    sourceRow.amount
-            };
-
-            const {
-                data,
-                error
-            } =
-                await sb
-                    .from(
-                        BUDGET_SNAPSHOT_TABLE
-                    )
-                    .insert([payload])
-                    .select()
-                    .single();
-
-            if (error) throw error;
-
-            budgetSnapshotRows.push(
-                data
-            );
-
-            row = data;
-        }
-
-        Object.assign(
-            row,
-            patch
-        );
-
-        const {
-            error
-        } =
-            await sb
-                .from(
-                    BUDGET_SNAPSHOT_TABLE
-                )
-                .update(patch)
-                .eq(
-                    'id',
-                    row.id
-                );
-
-        if (error) throw error;
-
-        renderProjectionTab();
-
-        return true;
-
-    } catch (err) {
-
-        console.error(err);
-
-        setStatus(
-            'Could not save projection.'
-        );
-
-        return false;
-    }
-}
-
-function renderProjectionGrid(
-    projectedRows
-) {
-
-    const body =
-        document.getElementById(
-            'projectionGridBody'
-        );
-
-    if (!body)
-        return;
-
-    body.replaceChildren();
-
-    projectedRows.forEach(
-        row => {
-
-            body.append(
-
-                buildCategoryRow(
-                    row,
-                    {
-                        deleteTitle:
-                            'Projection row',
-
-                        onDelete:
-                            () => {},
-
-                        onUpdate:
-                            (
-                                id,
-                                patch
-                            ) =>
-                                updateBudgetSnapshotRow(
-                                    id,
-                                    patch
-                                )
-                    }
-                )
-
-            );
-        }
-    );
-}
-
-function renderProjectionTab() {
-
-    const monthSelect = document.getElementById('projectionMonthSelect');
-    const summaryGrid = document.getElementById('projectionSummaryGrid');
-
-    if (!monthSelect || !summaryGrid) {return;}
-
-    const months = projectionMonths();
-
-    monthSelect.replaceChildren();
-
-    if (!months.length) {
-
-        const option =
-            document.createElement('option');
-        option.value = '';
-        option.textContent =
-            'No projections yet';
-        monthSelect.append(option);
-        summaryGrid.replaceChildren();
-        return;
-    }
-
-    months.forEach(month => {
-
-        const option =
-            document.createElement('option');
-
-        option.value = month;
-        option.textContent = month;
-
-        monthSelect.append(option);
-    });
-
-    if (!selectedProjectionMonth || !months.includes(selectedProjectionMonth)) {selectedProjectionMonth = months[0];}
-
-    monthSelect.value = selectedProjectionMonth;
-
-    const projectedRows = getProjectedRows(selectedProjectionMonth);
-
-    renderProjectionGrid(projectedRows);
-
-    const projectedIncome =
-        projectedRows
-            .filter(
-                row =>
-                    row.account_type ===
-                    'income'
-            )
-            .reduce(
-                (sum, row) =>
-                    sum +
-                    (row.monthly_spend || 0),
-                0
-            );
-
-    const projectedCreditCardSpend =
-        projectedRows
-            .filter(
-                row =>
-                    row.account_type ===
-                    'credit_cards'
-            )
-            .reduce(
-                (sum, row) =>
-                    sum +
-                    (row.monthly_spend || 0),
-                0
-            );
-
-    const projectedBankSpend =
-        projectedRows
-            .filter(
-                row =>
-                    row.account_type ===
-                    'bank'
-            )
-            .reduce(
-                (sum, row) =>
-                    sum +
-                    (row.monthly_spend || 0),
-                0
-            );
-
-    const projectedRentalProfit =
-        RENTAL_PROPERTIES.reduce(
-            (sum, property) =>
-                sum +
-                getRentalProfit(property),
-            0
-        );
-
-    const projectedTotalIncome =
-        projectedIncome +
-        projectedRentalProfit;
-
-    const projectedTotalSpending =
-        projectedCreditCardSpend +
-        projectedBankSpend;
-
-    const projectedNetBalance =
-        projectedTotalIncome -
-        projectedTotalSpending;
-
-    renderSummaryCards(
-        summaryGrid,
-        [
-            {
-                label:
-                    'Projected Income',
-
-                value:
-                    fmt$(
-                        projectedTotalIncome
-                    ),
-
-                foot:
-                    `${fmt$(
-                        projectedTotalIncome * 12
-                    )}/yr`
-            },
-
-            {
-                label:
-                    'Projected Spending',
-
-                value:
-                    fmt$(
-                        projectedTotalSpending
-                    ),
-
-                foot:
-                    `Credit Cards ${fmt$(
-                        projectedCreditCardSpend
-                    )}/mo · Bank ${fmt$(
-                        projectedBankSpend
-                    )}/mo`
-            },
-
-            {
-                label:
-                    'Projected Rental Profit',
-
-                value:
-                    fmt$(
-                        projectedRentalProfit
-                    ),
-
-                foot:
-                    `${fmt$(
-                        projectedRentalProfit * 12
-                    )}/yr`
-            },
-
-            {
-                label:
-                    projectedNetBalance >= 0
-                        ? 'Projected Surplus'
-                        : 'Projected Deficit',
-
-                value:
-                    fmt$(
-                        projectedNetBalance
-                    ),
-
-                statusClass:
-                    projectedNetBalance >= 0
-                        ? 'surplus'
-                        : 'deficit',
-
-                foot:
-                    `Income ${fmt$(
-                        projectedTotalIncome
-                    )} − Spending ${fmt$(
-                        projectedTotalSpending
-                    )} = ${fmt$(
-                        projectedNetBalance
-                    )}/mo`
-            }
-        ]
-    );
-}
-
 
 // -------------------------------------------------------------------
 // Unified category-row normalization + derived views
@@ -504,8 +95,37 @@ const getRentalIncomeRow = property => categoryRows.find(r => r.account_type ===
 const getRentalExpenseRows = property => categoryRows.filter(r => r.account_type === 'rental' && r.property === property && r.type === 'spending');
 
 // -------------------------------------------------------------------
-// Generic category-row CRUD — one add/update/delete for spend, bank
-// spend, income, and rental rows (previously four near-identical sets).
+// Budget Totals Calculations
+// -------------------------------------------------------------------
+function computeBudgetTotals(rows) {
+    const cc = rows.filter(r => r.account_type === 'credit_cards');
+    const bank = rows.filter(r => r.account_type === 'bank');
+    const inc = rows.filter(r => r.account_type === 'income');
+
+    const totalCcSpend = cc.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const totalBankSpend = bank.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const totalSpending = totalCcSpend + totalBankSpend;
+    const regularIncome = inc.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+    const rentalProfits = RENTAL_PROPERTIES.reduce((sum, prop) => sum + getRentalProfit(prop), 0);
+    const totalIncome = regularIncome + rentalProfits;
+    const netBalance = totalIncome - totalSpending;
+
+    return {
+        income: inc,
+        totalCcSpend,
+        totalBankSpend,
+        totalSpending,
+        regularIncome,
+        rentalProfits,
+        totalIncome,
+        netBalance
+    };
+}
+
+const getBudgetTotals = () => computeBudgetTotals(categoryRows);
+
+// -------------------------------------------------------------------
+// Generic category-row CRUD
 // -------------------------------------------------------------------
 async function addCategoryRow(fields, tag) {
     if (!sb) return false;
@@ -590,9 +210,122 @@ async function setRentalRent(propertyName, rentAmount) {
 }
 
 // -------------------------------------------------------------------
-// Add-form wiring — one helper for the five "name, frequency, amount,
-// notes" forms (credit card / bank / income / two rental expense forms),
-// replacing five near-identical click handlers.
+// Budget Projections (Snapshots)
+// -------------------------------------------------------------------
+function projectionMonths() {
+    return [...new Set(budgetSnapshotRows.map(x => x.month))].sort().reverse();
+}
+
+function getProjectedRows(month) {
+    if (!month) return categoryRows;
+
+    return categoryRows.map(row => {
+        const snapshot = budgetSnapshotRows.find(x => String(x.category_id) === String(row.id) && x.month === month);
+        if (!snapshot) return row;
+        return {
+            ...row,
+            amount: snapshot.amount,
+            monthly_spend: computeMonthlySpend(snapshot.amount, row.frequency)
+        };
+    });
+}
+
+async function createBudgetSnapshot(month) {
+    if (!sb) return;
+
+    const rows = categoryRows.map(row => ({
+        category_id: row.id,
+        month,
+        amount: row.amount
+    }));
+
+    try {
+        const { data, error } = await sb
+            .from(BUDGET_SNAPSHOT_TABLE)
+            .upsert(rows, { onConflict: 'category_id,month' })
+            .select();
+
+        if (error) throw error;
+
+        budgetSnapshotRows.push(...(data || []));
+        selectedProjectionMonth = month;
+        render();
+    } catch (err) {
+        console.error('Could not create budget snapshot:', err);
+        setStatus('Could not create snapshot.');
+    }
+}
+
+async function updateBudgetSnapshotRow(categoryId, patch) {
+    if (!selectedProjectionMonth || !sb) return false;
+
+    try {
+        let row = budgetSnapshotRows.find(x => String(x.category_id) === String(categoryId) && x.month === selectedProjectionMonth);
+
+        if (!row) {
+            const sourceRow = categoryRows.find(r => String(r.id) === String(categoryId));
+            const payload = {
+                category_id: categoryId,
+                month: selectedProjectionMonth,
+                amount: patch.amount ?? sourceRow?.amount ?? 0
+            };
+
+            const { data, error } = await sb.from(BUDGET_SNAPSHOT_TABLE).insert([payload]).select().single();
+            if (error) throw error;
+            budgetSnapshotRows.push(data);
+            row = data;
+        }
+
+        Object.assign(row, patch);
+
+        const { error } = await sb.from(BUDGET_SNAPSHOT_TABLE).update(patch).eq('id', row.id);
+        if (error) throw error;
+
+        renderProjectionTab();
+        return true;
+    } catch (err) {
+        console.error('Could not update budget snapshot:', err);
+        setStatus('Could not save projection.');
+        return false;
+    }
+}
+
+// -------------------------------------------------------------------
+// Category Grid Renderer (declarative by [data-account-type])
+// -------------------------------------------------------------------
+function renderTabGrids(containerEl, rows, { onUpdate, onDelete, isProjection = false } = {}) {
+    if (!containerEl) return;
+    containerEl.querySelectorAll('[data-account-type]').forEach(card => {
+        const type = card.dataset.accountType;
+        const body = card.querySelector('[data-ref="gridBody"]') || card.querySelector('tbody');
+        const empty = card.querySelector('[data-ref="gridEmpty"]') || card.querySelector('.empty-state');
+        if (!body) return;
+
+        const sectionRows = rows.filter(r => r.account_type === type);
+        const extraRows = (type === 'income')
+            ? RENTAL_PROPERTIES.map(p => buildRentalIncomeRow(p, getRentalProfit(p)))
+            : [];
+
+        body.replaceChildren();
+        if (empty) empty.hidden = (sectionRows.length + extraRows.length) > 0;
+
+        const deleteTitle = isProjection ? 'Projection row' : (type === 'income' ? 'Delete income source' : (type === 'bank' ? 'Delete expense' : 'Delete category'));
+        const deleteMsg = type === 'income' ? 'Deleted income source.' : (type === 'bank' ? 'Deleted bank expense.' : 'Deleted category.');
+
+        sectionRows.forEach(row => {
+            body.append(buildCategoryRow(row, {
+                onUpdate,
+                onDelete: onDelete ? () => onDelete(row.id, deleteMsg) : () => {},
+                deleteTitle
+            }));
+        });
+
+        extraRows.forEach(el => body.append(el));
+    });
+}
+
+// -------------------------------------------------------------------
+// Add-form wiring helper
 // -------------------------------------------------------------------
 function wireAddForm({ buttonId, fieldIds, requiredMessage, onAdd }) {
     const btn = document.getElementById(buttonId);
@@ -702,56 +435,6 @@ function buildRentalIncomeRow(property, profit) {
     return tr;
 }
 
-function buildCompareCell(eff, reward) {
-    const cell = cloneEl('tpl-compare-cell');
-    const r = refs(cell);
-
-    if (eff.none) {
-        cell.replaceChildren();
-        cell.textContent = 'no rate';
-        cell.classList.add('empty-state');
-        return cell;
-    }
-
-    r.rate.textContent = `${eff.rate.toFixed(1)}%${eff.isDefault ? ' (base)' : ''}`;
-    r.reward.textContent = fmt$(reward);
-    if (eff.refund) {
-        r.note.hidden = false;
-        r.note.textContent = `(incl. ${fmt$(eff.refund)} refund)`;
-    } else {
-        r.note.remove();
-    }
-
-    return cell;
-}
-
-function buildWinnerCell(aReward, bReward, aName, bName, bothNone) {
-    const cell = cloneEl('tpl-winner-cell');
-    const r = refs(cell);
-
-    if (bothNone) {
-        r.name.textContent = 'No rate set';
-        r.name.className = 'tie';
-        r.badge.remove();
-        return cell;
-    }
-    if (aReward === bReward) {
-        r.name.textContent = 'Tie';
-        r.name.className = 'tie';
-        r.badge.remove();
-        return cell;
-    }
-
-    const aWins = aReward > bReward;
-    r.name.textContent = aWins ? aName : bName;
-    r.name.className = aWins ? 'win-a' : 'win-b';
-    r.badge.hidden = false;
-    r.badge.classList.add(aWins ? 'a' : 'b');
-    r.badge.textContent = `+${fmt$(Math.abs(aReward - bReward))}`;
-
-    return cell;
-}
-
 function buildCompareRow(result) {
     const tr = cloneEl('tpl-compare-row');
     const r = refs(tr);
@@ -759,9 +442,59 @@ function buildCompareRow(result) {
 
     r.category.textContent = cat;
     r.spend.textContent = fmt$(spend);
-    r.cellA.append(buildCompareCell(a, aReward));
-    r.cellB.append(buildCompareCell(b, bReward));
-    r.winner.append(buildWinnerCell(aReward, bReward, aName, bName, a.none && b.none));
+
+    // Card A cell
+    if (a.none) {
+        r.cellA.hidden = true;
+        r.noneA.hidden = false;
+    } else {
+        r.cellA.hidden = false;
+        r.noneA.hidden = true;
+        r.rateA.textContent = `${a.rate.toFixed(1)}%${a.isDefault ? ' (base)' : ''}`;
+        r.rewardA.textContent = fmt$(aReward);
+        if (a.refund) {
+            r.noteA.hidden = false;
+            r.noteA.textContent = ` (incl. ${fmt$(a.refund)} refund)`;
+        } else {
+            r.noteA.hidden = true;
+        }
+    }
+
+    // Card B cell
+    if (b.none) {
+        r.cellB.hidden = true;
+        r.noneB.hidden = false;
+    } else {
+        r.cellB.hidden = false;
+        r.noneB.hidden = true;
+        r.rateB.textContent = `${b.rate.toFixed(1)}%${b.isDefault ? ' (base)' : ''}`;
+        r.rewardB.textContent = fmt$(bReward);
+        if (b.refund) {
+            r.noteB.hidden = false;
+            r.noteB.textContent = ` (incl. ${fmt$(b.refund)} refund)`;
+        } else {
+            r.noteB.hidden = true;
+        }
+    }
+
+    // Winner cell
+    const bothNone = a.none && b.none;
+    if (bothNone) {
+        r.winnerName.textContent = 'No rate set';
+        r.winnerName.className = 'tie';
+        r.winnerBadge.hidden = true;
+    } else if (aReward === bReward) {
+        r.winnerName.textContent = 'Tie';
+        r.winnerName.className = 'tie';
+        r.winnerBadge.hidden = true;
+    } else {
+        const aWins = aReward > bReward;
+        r.winnerName.textContent = aWins ? aName : bName;
+        r.winnerName.className = aWins ? 'win-a' : 'win-b';
+        r.winnerBadge.hidden = false;
+        r.winnerBadge.className = `badge ${aWins ? 'a' : 'b'}`;
+        r.winnerBadge.textContent = `+${fmt$(Math.abs(aReward - bReward))}`;
+    }
 
     return tr;
 }
@@ -826,105 +559,17 @@ function getRentalProfit(propertyName) {
     return getRentalRent(propertyName) - getRentalTotalExpenses(propertyName);
 }
 
-function getBudgetTotals() {
-    const spend = spendRows(), bank = bankSpendRows(), income = incomeRows();
-    const totalCcSpend = spend.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const totalBankSpend = bank.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const totalSpending = totalCcSpend + totalBankSpend;
-    const regularIncome = income.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const rentalProfits = RENTAL_PROPERTIES.reduce((sum, prop) => sum + getRentalProfit(prop), 0);
-    const totalIncome = regularIncome + rentalProfits;
-    return { income, totalCcSpend, totalBankSpend, totalSpending, totalIncome, netBalance: totalIncome - totalSpending };
-}
-
-function render() {
-    const open = captureDetailsState(document);
-    renderSpendGrid();
-    renderBankSpendGrid();
-    renderIncomeGrid();
+// -------------------------------------------------------------------
+// Tab 1: Budget Rendering
+// -------------------------------------------------------------------
+function renderBudgetTab() {
+    renderTabGrids(document.getElementById('tab-budget'), categoryRows, {
+        onUpdate: updateCategoryRow,
+        onDelete: (id, msg) => deleteCategoryRow(id, msg)
+    });
     renderBalanceSummary();
-    renderCardsGrid();
-    renderRewardsGrid();
-    renderCardOptions();
-    renderBestCombo();
-    renderComparison();
-    renderRentals();
-    renderDebts();
-    renderProjectionTab();
-
-    restoreDetailsState(open, document);
 }
 
-// -------------------------------------------------------------------
-// Grid 1: Credit Card Spending
-// -------------------------------------------------------------------
-function renderSpendGrid() {
-    const body = document.getElementById('spendGridBody');
-    const empty = document.getElementById('spendGridEmpty');
-    if (!body) return;
-
-    const rows = spendRows();
-    body.replaceChildren();
-    if (empty) empty.hidden = rows.length > 0;
-
-    rows.forEach(row => {
-        body.append(buildCategoryRow(row, {
-            onUpdate: updateCategoryRow,
-            onDelete: id => deleteCategoryRow(id, 'Deleted category.'),
-            deleteTitle: 'Delete category'
-        }));
-    });
-}
-
-// -------------------------------------------------------------------
-// Grid 1b: Bank Account Spending
-// -------------------------------------------------------------------
-function renderBankSpendGrid() {
-    const body = document.getElementById('bankSpendGridBody');
-    const empty = document.getElementById('bankSpendGridEmpty');
-    if (!body) return;
-
-    const rows = bankSpendRows();
-    body.replaceChildren();
-    if (empty) empty.hidden = rows.length > 0;
-
-    rows.forEach(row => {
-        body.append(buildCategoryRow(row, {
-            onUpdate: updateCategoryRow,
-            onDelete: id => deleteCategoryRow(id, 'Deleted bank expense.'),
-            deleteTitle: 'Delete expense'
-        }));
-    });
-}
-
-// -------------------------------------------------------------------
-// Grid 1c: Income (with non-editable monthly rental profit lines)
-// -------------------------------------------------------------------
-function renderIncomeGrid() {
-    const body = document.getElementById('incomeGridBody');
-    const empty = document.getElementById('incomeGridEmpty');
-    if (!body) return;
-
-    const rows = incomeRows();
-    body.replaceChildren();
-    if (empty) empty.hidden = (rows.length + RENTAL_PROPERTIES.length) > 0;
-
-    rows.forEach(row => {
-        body.append(buildCategoryRow(row, {
-            onUpdate: updateCategoryRow,
-            onDelete: id => deleteCategoryRow(id, 'Deleted income source.'),
-            deleteTitle: 'Delete income source'
-        }));
-    });
-
-    RENTAL_PROPERTIES.forEach(property => {
-        body.append(buildRentalIncomeRow(property, getRentalProfit(property)));
-    });
-}
-
-// -------------------------------------------------------------------
-// Grid 1d: Budget Balance (Total Income - Total Spending = Balance)
-// -------------------------------------------------------------------
 function renderBalanceSummary() {
     const container = document.getElementById('balanceSummaryGrid');
     if (!container) return;
@@ -935,24 +580,205 @@ function renderBalanceSummary() {
     const statusClass = isSurplus ? 'surplus' : 'deficit';
     const statusText = isSurplus ? 'Surplus' : 'Deficit';
 
-    renderSummaryCards(container, [
-        {
-            label: 'Total Income',
-            value: fmt$(totalIncome),
-            foot: `${fmt$(totalIncome * 12)}/yr &middot; across ${income.length} source${income.length === 1 ? '' : 's'} + ${RENTAL_PROPERTIES.length} rental${RENTAL_PROPERTIES.length === 1 ? '' : 's'}`
-        },
-        {
-            label: 'Total Spending',
-            value: fmt$(totalSpending),
-            foot: `CC: ${fmt$(totalCcSpend)}/mo &middot; Bank: ${fmt$(totalBankSpend)}/mo &middot; ${fmt$(totalSpending * 12)}/yr`
-        },
-        {
-            label: `Net Balance (${statusText})`,
-            value: fmt$(netBalance),
-            statusClass,
-            foot: `Income (${fmt$(totalIncome)}) &minus; Spending (${fmt$(totalSpending)}) = ${fmt$(netBalance)}/mo (${fmt$(netBalance * 12)}/yr)`
+    const r = refs(container);
+    if (!r.incomeVal) return;
+
+    r.incomeVal.textContent = fmt$(totalIncome);
+    r.incomeFoot.textContent = `${fmt$(totalIncome * 12)}/yr · across ${income.length} source${income.length === 1 ? '' : 's'} + ${RENTAL_PROPERTIES.length} rental${RENTAL_PROPERTIES.length === 1 ? '' : 's'}`;
+
+    r.spendVal.textContent = fmt$(totalSpending);
+    r.spendFoot.textContent = `CC: ${fmt$(totalCcSpend)}/mo · Bank: ${fmt$(totalBankSpend)}/mo · ${fmt$(totalSpending * 12)}/yr`;
+
+    r.netLabel.textContent = `Net Balance (${statusText})`;
+    r.netVal.textContent = fmt$(netBalance);
+    r.netFoot.textContent = `Income (${fmt$(totalIncome)}) − Spending (${fmt$(totalSpending)}) = ${fmt$(netBalance)}/mo (${fmt$(netBalance * 12)}/yr)`;
+    r.netCard.className = `summary-card ${statusClass}`;
+}
+
+// -------------------------------------------------------------------
+// Tab 2: Comparison Rendering
+// -------------------------------------------------------------------
+function renderCardsGrid() {
+    const body = document.getElementById('cardsGridBody');
+    const empty = document.getElementById('cardsGridEmpty');
+    if (!body) return;
+    body.replaceChildren();
+    if (empty) empty.hidden = cardsRows.length > 0;
+    cardsRows.forEach(row => body.append(buildCardRow(row, { onUpdate: updateCardRow, onDelete: deleteCardRow })));
+}
+
+function renderRewardsGrid() {
+    const body = document.getElementById('rewardsGridBody');
+    const empty = document.getElementById('rewardsGridEmpty');
+    if (!body) return;
+    body.replaceChildren();
+    if (empty) empty.hidden = rewardRows.length > 0;
+    rewardRows.forEach(row => body.append(buildRewardRow(row, { onUpdate: updateRewardRow, onDelete: deleteRewardRow })));
+}
+
+function renderCardOptions() {
+    const newRewardCard = document.getElementById('newRewardCard');
+    const sortedCards = [...cardsRows].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    if (newRewardCard) {
+        const current = newRewardCard.value;
+        populateCardSelect(newRewardCard, cardsRows.some(c => c.id === current) ? current : '');
+    }
+
+    const aSel = document.getElementById('cardASelect');
+    const bSel = document.getElementById('cardBSelect');
+    if (!aSel || !bSel) return;
+
+    [aSel, bSel].forEach(sel => {
+        const current = sel.value;
+        sel.replaceChildren();
+        const blank = document.createElement('option');
+        blank.value = ''; blank.textContent = 'Choose a card…';
+        sel.append(blank);
+        sortedCards.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.textContent = c.name;
+            sel.append(opt);
+        });
+        if (sortedCards.some(c => c.id === current)) sel.value = current;
+    });
+}
+
+function getEffectiveRate(cardId, category) {
+    const exact = rewardRows.find(r => r.card_id === cardId && r.category && r.category.trim().toLowerCase() === category.trim().toLowerCase());
+    if (exact) return { rate: exact.rate || 0, refund: exact.special_refund || 0, isDefault: false };
+    const card = cardsRows.find(c => c.id === cardId);
+    if (card) return { rate: card.base_rate || 0, refund: 0, isDefault: true };
+    return { rate: 0, refund: 0, isDefault: false, none: true };
+}
+
+function getAnnualFee(cardId) {
+    const card = cardsRows.find(c => c.id === cardId);
+    return card ? (card.annual_fee || 0) : 0;
+}
+
+function findBestTwoCardCombo() {
+    const spend = spendRows();
+    if (cardsRows.length < 2 || !spend.length) return null;
+    let bestCombo = null;
+
+    for (let i = 0; i < cardsRows.length; i++) {
+        for (let j = i + 1; j < cardsRows.length; j++) {
+            const cardA = cardsRows[i], cardB = cardsRows[j];
+            const aFee = getAnnualFee(cardA.id), bFee = getAnnualFee(cardB.id);
+
+            let grossTotal = 0;
+            spend.forEach(catRow => {
+                const s = catRow.monthly_spend || 0;
+                const a = getEffectiveRate(cardA.id, catRow.category);
+                const b = getEffectiveRate(cardB.id, catRow.category);
+                grossTotal += Math.max((s * a.rate / 100) + a.refund, (s * b.rate / 100) + b.refund);
+            });
+
+            const combinedMonthlyFee = (aFee + bFee) / 12;
+            const netMonthly = grossTotal - combinedMonthlyFee;
+
+            if (!bestCombo || netMonthly > bestCombo.netMonthly) {
+                bestCombo = { cardA, cardB, grossTotal, aFee, bFee, combinedMonthlyFee, netMonthly, netAnnual: netMonthly * 12 };
+            }
         }
-    ]);
+    }
+    return bestCombo;
+}
+
+function renderBestCombo() {
+    const container = document.getElementById('bestComboContainer');
+    if (!container) return;
+
+    const combo = (cardsRows.length >= 2 && spendRows().length) ? findBestTwoCardCombo() : null;
+    if (!combo) {
+        container.replaceChildren();
+        container.hidden = true;
+        return;
+    }
+
+    container.hidden = false;
+    container.replaceChildren(buildBestComboCard(combo, () => {
+        const aSel = document.getElementById('cardASelect');
+        const bSel = document.getElementById('cardBSelect');
+        if (aSel && bSel) {
+            aSel.value = combo.cardA.id;
+            bSel.value = combo.cardB.id;
+            renderComparison();
+        }
+    }));
+}
+
+function renderComparison() {
+    const aSel = document.getElementById('cardASelect');
+    const bSel = document.getElementById('cardBSelect');
+    if (!aSel || !bSel) return;
+
+    const aId = aSel.value, bId = bSel.value;
+    const compareTableWrap = document.getElementById('compareTableWrap');
+    const compareEmpty = document.getElementById('compareEmpty');
+    const summaryGrid = document.getElementById('summaryGrid');
+    const spend = spendRows();
+
+    if (!aId || !bId || aId === bId || !spend.length) {
+        if (compareTableWrap) compareTableWrap.hidden = true;
+        if (summaryGrid) summaryGrid.hidden = true;
+        if (compareEmpty) {
+            compareEmpty.hidden = false;
+            compareEmpty.textContent = !spend.length
+                ? 'Add spending categories in the Budget tab and at least two cards to compare.'
+                : (!aId || !bId) ? 'Pick two different cards above to compare.' : 'Pick two different cards to compare.';
+        }
+        return;
+    }
+
+    const aName = (cardsRows.find(c => c.id === aId) || {}).name || '';
+    const bName = (cardsRows.find(c => c.id === bId) || {}).name || '';
+
+    if (compareEmpty) compareEmpty.hidden = true;
+    if (compareTableWrap) compareTableWrap.hidden = false;
+    if (summaryGrid) summaryGrid.hidden = false;
+
+    const headA = document.getElementById('headA'), headB = document.getElementById('headB');
+    if (headA) headA.textContent = aName;
+    if (headB) headB.textContent = bName;
+
+    const aFee = getAnnualFee(aId), bFee = getAnnualFee(bId);
+    let aTotal = 0, bTotal = 0, bestTotal = 0;
+    const tbody = document.getElementById('compareBody');
+    if (!tbody) return;
+    tbody.replaceChildren();
+
+    const categoryResults = spend.map(catRow => {
+        const s = catRow.monthly_spend || 0;
+        const a = getEffectiveRate(aId, catRow.category), b = getEffectiveRate(bId, catRow.category);
+        const aReward = (s * a.rate / 100) + a.refund, bReward = (s * b.rate / 100) + b.refund;
+        return { cat: catRow.category, spend: s, a, b, aReward, bReward, aName, bName, best: Math.max(aReward, bReward) };
+    }).sort((x, y) => y.best - x.best);
+
+    categoryResults.forEach(result => {
+        aTotal += result.aReward;
+        bTotal += result.bReward;
+        bestTotal += Math.max(result.aReward, result.bReward);
+        tbody.append(buildCompareRow(result));
+    });
+
+    if (summaryGrid) {
+        const aNet = aTotal - aFee / 12, bNet = bTotal - bFee / 12, bestNet = bestTotal - (aFee + bFee) / 12;
+        const r = refs(summaryGrid);
+        if (r.cardALabel) {
+            r.cardALabel.textContent = aName;
+            r.cardAVal.textContent = fmt$(aNet);
+            r.cardAFoot.textContent = `Rewards ${fmt$(aTotal)}/mo · Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) · Net ${fmt$(aNet)}/mo`;
+
+            r.cardBLabel.textContent = bName;
+            r.cardBVal.textContent = fmt$(bNet);
+            r.cardBFoot.textContent = `Rewards ${fmt$(bTotal)}/mo · Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) · Net ${fmt$(bNet)}/mo`;
+
+            r.bestVal.textContent = fmt$(bestNet);
+            r.bestFoot.textContent = `Rewards ${fmt$(bestTotal)}/mo if you used whichever card wins each category · minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestNet)}/mo`;
+        }
+    }
 }
 
 // -------------------------------------------------------------------
@@ -1021,250 +847,119 @@ function renderPropertySection(propertyName, elements) {
         const statusClass = isProfit ? 'surplus' : 'deficit';
         const statusText = isProfit ? 'Net Profit' : 'Net Loss';
 
-        renderSummaryCards(summary, [
-            { label: 'Monthly Rent (Income)', value: fmt$(rent), foot: `${fmt$(rent * 12)}/yr` },
-            { label: 'Total Expenses', value: fmt$(totalExpenses), foot: `${fmt$(operatingExpenses)}/mo expenses + ${fmt$(monthlyTax)}/mo tax &middot; ${fmt$(totalExpenses * 12)}/yr` },
-            { label: statusText, value: fmt$(profit), statusClass, foot: `Rent (${fmt$(rent)}) &minus; Expenses (${fmt$(totalExpenses)}) = ${fmt$(profit)}/mo (${fmt$(profit * 12)}/yr)` }
-        ]);
-    }
-}
+        const r = refs(summary);
+        if (r.rentVal) {
+            r.rentVal.textContent = fmt$(rent);
+            r.rentFoot.textContent = `${fmt$(rent * 12)}/yr`;
 
-// -------------------------------------------------------------------
-// Grid 2: Credit Cards
-// -------------------------------------------------------------------
-function renderCardsGrid() {
-    const body = document.getElementById('cardsGridBody');
-    const empty = document.getElementById('cardsGridEmpty');
-    if (!body) return;
-    body.replaceChildren();
-    if (empty) empty.hidden = cardsRows.length > 0;
-    cardsRows.forEach(row => body.append(buildCardRow(row, { onUpdate: updateCardRow, onDelete: deleteCardRow })));
-}
+            r.expensesVal.textContent = fmt$(totalExpenses);
+            r.expensesFoot.textContent = `${fmt$(operatingExpenses)}/mo expenses + ${fmt$(monthlyTax)}/mo tax · ${fmt$(totalExpenses * 12)}/yr`;
 
-// -------------------------------------------------------------------
-// Grid 3: Card Rewards
-// -------------------------------------------------------------------
-function renderRewardsGrid() {
-    const body = document.getElementById('rewardsGridBody');
-    const empty = document.getElementById('rewardsGridEmpty');
-    if (!body) return;
-    body.replaceChildren();
-    if (empty) empty.hidden = rewardRows.length > 0;
-    rewardRows.forEach(row => body.append(buildRewardRow(row, { onUpdate: updateRewardRow, onDelete: deleteRewardRow })));
-}
-
-function renderCardOptions() {
-    const newRewardCard = document.getElementById('newRewardCard');
-    const sortedCards = [...cardsRows].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-    if (newRewardCard) {
-        const current = newRewardCard.value;
-        populateCardSelect(newRewardCard, cardsRows.some(c => c.id === current) ? current : '');
-    }
-
-    const aSel = document.getElementById('cardASelect');
-    const bSel = document.getElementById('cardBSelect');
-    if (!aSel || !bSel) return;
-
-    [aSel, bSel].forEach(sel => {
-        const current = sel.value;
-        sel.replaceChildren();
-        const blank = document.createElement('option');
-        blank.value = ''; blank.textContent = 'Choose a card…';
-        sel.append(blank);
-        sortedCards.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.id; opt.textContent = c.name;
-            sel.append(opt);
-        });
-        if (sortedCards.some(c => c.id === current)) sel.value = current;
-    });
-}
-
-function getEffectiveRate(cardId, category) {
-    const exact = rewardRows.find(r => r.card_id === cardId && r.category && r.category.trim().toLowerCase() === category.trim().toLowerCase());
-    if (exact) return { rate: exact.rate || 0, refund: exact.special_refund || 0, isDefault: false };
-    const card = cardsRows.find(c => c.id === cardId);
-    if (card) return { rate: card.base_rate || 0, refund: 0, isDefault: true };
-    return { rate: 0, refund: 0, isDefault: false, none: true };
-}
-
-function getAnnualFee(cardId) {
-    const card = cardsRows.find(c => c.id === cardId);
-    return card ? (card.annual_fee || 0) : 0;
-}
-
-// -------------------------------------------------------------------
-// Best Two-Card Combination
-// -------------------------------------------------------------------
-function findBestTwoCardCombo() {
-    const spend = spendRows();
-    if (cardsRows.length < 2 || !spend.length) return null;
-    let bestCombo = null;
-
-    for (let i = 0; i < cardsRows.length; i++) {
-        for (let j = i + 1; j < cardsRows.length; j++) {
-            const cardA = cardsRows[i], cardB = cardsRows[j];
-            const aFee = getAnnualFee(cardA.id), bFee = getAnnualFee(cardB.id);
-
-            let grossTotal = 0;
-            spend.forEach(catRow => {
-                const s = catRow.monthly_spend || 0;
-                const a = getEffectiveRate(cardA.id, catRow.category);
-                const b = getEffectiveRate(cardB.id, catRow.category);
-                grossTotal += Math.max((s * a.rate / 100) + a.refund, (s * b.rate / 100) + b.refund);
-            });
-
-            const combinedMonthlyFee = (aFee + bFee) / 12;
-            const netMonthly = grossTotal - combinedMonthlyFee;
-
-            if (!bestCombo || netMonthly > bestCombo.netMonthly) {
-                bestCombo = { cardA, cardB, grossTotal, aFee, bFee, combinedMonthlyFee, netMonthly, netAnnual: netMonthly * 12 };
-            }
+            r.profitLabel.textContent = statusText;
+            r.profitVal.textContent = fmt$(profit);
+            r.profitFoot.textContent = `Rent (${fmt$(rent)}) − Expenses (${fmt$(totalExpenses)}) = ${fmt$(profit)}/mo (${fmt$(profit * 12)}/yr)`;
+            r.profitCard.className = `summary-card ${statusClass}`;
         }
     }
-    return bestCombo;
 }
 
-function renderBestCombo() {
-    const container = document.getElementById('bestComboContainer');
-    if (!container) return;
+// -------------------------------------------------------------------
+// Tab 5: Budget Projection Rendering
+// -------------------------------------------------------------------
+function renderProjectionSummary(totals) {
+    const summaryGrid = document.getElementById('projectionSummaryGrid');
+    if (!summaryGrid) return;
 
-    const combo = (cardsRows.length >= 2 && spendRows().length) ? findBestTwoCardCombo() : null;
-    if (!combo) {
-        container.replaceChildren();
-        container.hidden = true;
+    if (!totals) {
+        summaryGrid.hidden = true;
+        return;
+    }
+    summaryGrid.hidden = false;
+
+    const isSurplus = totals.netBalance >= 0;
+    const statusClass = isSurplus ? 'surplus' : 'deficit';
+    const statusText = isSurplus ? 'Projected Surplus' : 'Projected Deficit';
+
+    const r = refs(summaryGrid);
+    if (!r.incomeVal) return;
+
+    r.incomeVal.textContent = fmt$(totals.totalIncome);
+    r.incomeFoot.textContent = `${fmt$(totals.totalIncome * 12)}/yr`;
+
+    r.spendVal.textContent = fmt$(totals.totalSpending);
+    r.spendFoot.textContent = `Credit Cards ${fmt$(totals.totalCcSpend)}/mo · Bank ${fmt$(totals.totalBankSpend)}/mo`;
+
+    r.rentalVal.textContent = fmt$(totals.rentalProfits);
+    r.rentalFoot.textContent = `${fmt$(totals.rentalProfits * 12)}/yr`;
+
+    r.netLabel.textContent = statusText;
+    r.netVal.textContent = fmt$(totals.netBalance);
+    r.netFoot.textContent = `Income (${fmt$(totals.totalIncome)}) − Spending (${fmt$(totals.totalSpending)}) = ${fmt$(totals.netBalance)}/mo`;
+    r.netCard.className = `summary-card ${statusClass}`;
+}
+
+function renderProjectionTab() {
+    const monthSelect = document.getElementById('projectionMonthSelect');
+    const tabEl = document.getElementById('tab-projection');
+
+    if (!monthSelect || !tabEl) return;
+
+    const months = projectionMonths();
+    monthSelect.replaceChildren();
+
+    if (!months.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No projections yet';
+        monthSelect.append(option);
+        renderTabGrids(tabEl, [], { isProjection: true });
+        renderProjectionSummary(null);
         return;
     }
 
-    container.hidden = false;
-    container.replaceChildren(buildBestComboCard(combo, () => {
-        const aSel = document.getElementById('cardASelect');
-        const bSel = document.getElementById('cardBSelect');
-        if (aSel && bSel) {
-            aSel.value = combo.cardA.id;
-            bSel.value = combo.cardB.id;
-            renderComparison();
-        }
-    }));
-}
-
-// -------------------------------------------------------------------
-// Comparison
-// -------------------------------------------------------------------
-function renderComparison() {
-    const aSel = document.getElementById('cardASelect');
-    const bSel = document.getElementById('cardBSelect');
-    if (!aSel || !bSel) return;
-
-    const aId = aSel.value, bId = bSel.value;
-    const compareTableWrap = document.getElementById('compareTableWrap');
-    const compareEmpty = document.getElementById('compareEmpty');
-    const summaryGrid = document.getElementById('summaryGrid');
-    const spend = spendRows();
-
-    if (!aId || !bId || aId === bId || !spend.length) {
-        if (compareTableWrap) compareTableWrap.hidden = true;
-        if (summaryGrid) summaryGrid.hidden = true;
-        if (compareEmpty) {
-            compareEmpty.hidden = false;
-            compareEmpty.textContent = !spend.length
-                ? 'Add spending categories in the Budget tab and at least two cards to compare.'
-                : (!aId || !bId) ? 'Pick two different cards above to compare.' : 'Pick two different cards to compare.';
-        }
-        return;
-    }
-
-    const aName = (cardsRows.find(c => c.id === aId) || {}).name || '';
-    const bName = (cardsRows.find(c => c.id === bId) || {}).name || '';
-
-    if (compareEmpty) compareEmpty.hidden = true;
-    if (compareTableWrap) compareTableWrap.hidden = false;
-    if (summaryGrid) summaryGrid.hidden = false;
-
-    const headA = document.getElementById('headA'), headB = document.getElementById('headB');
-    if (headA) headA.textContent = aName;
-    if (headB) headB.textContent = bName;
-
-    const aFee = getAnnualFee(aId), bFee = getAnnualFee(bId);
-    let aTotal = 0, bTotal = 0, bestTotal = 0;
-    const tbody = document.getElementById('compareBody');
-    if (!tbody) return;
-    tbody.replaceChildren();
-
-    const categoryResults = spend.map(catRow => {
-        const s = catRow.monthly_spend || 0;
-        const a = getEffectiveRate(aId, catRow.category), b = getEffectiveRate(bId, catRow.category);
-        const aReward = (s * a.rate / 100) + a.refund, bReward = (s * b.rate / 100) + b.refund;
-        return { cat: catRow.category, spend: s, a, b, aReward, bReward, aName, bName, best: Math.max(aReward, bReward) };
-    }).sort((x, y) => y.best - x.best);
-
-    categoryResults.forEach(result => {
-        aTotal += result.aReward;
-        bTotal += result.bReward;
-        bestTotal += Math.max(result.aReward, result.bReward);
-        tbody.append(buildCompareRow(result));
+    months.forEach(month => {
+        const option = document.createElement('option');
+        option.value = month;
+        option.textContent = month;
+        monthSelect.append(option);
     });
 
-    if (summaryGrid) {
-        const aNet = aTotal - aFee / 12, bNet = bTotal - bFee / 12, bestNet = bestTotal - (aFee + bFee) / 12;
-        renderSummaryCards(summaryGrid, [
-            { label: aName, value: fmt$(aNet), unit: '/mo net', foot: `Rewards ${fmt$(aTotal)}/mo &middot; Annual fee ${fmt$(aFee)} (${fmt$(aFee / 12)}/mo) &middot; Net ${fmt$(aNet)}/mo` },
-            { label: bName, value: fmt$(bNet), unit: '/mo net', foot: `Rewards ${fmt$(bTotal)}/mo &middot; Annual fee ${fmt$(bFee)} (${fmt$(bFee / 12)}/mo) &middot; Net ${fmt$(bNet)}/mo` },
-            { label: 'Best of Both (optimal routing)', value: fmt$(bestNet), unit: '/mo net', statusClass: 'best', foot: `Rewards ${fmt$(bestTotal)}/mo if you used whichever card wins each category &middot; minus ${fmt$((aFee + bFee) / 12)}/mo combined fees = ${fmt$(bestNet)}/mo` }
-        ]);
+    if (!selectedProjectionMonth || !months.includes(selectedProjectionMonth)) {
+        selectedProjectionMonth = months[0];
     }
-}
 
-const projectionMonthSelect =
-    document.getElementById(
-        'projectionMonthSelect'
-    );
+    monthSelect.value = selectedProjectionMonth;
 
-if (projectionMonthSelect) {
+    const projectedRows = getProjectedRows(selectedProjectionMonth);
 
-    projectionMonthSelect.addEventListener(
-        'change',
-        () => {
+    renderTabGrids(tabEl, projectedRows, {
+        onUpdate: updateBudgetSnapshotRow,
+        isProjection: true
+    });
 
-            selectedProjectionMonth =
-                projectionMonthSelect.value;
-
-            renderProjectionTab();
-        }
-    );
-}
-
-const projectionNewSnapshotBtn =
-    document.getElementById(
-        'projectionNewSnapshotBtn'
-    );
-
-if (projectionNewSnapshotBtn) {
-
-    projectionNewSnapshotBtn.addEventListener(
-        'click',
-        () => {
-
-            const month =
-                document.getElementById(
-                    'projectionNewMonth'
-                )?.value;
-
-            if (!month) {
-                setStatus(
-                    'Choose a projection month.'
-                );
-                return;
-            }
-
-            createBudgetSnapshot(month);
-        }
-    );
+    const totals = computeBudgetTotals(projectedRows);
+    renderProjectionSummary(totals);
 }
 
 // -------------------------------------------------------------------
-// Supabase load — categories, cards, rewards, tax
+// Master Render
+// -------------------------------------------------------------------
+function render() {
+    const open = captureDetailsState(document);
+    renderBudgetTab();
+    renderCardsGrid();
+    renderRewardsGrid();
+    renderCardOptions();
+    renderBestCombo();
+    renderComparison();
+    renderRentals();
+    renderDebts();
+    renderProjectionTab();
+    restoreDetailsState(open, document);
+}
+
+// -------------------------------------------------------------------
+// Supabase Data Loaders & Mutations
 // -------------------------------------------------------------------
 async function loadSpendingCategories() {
     if (!sb) return;
@@ -1401,19 +1096,12 @@ async function loadIncomeTax() {
 
 async function loadBudgetSnapshots() {
     if (!sb) return;
-
     try {
-        const {data, error} =
-            await sb
-                .from(BUDGET_SNAPSHOT_TABLE)
-                .select('*')
-                .order('month');
-
+        const { data, error } = await sb.from(BUDGET_SNAPSHOT_TABLE).select('*').order('month');
         if (error) throw error;
-
         budgetSnapshotRows = data || [];
     } catch (err) {
-        console.error(err);
+        console.error('Could not load budget snapshots:', err);
         budgetSnapshotRows = [];
     }
 }
@@ -1449,7 +1137,7 @@ async function updateTaxRow(streamName, patch) {
 }
 
 // -------------------------------------------------------------------
-// Realtime + init
+// Realtime + Lifecycle
 // -------------------------------------------------------------------
 function setupRealtime() {
     if (realtimeChannel || !sb) return;
@@ -1502,7 +1190,7 @@ initDebts({
 });
 
 // -------------------------------------------------------------------
-// Wire up UI
+// UI Event Handlers & Initialization
 // -------------------------------------------------------------------
 wireAddForm({
     buttonId: 'addCategoryBtn',
@@ -1539,7 +1227,7 @@ wireAddForm({
     onAdd: v => addCategoryRow(v, { account_type: 'rental', type: 'spending', property: 'County Line', addedMessage: 'Added expense for County Line.' })
 });
 
-// Rent inputs commit on change, and Enter blurs (rather than submitting a form)
+// Rent inputs commit on change
 const sanJacintoRentInput = document.getElementById('sanJacintoRentInput');
 if (sanJacintoRentInput) sanJacintoRentInput.addEventListener('change', () => setRentalRent('San Jacinto', sanJacintoRentInput.value));
 const countyLineRentInput = document.getElementById('countyLineRentInput');
@@ -1610,6 +1298,26 @@ const cardBSelect = document.getElementById('cardBSelect');
 if (cardASelect) cardASelect.addEventListener('change', renderComparison);
 if (cardBSelect) cardBSelect.addEventListener('change', renderComparison);
 
+const projectionMonthSelect = document.getElementById('projectionMonthSelect');
+if (projectionMonthSelect) {
+    projectionMonthSelect.addEventListener('change', () => {
+        selectedProjectionMonth = projectionMonthSelect.value;
+        renderProjectionTab();
+    });
+}
+
+const projectionNewSnapshotBtn = document.getElementById('projectionNewSnapshotBtn');
+if (projectionNewSnapshotBtn) {
+    projectionNewSnapshotBtn.addEventListener('click', () => {
+        const month = document.getElementById('projectionNewMonth')?.value;
+        if (!month) {
+            setStatus('Choose a projection month.');
+            return;
+        }
+        createBudgetSnapshot(month);
+    });
+}
+
 // -------------------------------------------------------------------
 // Tabs — hash-routed
 // -------------------------------------------------------------------
@@ -1628,17 +1336,13 @@ const tabsContainer = document.getElementById('cc-tabs');
 if (tabsContainer) {
     tabsContainer.addEventListener('click', e => {
         const btn = e.target.closest('.tab');
-        if (btn && btn.dataset.tab) location.hash = btn.dataset.tab;
+        if (!btn || !btn.dataset.tab) return;
+        location.hash = btn.dataset.tab;
     });
-    window.addEventListener('hashchange', () => switchTab(tabFromHash()));
-    switchTab(tabFromHash());
 }
 
-// -------------------------------------------------------------------
-// Init
-// -------------------------------------------------------------------
-if (window.initAppPage) {
-    window.initAppPage(loadAll);
-} else {
-    document.addEventListener('app:ready', loadAll, { once: true });
-}
+window.addEventListener('hashchange', () => switchTab(tabFromHash()));
+
+// Initial tab & start
+switchTab(tabFromHash());
+loadAll();

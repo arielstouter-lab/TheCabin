@@ -45,7 +45,7 @@
             <!-- Tab 1: Budget -->
             <div id="tab-budget" class="tab-pane">
 
-                <div class="card">
+                <div class="card" data-account-type="credit_cards">
                     <div class="card-head">
                         <h2 class="card-title">Credit Card Spending</h2>
                         <span class="note">Monthly credit card spend per category, used by credit card comparison</span>
@@ -63,10 +63,10 @@
                                     <th class="col-action"></th>
                                 </tr>
                                 </thead>
-                                <tbody id="spendGridBody"></tbody>
+                                <tbody id="spendGridBody" data-ref="gridBody"></tbody>
                             </table>
                         </div>
-                        <p id="spendGridEmpty" class="empty-state" hidden>No credit card categories yet &mdash; add your first one below.</p>
+                        <p id="spendGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No credit card categories yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -87,7 +87,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card" data-account-type="bank">
                     <div class="card-head">
                         <h2 class="card-title">Bank Account Spending</h2>
                         <span class="note">Non-card monthly expenses</span>
@@ -105,10 +105,10 @@
                                     <th class="col-action"></th>
                                 </tr>
                                 </thead>
-                                <tbody id="bankSpendGridBody"></tbody>
+                                <tbody id="bankSpendGridBody" data-ref="gridBody"></tbody>
                             </table>
                         </div>
-                        <p id="bankSpendGridEmpty" class="empty-state" hidden>No bank account expenses yet &mdash; add your first one below.</p>
+                        <p id="bankSpendGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No bank account expenses yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -129,7 +129,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card" data-account-type="income">
                     <div class="card-head">
                         <h2 class="card-title">Income</h2>
                         <span class="note">Monthly income sources (e.g. primary salary, side income)</span>
@@ -147,10 +147,10 @@
                                     <th class="col-action"></th>
                                 </tr>
                                 </thead>
-                                <tbody id="incomeGridBody"></tbody>
+                                <tbody id="incomeGridBody" data-ref="gridBody"></tbody>
                             </table>
                         </div>
-                        <p id="incomeGridEmpty" class="empty-state" hidden>No income sources yet &mdash; add your first one below.</p>
+                        <p id="incomeGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No income sources yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -177,7 +177,23 @@
                         <span class="note">Total Income &minus; Total Spending = Net Balance</span>
                     </div>
                     <div class="card-body">
-                        <div id="balanceSummaryGrid" class="summary-grid"></div>
+                        <div id="balanceSummaryGrid" class="summary-grid">
+                            <div class="summary-card">
+                                <div class="label">Total Income</div>
+                                <div class="value"><span data-ref="incomeVal">$0.00</span></div>
+                                <div class="foot" data-ref="incomeFoot"></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">Total Spending</div>
+                                <div class="value"><span data-ref="spendVal">$0.00</span></div>
+                                <div class="foot" data-ref="spendFoot"></div>
+                            </div>
+                            <div class="summary-card" data-ref="netCard">
+                                <div class="label" data-ref="netLabel">Net Balance</div>
+                                <div class="value"><span data-ref="netVal">$0.00</span></div>
+                                <div class="foot" data-ref="netFoot"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -219,7 +235,23 @@
                             </table>
                         </div>
 
-                        <div id="summaryGrid" class="summary-grid" hidden></div>
+                        <div id="summaryGrid" class="summary-grid" hidden>
+                            <div class="summary-card">
+                                <div class="label" data-ref="cardALabel">Card A</div>
+                                <div class="value"><span data-ref="cardAVal">$0.00</span><span class="combo-unit">/mo net</span></div>
+                                <div class="foot" data-ref="cardAFoot"></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label" data-ref="cardBLabel">Card B</div>
+                                <div class="value"><span data-ref="cardBVal">$0.00</span><span class="combo-unit">/mo net</span></div>
+                                <div class="foot" data-ref="cardBFoot"></div>
+                            </div>
+                            <div class="summary-card best">
+                                <div class="label">Best of Both (optimal routing)</div>
+                                <div class="value"><span data-ref="bestVal">$0.00</span><span class="combo-unit">/mo net</span></div>
+                                <div class="foot" data-ref="bestFoot"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -389,7 +421,23 @@
                             </div>
                         </div>
 
-                        <div id="sanJacintoProfitSummary" class="summary-grid"></div>
+                        <div id="sanJacintoProfitSummary" class="summary-grid">
+                            <div class="summary-card">
+                                <div class="label">Monthly Rent (Income)</div>
+                                <div class="value"><span data-ref="rentVal">$0.00</span></div>
+                                <div class="foot" data-ref="rentFoot"></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">Total Expenses</div>
+                                <div class="value"><span data-ref="expensesVal">$0.00</span></div>
+                                <div class="foot" data-ref="expensesFoot"></div>
+                            </div>
+                            <div class="summary-card" data-ref="profitCard">
+                                <div class="label" data-ref="profitLabel">Net Profit</div>
+                                <div class="value"><span data-ref="profitVal">$0.00</span></div>
+                                <div class="foot" data-ref="profitFoot"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -480,7 +528,23 @@
                             </div>
                         </div>
 
-                        <div id="countyLineProfitSummary" class="summary-grid"></div>
+                        <div id="countyLineProfitSummary" class="summary-grid">
+                            <div class="summary-card">
+                                <div class="label">Monthly Rent (Income)</div>
+                                <div class="value"><span data-ref="rentVal">$0.00</span></div>
+                                <div class="foot" data-ref="rentFoot"></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">Total Expenses</div>
+                                <div class="value"><span data-ref="expensesVal">$0.00</span></div>
+                                <div class="foot" data-ref="expensesFoot"></div>
+                            </div>
+                            <div class="summary-card" data-ref="profitCard">
+                                <div class="label" data-ref="profitLabel">Net Profit</div>
+                                <div class="value"><span data-ref="profitVal">$0.00</span></div>
+                                <div class="foot" data-ref="profitFoot"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -667,7 +731,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card" data-account-type="credit_cards">
                     <div class="card-head">
                         <h2 class="card-title">Credit Card Spending</h2>
                         <span class="note">Monthly credit card spend per category, used by credit card comparison</span>
@@ -685,31 +749,14 @@
                                     <th class="col-action"></th>
                                 </tr>
                                 </thead>
-                                <tbody id="projectionGridBody"></tbody>
+                                <tbody id="projectionGridBody" data-ref="gridBody"></tbody>
                             </table>
                         </div>
-                        <p id="projectionGridEmpty" class="empty-state" hidden>No credit card categories yet &mdash; add your first one below.</p>
-
-                        <div class="cc-add-form">
-                            <div class="cc-add-fields">
-                                <input type="text" class="text-input" id="newCategory" placeholder="Category (e.g. Dining, Gas)" />
-                                <select class="text-input" id="newCategoryFrequency">
-                                    <option value="monthly">Monthly</option>
-                                    <option value="semimonthly">Semimonthly (twice a month)</option>
-                                    <option value="biweekly">Biweekly (every other week)</option>
-                                    <option value="annual">Annual</option>
-                                </select>
-                                <div class="num-wrap money">
-                                    <input type="number" class="text-input" id="newCategoryAmount" placeholder="Amount" min="0" step="any" />
-                                </div>
-                                <input type="text" class="text-input note" id="newCategoryNotes" placeholder="Notes (optional)" />
-                            </div>
-                            <button class="button-inline" id="addCategoryBtn">Add category</button>
-                        </div>
+                        <p id="projectionGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No credit card categories yet &mdash; add your first one below.</p>
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card" data-account-type="bank">
                     <div class="card-head">
                         <h2 class="card-title">Bank Account Spending</h2>
                         <span class="note">Non-card monthly expenses</span>
@@ -727,31 +774,14 @@
                                     <th class="col-action"></th>
                                 </tr>
                                 </thead>
-                                <tbody id="projectionSpendGridBody"></tbody>
+                                <tbody id="projectionSpendGridBody" data-ref="gridBody"></tbody>
                             </table>
                         </div>
-                        <p id="projectionSpendGridEmpty" class="empty-state" hidden>No bank account expenses yet &mdash; add your first one below.</p>
-
-                        <div class="cc-add-form">
-                            <div class="cc-add-fields">
-                                <input type="text" class="text-input" id="newBankCategory" placeholder="Expense (e.g. Rent, Utilities)" />
-                                <select class="text-input" id="newBankCategoryFrequency">
-                                    <option value="monthly">Monthly</option>
-                                    <option value="semimonthly">Semimonthly (twice a month)</option>
-                                    <option value="biweekly">Biweekly (every other week)</option>
-                                    <option value="annual">Annual</option>
-                                </select>
-                                <div class="num-wrap money">
-                                    <input type="number" class="text-input" id="newBankCategoryAmount" placeholder="Amount" min="0" step="any" />
-                                </div>
-                                <input type="text" class="text-input note" id="newBankCategoryNotes" placeholder="Notes (optional)" />
-                            </div>
-                            <button class="button-inline" id="addBankCategoryBtn">Add expense</button>
-                        </div>
+                        <p id="projectionSpendGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No bank account expenses yet &mdash; add your first one below.</p>
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card" data-account-type="income">
                     <div class="card-head">
                         <h2 class="card-title">Income</h2>
                         <span class="note">Monthly income sources (e.g. primary salary, side income)</span>
@@ -769,27 +799,10 @@
                                     <th class="col-action"></th>
                                 </tr>
                                 </thead>
-                                <tbody id="projectionIncomeGridBody"></tbody>
+                                <tbody id="projectionIncomeGridBody" data-ref="gridBody"></tbody>
                             </table>
                         </div>
-                        <p id="projectionIncomeGridEmpty" class="empty-state" hidden>No income sources yet &mdash; add your first one below.</p>
-
-                        <div class="cc-add-form">
-                            <div class="cc-add-fields">
-                                <input type="text" class="text-input" id="newIncomeSource" placeholder="Income source (e.g. Salary, Consulting)" />
-                                <select class="text-input" id="newIncomeFrequency">
-                                    <option value="monthly">Monthly</option>
-                                    <option value="semimonthly">Semimonthly (twice a month)</option>
-                                    <option value="biweekly">Biweekly (every other week)</option>
-                                    <option value="annual">Annual</option>
-                                </select>
-                                <div class="num-wrap money">
-                                    <input type="number" class="text-input" id="newIncomeAmount" placeholder="Amount" min="0" step="any" />
-                                </div>
-                                <input type="text" class="text-input note" id="newIncomeNotes" placeholder="Notes (optional)" />
-                            </div>
-                            <button class="button-inline" id="addIncomeBtn">Add income</button>
-                        </div>
+                        <p id="projectionIncomeGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No income sources yet &mdash; add your first one below.</p>
                     </div>
                 </div>
 
@@ -799,16 +812,31 @@
                         <span class="note">Total Income &minus; Total Spending = Net Balance</span>
                     </div>
                     <div class="card-body">
-                        <div id="projectionSummaryGrid" class="summary-grid"></div>
+                        <div id="projectionSummaryGrid" class="summary-grid">
+                            <div class="summary-card">
+                                <div class="label">Projected Income</div>
+                                <div class="value"><span data-ref="incomeVal">$0.00</span></div>
+                                <div class="foot" data-ref="incomeFoot"></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">Projected Spending</div>
+                                <div class="value"><span data-ref="spendVal">$0.00</span></div>
+                                <div class="foot" data-ref="spendFoot"></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">Projected Rental Profit</div>
+                                <div class="value"><span data-ref="rentalVal">$0.00</span></div>
+                                <div class="foot" data-ref="rentalFoot"></div>
+                            </div>
+                            <div class="summary-card" data-ref="netCard">
+                                <div class="label" data-ref="netLabel">Projected Net Balance</div>
+                                <div class="value"><span data-ref="netVal">$0.00</span></div>
+                                <div class="foot" data-ref="netFoot"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-
-
-
-
-
-</div>
 
             <!-- ============ Templates ============ -->
 
@@ -817,7 +845,14 @@
             <template id="tpl-category-row">
                 <tr>
                     <td><input type="text" class="text-input" data-ref="name" /></td>
-                    <td><select class="text-input" data-ref="frequency"></select></td>
+                    <td>
+                        <select class="text-input" data-ref="frequency">
+                            <option value="monthly">Monthly</option>
+                            <option value="semimonthly">Semimonthly (twice a month)</option>
+                            <option value="biweekly">Biweekly (every other week)</option>
+                            <option value="annual">Annual</option>
+                        </select>
+                    </td>
                     <td class="col-num">
                         <div class="num-wrap money">
                             <input type="number" class="text-input" min="0" step="any" data-ref="amount" />
@@ -883,26 +918,29 @@
                 <tr>
                     <td data-ref="category"></td>
                     <td class="col-num" data-ref="spend"></td>
-                    <td class="col-num" data-ref="cellA"></td>
-                    <td class="col-num" data-ref="cellB"></td>
-                    <td data-ref="winner"></td>
+                    <td class="col-num">
+                        <span data-ref="cellA">
+                            <span data-ref="rateA"></span>
+                            <span aria-hidden="true"> &rarr; </span>
+                            <span data-ref="rewardA"></span>
+                            <span class="note" data-ref="noteA" hidden></span>
+                        </span>
+                        <span class="empty-state" data-ref="noneA" hidden>no rate</span>
+                    </td>
+                    <td class="col-num">
+                        <span data-ref="cellB">
+                            <span data-ref="rateB"></span>
+                            <span aria-hidden="true"> &rarr; </span>
+                            <span data-ref="rewardB"></span>
+                            <span class="note" data-ref="noteB" hidden></span>
+                        </span>
+                        <span class="empty-state" data-ref="noneB" hidden>no rate</span>
+                    </td>
+                    <td>
+                        <span data-ref="winnerName"></span>
+                        <span class="badge" data-ref="winnerBadge" hidden></span>
+                    </td>
                 </tr>
-            </template>
-
-            <template id="tpl-compare-cell">
-                <span>
-                    <span data-ref="rate"></span>
-                    <span aria-hidden="true"> &rarr; </span>
-                    <span data-ref="reward"></span>
-                    <span class="empty-state" data-ref="note" hidden></span>
-                </span>
-            </template>
-
-            <template id="tpl-winner-cell">
-                <span>
-                    <span data-ref="name"></span>
-                    <span class="badge" data-ref="badge" hidden></span>
-                </span>
             </template>
 
             <template id="tpl-best-combo-card">

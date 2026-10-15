@@ -9,31 +9,12 @@
 import { cloneEl, refs, focusAtEnd } from '../SharedJS/dom.js';
 import { fmt$ as defaultFmt } from '../SharedJS/ui.js';
 
-const FREQUENCIES = [
-    { value: 'monthly', label: 'Monthly' },
-    { value: 'semimonthly', label: 'Semimonthly (twice a month)' },
-    { value: 'biweekly', label: 'Biweekly (every other week)' },
-    { value: 'annual', label: 'Annual' }
-];
-
-function populateFrequencyOptions(select){
-    if(select.options.length) return; // already populated (template reused)
-    FREQUENCIES.forEach(({ value, label }) => {
-        const opt = document.createElement('option');
-        opt.value = value;
-        opt.textContent = label;
-        select.append(opt);
-    });
-}
-
 // row: { id, category|name, frequency, amount, notes, monthly_spend }
 // onUpdate(id, patch) / onDelete(id) are called with just the changed field(s).
 // options: { deleteTitle, notePlaceholder, fmt$ }
 export function buildCategoryRow(row, { onUpdate, onDelete, deleteTitle = 'Delete', notePlaceholder, fmt$ = defaultFmt }){
     const tr = cloneEl('tpl-category-row');
     const r = refs(tr);
-
-    populateFrequencyOptions(r.frequency);
 
     r.name.value = row.category || row.name || '';
     r.frequency.value = row.frequency || 'monthly';
