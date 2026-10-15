@@ -92,6 +92,9 @@ const THEMES = {
         wxSevereThunderstorm: "#38203F",
         wxUnsettled: "#6A4B74",
 
+        flowLight: "#6A4B74",
+        flowMedium: "#56385F",
+
         navLabel: "#88778A"
     }
 };
@@ -131,6 +134,10 @@ const THEMES = {
             "--wx-thunderstorm": activeTheme.wxThunderstorm,
             "--wx-severe-storm": activeTheme.wxSevereThunderstorm,
             "--wx-unsettled": activeTheme.wxUnsettled,
+
+            //Period colors
+            "--flowlight": activeTheme.flowLight,
+            "--flowmedium": activeTheme.flowMedium,
 
             // One offs
             "--nav-label": activeTheme.navLabel,
