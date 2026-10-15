@@ -639,12 +639,12 @@ input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--p
   z-index: -1;
 }
 
-.cal-day-flow[data-flow="spotting"] { background: var(--flowlight); opacity: 0.4; }
-.cal-day-flow[data-flow="light"] { background: var(--flowlight); opacity: 0.5; }
-.cal-day-flow[data-flow= "medium"] { background: var(--flowmedium); opacity: 0.6; }
+.cal-day-flow[data-flow="spotting"] { background: var(--flowlight); opacity: 0.6; }
+.cal-day-flow[data-flow="light"] { background: var(--flowlight); opacity: 0.7; }
+.cal-day-flow[data-flow= "medium"] { background: var(--flowmedium); opacity: 0.7; }
 .cal-day-flow[data-flow="heavy"] { background: var(--flowheavy); opacity: 0.7; }
 .cal-day-flow[data-flow="projected"] {
-  background: color-mix(in srgb, var(--flowlight) 30%, transparent);
+  background: color-mix(in srgb, var(--flowlight) 15%, transparent);
   outline: 1px dashed color-mix(in srgb, var(--flowheavy) 70%, transparent);
 }
 
