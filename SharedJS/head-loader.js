@@ -29,6 +29,9 @@ const THEMES = {
         wxThunderstorm: "#292f45",
         wxSevereThunderstorm: "#292f45",
 
+        flowLight: "#82000f",
+        flowHeavy: "#4e0009",
+
         /*Special one off colors*/
         navLabel: "#B8B5A8",
 
@@ -93,7 +96,7 @@ const THEMES = {
         wxUnsettled: "#6A4B74",
 
         flowLight: "#6A4B74",
-        flowMedium: "#56385F",
+        flowHeavy: "#56385F",
 
         navLabel: "#88778A"
     }
@@ -137,7 +140,7 @@ const THEMES = {
 
             //Period colors
             "--flowlight": activeTheme.flowLight,
-            "--flowmedium": activeTheme.flowMedium,
+            "--flowheavy": activeTheme.flowHeavy,
 
             // One offs
             "--nav-label": activeTheme.navLabel,
