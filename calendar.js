@@ -447,16 +447,32 @@ function getMoonStats(){
         months === 999 || parseDate(row.event_date) >= cutoff
     );
 
-    // ignore 1-day "cycles"
-    const cycles = buildMoonCycles(rows).filter(cycle => cycle.length > 1);
+    const allCycles = buildMoonCycles(rows);
+    if(!allCycles.length) return null;
+
+    // the last cycle is "ongoing" if it was logged today or yesterday (covers logging lag)
+    const lastCycle = allCycles[allCycles.length - 1];
+    const lastEnd = lastCycle[lastCycle.length - 1];
+    const ongoing = daysBetween(lastEnd, parseDate(todayStr())) <= 1;
+
+    // ignore 1-day "cycles", except the ongoing one (it may just be on day 1)
+    const cycles = allCycles.filter((cycle, i) =>
+        cycle.length > 1 || (ongoing && i === allCycles.length - 1)
+    );
     if(!cycles.length) return null;
+
+    // an in-progress cycle would drag the average length down, so leave it out
+    // (fall back to everything if it's the only cycle we have)
+    const completed = ongoing ? cycles.slice(0, -1) : cycles;
+    const lengthSource = completed.length ? completed : cycles;
 
     const gaps = cycles.slice(1).map((cycle, i) => daysBetween(cycles[i][0], cycle[0]));
 
     return {
-        avgLength: average(cycles.map(cycle => cycle.length)),
+        avgLength: average(lengthSource.map(cycle => cycle.length)),
         avgGap: average(gaps),   // 0 when there's only one cycle
-        lastStart: cycles[cycles.length - 1][0]
+        lastStart: cycles[cycles.length - 1][0],
+        ongoing
     };
 }
 
@@ -467,7 +483,8 @@ function buildProjection(stats){
     const length = Math.max(1, Math.round(stats.avgLength));
     const today = todayStr();
 
-    for(let k = 1; k <= PROJECTION_CYCLES; k++){
+    // k = 0 is the current period: project its remaining days (past days are skipped below)
+    for(let k = stats.ongoing ? 0 : 1; k <= PROJECTION_CYCLES; k++){
         const start = projectedStart(stats, k);
         for(let i = 0; i < length; i++){
             const str = toDateStr(addDays(start, i));

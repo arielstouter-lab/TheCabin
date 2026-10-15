@@ -6,7 +6,7 @@
 //   await loadDebtData()                        inside loadAll / debounceReload
 //   renderDebts()                               at the end of render()
 //
-// Math lives in debt-engine.js; this file is UI + Supabase only.
+// Math lives in debt-engine-v2.js; this file is UI + Supabase only.
 
 import { cloneEl, refs, bindEvents } from '../SharedJS/dom.js';
 import { renderSummaryCards } from '../SharedJS/summary-card.js';
@@ -14,6 +14,7 @@ import {
     amortizedPayment, minimumPayment, amortizationSchedule, scheduledBalanceAt,
     simulate, effectiveApr, ymToIndex, addMonths, isYm, MAX_MONTHS
 } from './debt-engine-v2.js';
+import { fmt$, el, setStatus, captureDetailsState, restoreDetailsState } from '../SharedJS/ui.js';
 
 const sb = window.supabaseClient;
 const TABLES = window.TABLES;
@@ -35,7 +36,7 @@ let renderQueued = false;
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
-const status = msg => { if (window.setStatus) window.setStatus(msg); };
+const status = setStatus;
 const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
 const numOrNull = v => {
     const s = String(v ?? '').trim();
@@ -44,12 +45,6 @@ const numOrNull = v => {
     return Number.isFinite(n) ? n : null;
 };
 const sameId = (a, b) => a != null && b != null && String(a) === String(b);
-
-function fmt$(n) {
-    const val = typeof n === 'number' && !isNaN(n) ? n : 0;
-    const sign = val < 0 ? '-' : '';
-    return sign + '$' + (Math.round(Math.abs(val) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function fmtYm(ym) {
     if (!isYm(ym)) return '—';
@@ -71,13 +66,6 @@ const dateToYm = v => {
 function thisYm() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function el(tag, text, cls) {
-    const e = document.createElement(tag);
-    if (text != null) e.textContent = text;
-    if (cls) e.className = cls;
-    return e;
 }
 
 const strategyLabel = s => {
@@ -299,7 +287,6 @@ async function createSnapshot(month) {
             if (!mErr && m) moneyRows = [...moneyRows.filter(r => r.month !== month), m];
         } catch (err) {
             console.warn('Could not carry the money setting forward:', err);
-            console.warn('Could not carry the money setting forward:', err);
         }
         selectedMonth = month;
         const input = $('debtNewMonth');
@@ -319,6 +306,10 @@ async function deleteMonth(month) {
         const { error } = await sb.from(SNAP_TABLE).delete().eq('month', month);
         if (error) throw error;
         snapRows = snapRows.filter(s => s.month !== month);
+
+        const { error: mErr } = await sb.from(MONEY_TABLE).delete().eq('month', month);
+        if (mErr) throw mErr;
+        moneyRows = moneyRows.filter(r => r.month !== month);
         
 await sb.from(MONEY_TABLE).delete().eq('month', month);
         moneyRows = moneyRows.filter(r => r.month !== month);
@@ -543,6 +534,7 @@ export function renderDebts() {
     if (!pane) return;
     const active = document.activeElement;
     const fk = active && pane.contains(active) ? active.dataset.fk : null;
+    const openState = captureDetailsState(pane);
 
     const model = buildModel();
     renderToolbar(model);
@@ -551,6 +543,8 @@ export function renderDebts() {
     renderLoanCards(model);
     renderMoney(model);
     renderResults(model);
+
+    restoreDetailsState(openState, pane);
 
     if (fk) {
         const target = pane.querySelector(`[data-fk="${CSS.escape(fk)}"]`);

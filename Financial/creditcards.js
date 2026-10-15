@@ -2,6 +2,7 @@ import { cloneEl, refs } from '../SharedJS/dom.js';
 import { buildCategoryRow } from './category-row.js';
 import { renderSummaryCards } from '../SharedJS/summary-card.js';
 import { initDebts, loadDebtData, renderDebts } from './debts.js';
+import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../SharedJS/ui.js';
 
 const sb = window.supabaseClient;
 const TABLES = window.TABLES;
@@ -44,13 +45,6 @@ let taxRows = [];
 
 let realtimeChannel = null;
 let realtimeDebounceTimer = null;
-
-function fmt$(n) {
-    const val = typeof n === 'number' && !isNaN(n) ? n : 0;
-    const sign = val < 0 ? '-' : '';
-    const absVal = Math.abs(val);
-    return sign + '$' + (Math.round(absVal * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function computeMonthlySpend(amount, frequency) {
     const val = parseFloat(amount) || 0;
@@ -121,11 +115,11 @@ async function addCategoryRow(fields, tag) {
             categoryRows.push(normalizeCategoryRow(inserted));
             render();
         }
-        if (window.setStatus) window.setStatus(tag.addedMessage || 'Added.');
+        setStatus(tag.addedMessage || 'Added.');
         return true;
     } catch (err) {
         console.error('Could not add row:', err);
-        if (window.setStatus) window.setStatus('Could not add: ' + (err.message || err));
+        setStatus('Could not add: ' + (err.message || err));
         return false;
     }
 }
@@ -151,7 +145,7 @@ async function updateCategoryRow(id, patch) {
         return true;
     } catch (err) {
         console.error('Could not update row:', err);
-        if (window.setStatus) window.setStatus('Could not update.');
+        setStatus('Could not update.');
         return false;
     }
 }
@@ -163,11 +157,11 @@ async function deleteCategoryRow(id, message) {
         if (error) throw error;
         categoryRows = categoryRows.filter(r => r.id !== id);
         render();
-        if (window.setStatus) window.setStatus(message || 'Deleted.');
+        setStatus(message || 'Deleted.');
         return true;
     } catch (err) {
         console.error('Could not delete row:', err);
-        if (window.setStatus) window.setStatus('Could not delete.');
+        setStatus('Could not delete.');
         return false;
     }
 }
@@ -178,7 +172,7 @@ async function setRentalRent(propertyName, rentAmount) {
     const ok = existing
         ? await updateCategoryRow(existing.id, { amount: val })
         : await addCategoryRow({ category: 'Rent', frequency: 'monthly', amount: val, notes: '' }, { account_type: 'rental', type: 'income', property: propertyName });
-    if (ok) { if (window.setStatus) window.setStatus(`Updated rent for ${propertyName}.`); }
+    if (ok) { setStatus(`Updated rent for ${propertyName}.`); }
 }
 
 // -------------------------------------------------------------------
@@ -204,7 +198,7 @@ function wireAddForm({ buttonId, fieldIds, requiredMessage, onAdd }) {
             notes: els.notes ? els.notes.value.trim() : ''
         };
         if (!value.category) {
-            if (window.setStatus) window.setStatus(requiredMessage);
+            setStatus(requiredMessage);
             return;
         }
         onAdd(value);
@@ -283,6 +277,7 @@ function buildRentalIncomeRow(property, profit) {
 
     r.propName.textContent = property;
     r.chip.textContent = `Rental ${isProfit ? 'Profit' : 'Loss'}`;
+    r.chip.dataset.kind = isProfit ? 'profit' : 'loss';
     r.profit1.textContent = fmt$(profit);
     r.profit2.textContent = fmt$(profit);
     if (!isProfit) {
@@ -429,6 +424,7 @@ function getBudgetTotals() {
 }
 
 function render() {
+    const open = captureDetailsState(document);
     renderSpendGrid();
     renderBankSpendGrid();
     renderIncomeGrid();
@@ -440,6 +436,7 @@ function render() {
     renderComparison();
     renderRentals();
     renderDebts();
+    restoreDetailsState(open, document);
 }
 
 // -------------------------------------------------------------------
@@ -458,8 +455,7 @@ function renderSpendGrid() {
         body.append(buildCategoryRow(row, {
             onUpdate: updateCategoryRow,
             onDelete: id => deleteCategoryRow(id, 'Deleted category.'),
-            deleteTitle: 'Delete category',
-            fmt$
+            deleteTitle: 'Delete category'
         }));
     });
 }
@@ -480,8 +476,7 @@ function renderBankSpendGrid() {
         body.append(buildCategoryRow(row, {
             onUpdate: updateCategoryRow,
             onDelete: id => deleteCategoryRow(id, 'Deleted bank expense.'),
-            deleteTitle: 'Delete expense',
-            fmt$
+            deleteTitle: 'Delete expense'
         }));
     });
 }
@@ -502,8 +497,7 @@ function renderIncomeGrid() {
         body.append(buildCategoryRow(row, {
             onUpdate: updateCategoryRow,
             onDelete: id => deleteCategoryRow(id, 'Deleted income source.'),
-            deleteTitle: 'Delete income source',
-            fmt$
+            deleteTitle: 'Delete income source'
         }));
     });
 
@@ -578,8 +572,7 @@ function renderPropertySection(propertyName, elements) {
             body.append(buildCategoryRow(row, {
                 onUpdate: updateCategoryRow,
                 onDelete: id => deleteCategoryRow(id, 'Deleted rental entry.'),
-                deleteTitle: 'Delete expense',
-                fmt$
+                deleteTitle: 'Delete expense'
             }));
         });
     }
@@ -818,7 +811,7 @@ async function loadSpendingCategories() {
         categoryRows = (data || []).map(normalizeCategoryRow);
     } catch (err) {
         console.error('Error loading spending categories:', err);
-        if (window.setStatus) window.setStatus('Could not load spending categories.');
+        setStatus('Could not load spending categories.');
         categoryRows = [];
     }
 }
@@ -831,7 +824,7 @@ async function loadCards() {
         cardsRows = data || [];
     } catch (err) {
         console.error('Error loading cards:', err);
-        if (window.setStatus) window.setStatus('Could not load cards.');
+        setStatus('Could not load cards.');
         cardsRows = [];
     }
 }
@@ -842,10 +835,10 @@ async function addCardRow(data) {
         const { data: inserted, error } = await sb.from(CARDS_TABLE).insert([data]).select().single();
         if (error) throw error;
         if (inserted) { cardsRows.push(inserted); render(); }
-        if (window.setStatus) window.setStatus('Added card.');
+        setStatus('Added card.');
     } catch (err) {
         console.error('Could not add card:', err);
-        if (window.setStatus) window.setStatus('Could not add card: ' + (err.message || err));
+        setStatus('Could not add card: ' + (err.message || err));
     }
 }
 
@@ -859,7 +852,7 @@ async function updateCardRow(id, patch) {
         if (error) throw error;
     } catch (err) {
         console.error('Could not update card:', err);
-        if (window.setStatus) window.setStatus('Could not update card.');
+        setStatus('Could not update card.');
     }
 }
 
@@ -870,10 +863,10 @@ async function deleteCardRow(id) {
         if (error) throw error;
         cardsRows = cardsRows.filter(r => r.id !== id);
         render();
-        if (window.setStatus) window.setStatus('Deleted card.');
+        setStatus('Deleted card.');
     } catch (err) {
         console.error('Could not delete card:', err);
-        if (window.setStatus) window.setStatus('Could not delete card.');
+        setStatus('Could not delete card.');
     }
 }
 
@@ -885,7 +878,7 @@ async function loadRewards() {
         rewardRows = data || [];
     } catch (err) {
         console.error('Error loading card rewards:', err);
-        if (window.setStatus) window.setStatus('Could not load card rewards.');
+        setStatus('Could not load card rewards.');
         rewardRows = [];
     }
 }
@@ -896,10 +889,10 @@ async function addRewardRow(data) {
         const { data: inserted, error } = await sb.from(REWARDS_TABLE).insert([data]).select().single();
         if (error) throw error;
         if (inserted) { rewardRows.push(inserted); render(); }
-        if (window.setStatus) window.setStatus('Added reward rate.');
+        setStatus('Added reward rate.');
     } catch (err) {
         console.error('Could not add row:', err);
-        if (window.setStatus) window.setStatus('Could not add row: ' + (err.message || err));
+        setStatus('Could not add row: ' + (err.message || err));
     }
 }
 
@@ -913,7 +906,7 @@ async function updateRewardRow(id, patch) {
         if (error) throw error;
     } catch (err) {
         console.error('Could not update row:', err);
-        if (window.setStatus) window.setStatus('Could not update row.');
+        setStatus('Could not update row.');
     }
 }
 
@@ -924,10 +917,10 @@ async function deleteRewardRow(id) {
         if (error) throw error;
         rewardRows = rewardRows.filter(r => r.id !== id);
         render();
-        if (window.setStatus) window.setStatus('Deleted row.');
+        setStatus('Deleted row.');
     } catch (err) {
         console.error('Could not delete row:', err);
-        if (window.setStatus) window.setStatus('Could not delete row.');
+        setStatus('Could not delete row.');
     }
 }
 
@@ -1087,7 +1080,7 @@ if (addCardBtn) {
         const feeInput = document.getElementById('newCardFee');
         const baseRateInput = document.getElementById('newCardBaseRate');
         const name = nameInput.value.trim();
-        if (!name) { if (window.setStatus) window.setStatus('Card name is required.'); return; }
+        if (!name) { setStatus('Card name is required.'); return; }
         addCardRow({ name, annual_fee: parseFloat(feeInput.value) || 0, base_rate: parseFloat(baseRateInput.value) || 0 });
         nameInput.value = ''; feeInput.value = ''; baseRateInput.value = ''; nameInput.focus();
     });
@@ -1105,8 +1098,8 @@ if (addRewardBtn) {
         const refundInput = document.getElementById('newSpecialRefund');
         const card = cardSelect.value;
         const category = catInput.value.trim();
-        if (!card) { if (window.setStatus) window.setStatus("Choose a card first — add one above if it's not listed yet."); return; }
-        if (!category) { if (window.setStatus) window.setStatus('Category is required for a reward override.'); return; }
+        if (!card) { setStatus("Choose a card first — add one above if it's not listed yet."); return; }
+        if (!category) { setStatus('Category is required for a reward override.'); return; }
         addRewardRow({ card_id: card, category, rate: parseFloat(rateInput.value) || 0, special_refund: parseFloat(refundInput.value) || 0 });
         catInput.value = ''; rateInput.value = ''; refundInput.value = ''; catInput.focus();
     });
