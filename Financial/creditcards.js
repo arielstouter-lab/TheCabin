@@ -1,6 +1,7 @@
 import { cloneEl, refs } from '../SharedJS/dom.js';
 import { buildCategoryRow } from './category-row.js';
 import { initDebts, loadDebtData, renderDebts } from './debts.js';
+import { addMonths, isYm } from './debt-engine-v2.js';
 import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../SharedJS/ui.js';
 
 const sb = window.supabaseClient;
@@ -212,15 +213,47 @@ async function setRentalRent(propertyName, rentAmount) {
 // -------------------------------------------------------------------
 // Budget Projections (Snapshots)
 // -------------------------------------------------------------------
+function thisYm() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function normalizeYm(ym) {
+    return String(ym || '').trim().replace('/', '-');
+}
+
+function fmtYm(ym) {
+    if (!ym) return '—';
+    const cleanYm = normalizeYm(ym);
+    if (!isYm(cleanYm)) return ym;
+    const [y, m] = cleanYm.split('-').map(Number);
+    const date = new Date(y, m - 1, 1);
+    return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
 function projectionMonths() {
-    return [...new Set(budgetSnapshotRows.map(x => x.month))].sort().reverse();
+    const rawMonths = budgetSnapshotRows.map(x => normalizeYm(x.month)).filter(Boolean);
+    const set = new Set(rawMonths);
+    set.add(thisYm());
+    return [...set].sort().reverse();
+}
+
+function resolveProjectionMonth() {
+    const months = projectionMonths();
+    if (selectedProjectionMonth && months.includes(selectedProjectionMonth)) {
+        return selectedProjectionMonth;
+    }
+    selectedProjectionMonth = months.includes(thisYm()) ? thisYm() : (months[0] || thisYm());
+    return selectedProjectionMonth;
 }
 
 function getProjectedRows(month) {
-    if (!month) return categoryRows;
+    const targetMonth = normalizeYm(month || resolveProjectionMonth());
 
     return categoryRows.map(row => {
-        const snapshot = budgetSnapshotRows.find(x => String(x.category_id) === String(row.id) && x.month === month);
+        const snapshot = budgetSnapshotRows.find(x => 
+            String(x.category_id) === String(row.id) && normalizeYm(x.month) === targetMonth
+        );
         if (!snapshot) return row;
         return {
             ...row,
@@ -231,11 +264,17 @@ function getProjectedRows(month) {
 }
 
 async function createBudgetSnapshot(month) {
-    if (!sb) return;
+    if (!sb || !month) return;
+    const normMonth = normalizeYm(month);
+    if (!isYm(normMonth)) {
+        setStatus('Pick a valid month (YYYY-MM).');
+        return;
+    }
 
-    const rows = categoryRows.map(row => ({
+    const sourceRows = getProjectedRows(resolveProjectionMonth());
+    const rows = sourceRows.map(row => ({
         category_id: row.id,
-        month,
+        month: normMonth,
         amount: row.amount
     }));
 
@@ -247,9 +286,11 @@ async function createBudgetSnapshot(month) {
 
         if (error) throw error;
 
+        budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== normMonth);
         budgetSnapshotRows.push(...(data || []));
-        selectedProjectionMonth = month;
-        render();
+        selectedProjectionMonth = normMonth;
+        renderProjectionTab();
+        setStatus(`Created projection for ${fmtYm(normMonth)}.`);
     } catch (err) {
         console.error('Could not create budget snapshot:', err);
         setStatus('Could not create snapshot.');
@@ -257,16 +298,17 @@ async function createBudgetSnapshot(month) {
 }
 
 async function updateBudgetSnapshotRow(categoryId, patch) {
-    if (!selectedProjectionMonth || !sb) return false;
+    const month = resolveProjectionMonth();
+    if (!month || !sb) return false;
 
     try {
-        let row = budgetSnapshotRows.find(x => String(x.category_id) === String(categoryId) && x.month === selectedProjectionMonth);
+        let row = budgetSnapshotRows.find(x => String(x.category_id) === String(categoryId) && normalizeYm(x.month) === month);
 
         if (!row) {
             const sourceRow = categoryRows.find(r => String(r.id) === String(categoryId));
             const payload = {
                 category_id: categoryId,
-                month: selectedProjectionMonth,
+                month: month,
                 amount: patch.amount ?? sourceRow?.amount ?? 0
             };
 
@@ -292,14 +334,18 @@ async function updateBudgetSnapshotRow(categoryId, patch) {
 
 async function deleteBudgetSnapshot(month) {
     if (!month || !sb) return;
-    if (!confirm(`Delete the budget projection for ${month}?`)) return;
+    if (!confirm(`Delete the budget projection for ${fmtYm(month)}?`)) return;
 
     try {
-        const { error } = await sb.from(BUDGET_SNAPSHOT_TABLE).delete().eq('month', month);
-        if (error) throw error;
+        const normMonth = normalizeYm(month);
+        const slashMonth = normMonth.replace('-', '/');
 
-        budgetSnapshotRows = budgetSnapshotRows.filter(r => r.month !== month);
-        if (selectedProjectionMonth === month) selectedProjectionMonth = null;
+        const { error: err1 } = await sb.from(BUDGET_SNAPSHOT_TABLE).delete().eq('month', normMonth);
+        if (err1) throw err1;
+        await sb.from(BUDGET_SNAPSHOT_TABLE).delete().eq('month', slashMonth);
+
+        budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== normMonth && r.month !== slashMonth);
+        selectedProjectionMonth = null;
         renderProjectionTab();
         setStatus('Deleted projection snapshot.');
     } catch (err) {
@@ -926,33 +972,28 @@ function renderProjectionTab() {
     const months = projectionMonths();
     monthSelect.replaceChildren();
 
-    const deleteBtn = document.getElementById('projectionDeleteMonthBtn');
-    if (deleteBtn) deleteBtn.disabled = !months.length || !selectedProjectionMonth;
-
-    if (!months.length) {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'No projections yet';
-        monthSelect.append(option);
-        renderTabGrids(tabEl, [], { isProjection: true });
-        renderProjectionSummary(null);
-        return;
-    }
-
     months.forEach(month => {
         const option = document.createElement('option');
         option.value = month;
-        option.textContent = month;
+        option.textContent = fmtYm(month);
         monthSelect.append(option);
     });
 
-    if (!selectedProjectionMonth || !months.includes(selectedProjectionMonth)) {
-        selectedProjectionMonth = months[0];
+    const currentMonth = resolveProjectionMonth();
+    monthSelect.value = currentMonth;
+
+    const deleteBtn = document.getElementById('projectionDeleteMonthBtn');
+    if (deleteBtn) {
+        const hasSnapshots = budgetSnapshotRows.some(r => normalizeYm(r.month) === currentMonth);
+        deleteBtn.disabled = !hasSnapshots;
     }
 
-    monthSelect.value = selectedProjectionMonth;
+    const input = document.getElementById('projectionNewMonth');
+    if (input && !input.value && document.activeElement !== input) {
+        input.value = months.length ? addMonths(months[0], 1) : thisYm();
+    }
 
-    const projectedRows = getProjectedRows(selectedProjectionMonth);
+    const projectedRows = getProjectedRows(currentMonth);
 
     renderTabGrids(tabEl, projectedRows, {
         onUpdate: updateBudgetSnapshotRow,
@@ -1343,11 +1384,12 @@ if (projectionNewSnapshotBtn) {
 const projectionDeleteMonthBtn = document.getElementById('projectionDeleteMonthBtn');
 if (projectionDeleteMonthBtn) {
     projectionDeleteMonthBtn.addEventListener('click', () => {
-        if (!selectedProjectionMonth) {
+        const month = resolveProjectionMonth();
+        if (!month) {
             setStatus('No projection month selected.');
             return;
         }
-        deleteBudgetSnapshot(selectedProjectionMonth);
+        deleteBudgetSnapshot(month);
     });
 }
 
