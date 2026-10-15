@@ -279,7 +279,8 @@ function getProjectedRentalNet(property, month) {
     const snap = budgetSnapshotRows.find(x =>
         String(x.category_id) === String(rent.id) && normalizeYm(x.month) === targetMonth
     );
-    return snap ? (parseFloat(snap.amount) || 0) : getRentalProfit(property);
+    const net = snap ? (parseFloat(snap.amount) || 0) : getRentalProfit(property);
+    return Math.round(net * 100) / 100;
 }
 
 function getProjectedRentalNets(month) {
