@@ -98,7 +98,9 @@ const getRentalExpenseRows = property => categoryRows.filter(r => r.account_type
 // -------------------------------------------------------------------
 // Budget Totals Calculations
 // -------------------------------------------------------------------
-function computeBudgetTotals(rows) {
+// rentalNets (optional): { [property]: netMonthly } overrides the live
+// rental profit calculation (used by the Budget Projection tab).
+function computeBudgetTotals(rows, rentalNets = null) {
     const cc = rows.filter(r => r.account_type === 'credit_cards');
     const bank = rows.filter(r => r.account_type === 'bank');
     const inc = rows.filter(r => r.account_type === 'income');
@@ -107,7 +109,10 @@ function computeBudgetTotals(rows) {
     const totalBankSpend = bank.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
     const totalSpending = totalCcSpend + totalBankSpend;
     const regularIncome = inc.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const rentalProfits = RENTAL_PROPERTIES.reduce((sum, prop) => sum + getRentalProfit(prop), 0);
+    const rentalProfits = RENTAL_PROPERTIES.reduce(
+        (sum, prop) => sum + (rentalNets ? (rentalNets[prop] || 0) : getRentalProfit(prop)),
+        0
+    );
     const totalIncome = regularIncome + rentalProfits;
     const netBalance = totalIncome - totalSpending;
 
@@ -251,7 +256,7 @@ function getProjectedRows(month) {
     const targetMonth = normalizeYm(month || resolveProjectionMonth());
 
     return categoryRows.map(row => {
-        const snapshot = budgetSnapshotRows.find(x => 
+        const snapshot = budgetSnapshotRows.find(x =>
             String(x.category_id) === String(row.id) && normalizeYm(x.month) === targetMonth
         );
         if (!snapshot) return row;
@@ -263,6 +268,24 @@ function getProjectedRows(month) {
     });
 }
 
+// Projected rental net per property. The net is stored in the snapshot row
+// belonging to the property's Rent row (so in projections, that row's
+// `amount` means "net", not rent). A month with no snapshot falls back to
+// the live calculated profit from the Rentals tab.
+function getProjectedRentalNet(property, month) {
+    const rent = getRentalIncomeRow(property);
+    if (!rent) return 0;
+    const targetMonth = normalizeYm(month);
+    const snap = budgetSnapshotRows.find(x =>
+        String(x.category_id) === String(rent.id) && normalizeYm(x.month) === targetMonth
+    );
+    return snap ? (parseFloat(snap.amount) || 0) : getRentalProfit(property);
+}
+
+function getProjectedRentalNets(month) {
+    return Object.fromEntries(RENTAL_PROPERTIES.map(p => [p, getProjectedRentalNet(p, month)]));
+}
+
 async function createBudgetSnapshot(month) {
     if (!sb || !month) return;
     const normMonth = normalizeYm(month);
@@ -271,12 +294,20 @@ async function createBudgetSnapshot(month) {
         return;
     }
 
-    const sourceRows = getProjectedRows(resolveProjectionMonth());
-    const rows = sourceRows.map(row => ({
-        category_id: row.id,
-        month: normMonth,
-        amount: row.amount
-    }));
+    const srcMonth = resolveProjectionMonth();
+    const nets = getProjectedRentalNets(srcMonth);
+
+    // Rental expense rows are not part of projections; the rental Rent row
+    // carries the property's projected net instead.
+    const rows = getProjectedRows(srcMonth)
+        .filter(row => !(row.account_type === 'rental' && row.type === 'spending'))
+        .map(row => ({
+            category_id: row.id,
+            month: normMonth,
+            amount: (row.account_type === 'rental' && row.type === 'income')
+                ? (nets[row.property] ?? 0)
+                : row.amount
+        }));
 
     try {
         const { data, error } = await sb
@@ -297,7 +328,11 @@ async function createBudgetSnapshot(month) {
     }
 }
 
-async function updateBudgetSnapshotRow(categoryId, patch) {
+async function updateBudgetSnapshotRow(categoryId, rawPatch) {
+    // The snapshot table only stores an amount per category + month.
+    if (!rawPatch || !('amount' in rawPatch)) return false;
+    const patch = { amount: rawPatch.amount };
+
     const month = resolveProjectionMonth();
     if (!month || !sb) return false;
 
@@ -358,7 +393,7 @@ async function deleteBudgetSnapshot(month) {
 // -------------------------------------------------------------------
 // Category Grid Renderer (declarative by [data-account-type])
 // -------------------------------------------------------------------
-function renderTabGrids(containerEl, rows, { onUpdate, onDelete, isProjection = false } = {}) {
+function renderTabGrids(containerEl, rows, { onUpdate, onDelete, isProjection = false, rentalNets = null } = {}) {
     if (!containerEl) return;
     containerEl.querySelectorAll('[data-account-type]').forEach(card => {
         const type = card.dataset.accountType;
@@ -368,7 +403,19 @@ function renderTabGrids(containerEl, rows, { onUpdate, onDelete, isProjection = 
 
         const sectionRows = rows.filter(r => r.account_type === type);
         const extraRows = (type === 'income')
-            ? RENTAL_PROPERTIES.map(p => buildRentalIncomeRow(p, getRentalProfit(p)))
+            ? RENTAL_PROPERTIES.map(p => {
+                if (!isProjection || !rentalNets) return buildRentalIncomeRow(p, getRentalProfit(p));
+
+                // Projection: one editable "rental net" row per property. It is
+                // backed by the snapshot row of the property's Rent row.
+                const rent = getRentalIncomeRow(p);
+                if (!rent) return buildRentalIncomeRow(p, 0);
+                const net = rentalNets[p] ?? 0;
+                return buildCategoryRow(
+                    { ...rent, category: `${p} rental net`, frequency: 'monthly', amount: net, monthly_spend: net, notes: '' },
+                    { onUpdate, onDelete: () => {}, deleteTitle: 'Projection row' }
+                );
+            })
             : [];
 
         body.replaceChildren();
@@ -994,13 +1041,15 @@ function renderProjectionTab() {
     }
 
     const projectedRows = getProjectedRows(currentMonth);
+    const rentalNets = getProjectedRentalNets(currentMonth);
 
     renderTabGrids(tabEl, projectedRows, {
         onUpdate: updateBudgetSnapshotRow,
-        isProjection: true
+        isProjection: true,
+        rentalNets
     });
 
-    const totals = computeBudgetTotals(projectedRows);
+    const totals = computeBudgetTotals(projectedRows, rentalNets);
     renderProjectionSummary(totals);
 }
 
