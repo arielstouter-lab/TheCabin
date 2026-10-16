@@ -2,6 +2,7 @@ import { cloneEl, refs } from '../SharedJS/dom.js';
 import { buildCategoryRow } from './category-row.js';
 import { initDebts, loadDebtData, renderDebts } from './debts.js';
 import { addMonths, isYm } from './debt-engine-v2.js';
+import { initTracker, loadTrackerData, renderTracker, TRACKER_TABLE } from './tracker.js';
 import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../SharedJS/ui.js';
 
 const sb = window.supabaseClient;
@@ -1329,6 +1330,7 @@ function setupRealtime() {
         .on('postgres_changes', { event: '*', schema: 'public', table: REWARDS_TABLE }, () => debounceReload())
         .on('postgres_changes', { event: '*', schema: 'public', table: TAX_TABLE }, () => debounceReload())
         .on('postgres_changes', { event: '*', schema: 'public', table: BUDGET_SNAPSHOT_TABLE }, () => debounceReload())
+        .on('postgres_changes', { event: '*', schema: 'public', table: TRACKER_TABLE }, () => debounceReload())
         .subscribe();
 }
 
@@ -1361,7 +1363,8 @@ async function loadAll() {
         loadRewards(),
         loadIncomeTax(),
         loadDebtData(),
-        loadBudgetSnapshots()
+        loadBudgetSnapshots(),
+        loadTrackerData()
     ]);
     render();
     setupRealtime();
@@ -1370,6 +1373,10 @@ async function loadAll() {
 initDebts({
     getNetBalance: () => getBudgetTotals().netBalance,
     getBankRows: () => bankSpendRows()
+});
+
+initTracker({
+    getSpendRows: () => spendRows()
 });
 
 // -------------------------------------------------------------------
