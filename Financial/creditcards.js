@@ -252,20 +252,35 @@ function resolveProjectionMonth() {
     return selectedProjectionMonth;
 }
 
+function monthHasSnapshots(month) {
+    const m = normalizeYm(month);
+    return budgetSnapshotRows.some(x => normalizeYm(x.month) === m);
+}
+
+// A month with no snapshot yet shows the live Budget rows. Once a month has a
+// snapshot, it contains exactly the rows that have a snapshot entry, so a row
+// deleted from the projection stays gone (and stays gone when copied forward).
 function getProjectedRows(month) {
     const targetMonth = normalizeYm(month || resolveProjectionMonth());
+    const hasSnapshots = monthHasSnapshots(targetMonth);
+    const out = [];
 
-    return categoryRows.map(row => {
+    categoryRows.forEach(row => {
         const snapshot = budgetSnapshotRows.find(x =>
             String(x.category_id) === String(row.id) && normalizeYm(x.month) === targetMonth
         );
-        if (!snapshot) return row;
-        return {
+        if (!snapshot) {
+            if (!hasSnapshots) out.push(row);
+            return;
+        }
+        out.push({
             ...row,
             amount: snapshot.amount,
             monthly_spend: computeMonthlySpend(snapshot.amount, row.frequency)
-        };
+        });
     });
+
+    return out;
 }
 
 // Projected rental net per property. The net is stored in the snapshot row
@@ -279,12 +294,46 @@ function getProjectedRentalNet(property, month) {
     const snap = budgetSnapshotRows.find(x =>
         String(x.category_id) === String(rent.id) && normalizeYm(x.month) === targetMonth
     );
+    if (!snap && monthHasSnapshots(targetMonth)) return null; // deleted from this projection
     const net = snap ? (parseFloat(snap.amount) || 0) : getRentalProfit(property);
     return Math.round(net * 100) / 100;
 }
 
 function getProjectedRentalNets(month) {
     return Object.fromEntries(RENTAL_PROPERTIES.map(p => [p, getProjectedRentalNet(p, month)]));
+}
+
+// Rows to store for targetMonth, copied from srcMonth. Rental expense rows are
+// not part of projections; the rental Rent row carries the property's projected
+// net instead. Rows deleted from srcMonth are not copied.
+function buildSnapshotPayload(srcMonth, targetMonth) {
+    const nets = getProjectedRentalNets(srcMonth);
+    return getProjectedRows(srcMonth)
+        .filter(row => !(row.account_type === 'rental' && row.type === 'spending'))
+        .filter(row => !(row.account_type === 'rental' && row.type === 'income' && nets[row.property] == null))
+        .map(row => ({
+            category_id: row.id,
+            month: targetMonth,
+            amount: (row.account_type === 'rental' && row.type === 'income')
+                ? nets[row.property]
+                : row.amount
+        }));
+}
+
+// Turns a month that is still showing live Budget rows into a real snapshot,
+// so that editing or deleting one row doesn't make the rest disappear.
+async function materializeSnapshot(month) {
+    const norm = normalizeYm(month);
+    const rows = buildSnapshotPayload(norm, norm);
+    if (!rows.length) return true;
+    const { data, error } = await sb
+        .from(BUDGET_SNAPSHOT_TABLE)
+        .upsert(rows, { onConflict: 'category_id,month' })
+        .select();
+    if (error) throw error;
+    budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== norm);
+    budgetSnapshotRows.push(...(data || []));
+    return true;
 }
 
 async function createBudgetSnapshot(month) {
@@ -295,20 +344,7 @@ async function createBudgetSnapshot(month) {
         return;
     }
 
-    const srcMonth = resolveProjectionMonth();
-    const nets = getProjectedRentalNets(srcMonth);
-
-    // Rental expense rows are not part of projections; the rental Rent row
-    // carries the property's projected net instead.
-    const rows = getProjectedRows(srcMonth)
-        .filter(row => !(row.account_type === 'rental' && row.type === 'spending'))
-        .map(row => ({
-            category_id: row.id,
-            month: normMonth,
-            amount: (row.account_type === 'rental' && row.type === 'income')
-                ? (nets[row.property] ?? 0)
-                : row.amount
-        }));
+    const rows = buildSnapshotPayload(resolveProjectionMonth(), normMonth);
 
     try {
         const { data, error } = await sb
@@ -338,6 +374,8 @@ async function updateBudgetSnapshotRow(categoryId, rawPatch) {
     if (!month || !sb) return false;
 
     try {
+        if (!monthHasSnapshots(month)) await materializeSnapshot(month);
+
         let row = budgetSnapshotRows.find(x => String(x.category_id) === String(categoryId) && normalizeYm(x.month) === month);
 
         if (!row) {
@@ -364,6 +402,34 @@ async function updateBudgetSnapshotRow(categoryId, rawPatch) {
     } catch (err) {
         console.error('Could not update budget snapshot:', err);
         setStatus('Could not save projection.');
+        return false;
+    }
+}
+
+// Removes one row (a category, or a property's rental net) from the selected
+// month's projection. The live Budget row is not touched.
+async function deleteBudgetSnapshotRow(categoryId) {
+    const month = resolveProjectionMonth();
+    if (!month || !sb) return false;
+
+    try {
+        if (!monthHasSnapshots(month)) await materializeSnapshot(month);
+
+        const row = budgetSnapshotRows.find(x =>
+            String(x.category_id) === String(categoryId) && normalizeYm(x.month) === month
+        );
+        if (!row) return false;
+
+        const { error } = await sb.from(BUDGET_SNAPSHOT_TABLE).delete().eq('id', row.id);
+        if (error) throw error;
+
+        budgetSnapshotRows = budgetSnapshotRows.filter(x => x !== row);
+        renderProjectionTab();
+        setStatus('Removed row from projection.');
+        return true;
+    } catch (err) {
+        console.error('Could not delete projection row:', err);
+        setStatus('Could not remove row.');
         return false;
     }
 }
@@ -411,18 +477,19 @@ function renderTabGrids(containerEl, rows, { onUpdate, onDelete, isProjection = 
                 // backed by the snapshot row of the property's Rent row.
                 const rent = getRentalIncomeRow(p);
                 if (!rent) return buildRentalIncomeRow(p, 0);
-                const net = rentalNets[p] ?? 0;
+                const net = rentalNets[p];
+                if (net == null) return null; // removed from this projection
                 return buildCategoryRow(
                     { ...rent, category: `${p} rental net`, frequency: 'monthly', amount: net, monthly_spend: net, notes: '' },
-                    { onUpdate, onDelete: () => {}, deleteTitle: 'Projection row' }
+                    { onUpdate, onDelete: onDelete ? () => onDelete(rent.id) : () => {}, deleteTitle: 'Remove from projection' }
                 );
-            })
+            }).filter(Boolean)
             : [];
 
         body.replaceChildren();
         if (empty) empty.hidden = (sectionRows.length + extraRows.length) > 0;
 
-        const deleteTitle = isProjection ? 'Projection row' : (type === 'income' ? 'Delete income source' : (type === 'bank' ? 'Delete expense' : 'Delete category'));
+        const deleteTitle = isProjection ? 'Remove from projection' : (type === 'income' ? 'Delete income source' : (type === 'bank' ? 'Delete expense' : 'Delete category'));
         const deleteMsg = type === 'income' ? 'Deleted income source.' : (type === 'bank' ? 'Deleted bank expense.' : 'Deleted category.');
 
         sectionRows.forEach(row => {
@@ -1046,6 +1113,7 @@ function renderProjectionTab() {
 
     renderTabGrids(tabEl, projectedRows, {
         onUpdate: updateBudgetSnapshotRow,
+        onDelete: deleteBudgetSnapshotRow,
         isProjection: true,
         rentalNets
     });
