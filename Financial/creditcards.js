@@ -357,7 +357,7 @@ async function createBudgetSnapshot(month) {
         budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== normMonth);
         budgetSnapshotRows.push(...(data || []));
         selectedProjectionMonth = normMonth;
-        renderProjectionTab();
+        renderProjection();
         setStatus(`Created projection for ${fmtYm(normMonth)}.`);
     } catch (err) {
         console.error('Could not create budget snapshot:', err);
@@ -397,7 +397,7 @@ async function updateBudgetSnapshotRow(categoryId, rawPatch) {
         const { error } = await sb.from(BUDGET_SNAPSHOT_TABLE).update(patch).eq('id', row.id);
         if (error) throw error;
 
-        renderProjectionTab();
+        renderProjection();
         return true;
     } catch (err) {
         console.error('Could not update budget snapshot:', err);
@@ -424,7 +424,7 @@ async function deleteBudgetSnapshotRow(categoryId) {
         if (error) throw error;
 
         budgetSnapshotRows = budgetSnapshotRows.filter(x => x !== row);
-        renderProjectionTab();
+        renderProjection();
         setStatus('Removed row from projection.');
         return true;
     } catch (err) {
@@ -448,7 +448,7 @@ async function deleteBudgetSnapshot(month) {
 
         budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== normMonth && r.month !== slashMonth);
         selectedProjectionMonth = null;
-        renderProjectionTab();
+        renderProjection();
         setStatus('Deleted projection snapshot.');
     } catch (err) {
         console.error('Could not delete budget snapshot:', err);
@@ -1078,7 +1078,7 @@ function renderProjectionSummary(totals) {
     r.netCard.className = `summary-card ${statusClass}`;
 }
 
-function renderProjectionTab() {
+function renderProjection() {
     const monthSelect = document.getElementById('projectionMonthSelect');
     const tabEl = document.getElementById('tab-projection');
 
@@ -1135,7 +1135,8 @@ function render() {
     renderComparison();
     renderRentals();
     renderDebts();
-    renderProjectionTab();
+    renderProjection();
+    renderTracker();
     restoreDetailsState(open, document);
 }
 
@@ -1342,7 +1343,8 @@ function debounceReload() {
             loadRewards(),
             loadIncomeTax(),
             loadDebtData(),
-            loadBudgetSnapshots()
+            loadBudgetSnapshots(),
+            loadTrackerData()
         ]);
         render();
     }, 400);
@@ -1483,7 +1485,7 @@ const projectionMonthSelect = document.getElementById('projectionMonthSelect');
 if (projectionMonthSelect) {
     projectionMonthSelect.addEventListener('change', () => {
         selectedProjectionMonth = projectionMonthSelect.value;
-        renderProjectionTab();
+        renderProjection();
     });
 }
 
@@ -1514,7 +1516,7 @@ if (projectionDeleteMonthBtn) {
 // -------------------------------------------------------------------
 // Tabs — hash-routed
 // -------------------------------------------------------------------
-const TAB_KEYS = ['budget', 'comparison', 'rental', 'debt', 'projection'];
+const TAB_KEYS = ['budget', 'comparison', 'rental', 'debt', 'projection', 'tracker'];
 const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
 
 function switchTab(tabKey) {
