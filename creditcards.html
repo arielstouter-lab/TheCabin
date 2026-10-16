@@ -40,6 +40,9 @@
                 <button type="button" class="tab" data-tab="projection">
                     <span>Budget Projection</span>
                 </button>
+                <button type="button" class="tab" data-tab="tracker">
+                    <span>Spending Tracker</span>
+                </button>
             </div>
 
             <!-- Tab 1: Budget -->
@@ -839,6 +842,74 @@
                 </div>
             </div>
 
+            <!-- Tab 6: Spending Tracker -->
+            <div id="tab-tracker" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Period</h2>
+                        <span class="note">Set the period first, then add spending below</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="cc-add-form">
+                            <div class="picker">
+                                <label for="trackerStart">Start</label>
+                                <input type="date" class="text-input" id="trackerStart" />
+                            </div>
+                            <div class="picker">
+                                <label for="trackerEnd">End</label>
+                                <input type="date" class="text-input" id="trackerEnd" />
+                            </div>
+                            <button type="button" class="button-inline" id="trackerTodayBtn">End = today</button>
+                        </div>
+                        <p class="note" id="trackerDays"></p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Credit Card Spending vs. Budget</h2>
+                        <span class="note">Each amount you add goes into that category's running total</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th class="col-num">Budget / mo</th>
+                                    <th class="col-num">Period Estimate</th>
+                                    <th class="col-num">Spent</th>
+                                    <th class="col-num">Remaining</th>
+                                    <th>Progress</th>
+                                    <th>Add spending</th>
+                                </tr>
+                                </thead>
+                                <tbody id="trackerGridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="trackerGridEmpty" class="empty-state" hidden>No credit card categories yet &mdash; add them in the Budget tab.</p>
+
+                        <div id="trackerSummaryGrid" class="summary-grid">
+                            <div class="summary-card">
+                                <div class="label">Period Estimate</div>
+                                <div class="value"><span data-ref="estVal">$0.00</span></div>
+                                <div class="foot" data-ref="estFoot"></div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">Spent So Far</div>
+                                <div class="value"><span data-ref="spentVal">$0.00</span></div>
+                                <div class="foot" data-ref="spentFoot"></div>
+                            </div>
+                            <div class="summary-card" data-ref="netCard">
+                                <div class="label" data-ref="netLabel">Remaining</div>
+                                <div class="value"><span data-ref="netVal">$0.00</span></div>
+                                <div class="foot" data-ref="netFoot"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ============ Templates ============ -->
 
             <!-- Shared components (also used by other pages that import
@@ -1093,6 +1164,31 @@
                     <td class="col-num" data-ref="interest"></td>
                     <td class="col-num" data-ref="balance"></td>
                     <td class="note" data-ref="notes"></td>
+                </tr>
+            </template>
+
+            <template id="tpl-tracker-row">
+                <tr>
+                    <td>
+                        <div data-ref="category"></div>
+                        <details>
+                            <summary class="note" data-ref="entriesSummary"></summary>
+                            <ul data-ref="entriesList" style="margin:6px 0 0;padding-left:18px"></ul>
+                        </details>
+                    </td>
+                    <td class="col-num" data-ref="monthly"></td>
+                    <td class="col-num" data-ref="estimate"></td>
+                    <td class="col-num" data-ref="spent"></td>
+                    <td class="col-num" data-ref="remaining"></td>
+                    <td><progress max="100" value="0" data-ref="bar"></progress></td>
+                    <td>
+                        <div class="cc-add-fields">
+                            <div class="num-wrap money">
+                                <input type="number" class="text-input" step="any" placeholder="Amount" data-ref="amount" />
+                            </div>
+                            <button type="button" class="button-inline" data-ref="addBtn">Add</button>
+                        </div>
+                    </td>
                 </tr>
             </template>
 
