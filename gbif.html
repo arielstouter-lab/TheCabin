@@ -138,7 +138,10 @@
         $('yearSummary').textContent = '';
         $('results').innerHTML = '';
         try {
-            const perYear = await Promise.all(years.map(y => fetchYear(y, base, kind)));
+            const perYear = [];
+            for (const y of years) {
+                perYear.push(await fetchYear(y, base, kind));
+            }
             render(perYear, lat, lon, km, thisYear);
         } catch (e) {
             setStatus('Error: ' + e.message, true);
