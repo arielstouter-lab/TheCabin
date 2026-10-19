@@ -176,12 +176,12 @@
     async function loadHouse() {
         const sb = window.supabaseClient;
         setStatus('Loading house location…');
-        const { data, error } = await sb.from('weather_location').select('lat, long').limit(1).maybeSingle();
-        if (error || !data || data.lat == null || data.long == null) {
+        const { data, error } = await sb.from('weather_location').select('lat, lon').limit(1).maybeSingle();
+        if (error || !data || data.lat == null || data.lon == null) {
             setStatus('Could not read weather_location' + (error ? ' (' + error.message + ')' : '') + '. Enter coordinates above.', true);
             return;
         }
-        const lat = +data.lat, lon = +data.long;
+        const lat = +data.lat, lon = +data.lon;
         $('lat').value = lat.toFixed(5); $('lon').value = lon.toFixed(5);
         search(lat, lon);
     }
