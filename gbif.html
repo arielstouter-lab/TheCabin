@@ -9,15 +9,15 @@
     <script src="app.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Point this at your app's stylesheet -->
     <style>
-        /* Only what the shared stylesheet doesn't cover, built from its tokens */
         .sp-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
         .sp-thumbs img { width: 72px; height: 72px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--line); display: block; }
         .sp-recs { display: flex; flex-direction: column; }
         .sp-recs .compact-list { margin-bottom: 4px; }
         .sp-recs a { color: var(--primary); font-weight: 600; white-space: nowrap; }
         .sp-sci { font-style: italic; }
+        .sp-years { display: flex; flex-wrap: wrap; gap: 4px; }
+        .sp-years .badge { margin-left: 0; }
         .coord-input { width: 110px; flex: 0 0 auto; }
     </style>
 </head>
@@ -30,7 +30,7 @@
     <header class="topbar">
         <div>
             <h1>Nearby Sightings</h1>
-            <p>Species reported around the house, from GBIF</p>
+            <p>Species reported around the house at this time of year, from GBIF</p>
         </div>
     </header>
 
@@ -40,16 +40,22 @@
                 <h2 class="card-title">Search</h2>
             </div>
             <div class="add-item">
+                <select id="window" aria-label="Date window">
+                    <option value="week" selected>This week (7 days to today)</option>
+                    <option value="around">Around today (±3 days)</option>
+                    <option value="month">This month</option>
+                </select>
+                <select id="years" aria-label="Years">
+                    <option value="3">Past 3 years</option>
+                    <option value="5">Past 5 years</option>
+                    <option value="10" selected>Past 10 years</option>
+                    <option value="20">Past 20 years</option>
+                </select>
                 <select id="radius" aria-label="Radius">
                     <option value="2">2 km</option>
                     <option value="5" selected>5 km</option>
                     <option value="10">10 km</option>
                     <option value="25">25 km</option>
-                </select>
-                <select id="days" aria-label="Date range">
-                    <option value="7" selected>Last 7 days</option>
-                    <option value="14">Last 14 days</option>
-                    <option value="30">Last 30 days</option>
                 </select>
                 <label class="lst-priority-toggle"><input type="checkbox" id="imgOnly"> With images only</label>
             </div>
@@ -60,6 +66,7 @@
                 <button class="button-inline button-ghost" id="go">Use device location</button>
             </div>
             <div id="status" class="note"></div>
+            <div id="yearSummary" class="note"></div>
         </section>
 
         <div id="results" class="summary-grid"></div>
@@ -70,6 +77,7 @@
     const API = 'https://api.gbif.org/v1/occurrence/search';
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const iso = d => d.toISOString().slice(0, 10);
 
     function setStatus(msg, isError) {
         const el = $('status');
@@ -92,62 +100,97 @@
         return `POLYGON((${w} ${s},${e} ${s},${e} ${n},${w} ${n},${w} ${s}))`;
     }
 
-    const iso = d => d.toISOString().slice(0, 10);
+    // The same calendar window, anchored to a given year
+    function windowFor(kind, year) {
+        const now = new Date(), m = now.getMonth(), d = now.getDate();
+        let s, e;
+        if (kind === 'month') {
+            s = new Date(Date.UTC(year, m, 1));
+            e = new Date(Date.UTC(year, m + 1, 0));
+        } else {
+            const back = kind === 'around' ? 3 : 6, fwd = kind === 'around' ? 3 : 0;
+            s = new Date(Date.UTC(year, m, d - back));
+            e = new Date(Date.UTC(year, m, d + fwd));
+        }
+        return `${iso(s)},${iso(e)}`;
+    }
 
-    async function fetchAll(params, maxPages = 4) {
-        const out = [];
+    async function fetchYear(year, base, kind, maxPages = 2) {
+        const params = new URLSearchParams(base);
+        params.set('eventDate', windowFor(kind, year));
+        const recs = [];
+        let capped = false;
         for (let p = 0; p < maxPages; p++) {
             const res = await fetch(`${API}?${params}&limit=300&offset=${p * 300}`);
             if (!res.ok) throw new Error('GBIF returned ' + res.status);
             const data = await res.json();
-            out.push(...data.results);
+            recs.push(...data.results.map(r => ({ ...r, _year: year })));
             if (data.endOfRecords) break;
+            if (p === maxPages - 1) capped = true;
         }
-        return out;
+        return { year, recs, capped };
     }
 
     async function search(lat, lon) {
-        const km = +$('radius').value, days = +$('days').value;
-        const end = new Date(), start = new Date(Date.now() - days * 864e5);
-        const q = new URLSearchParams({
+        const km = +$('radius').value, kind = $('window').value, n = +$('years').value;
+        const thisYear = new Date().getFullYear();
+        const years = Array.from({ length: n }, (_, i) => thisYear - i);
+        const base = {
             geometry: boxWkt(lat, lon, km),
-            eventDate: `${iso(start)},${iso(end)}`,
             occurrenceStatus: 'PRESENT',
             hasCoordinate: 'true'
-        });
-        if ($('imgOnly').checked) q.set('mediaType', 'StillImage');
-        setStatus('Searching GBIF…');
+        };
+        if ($('imgOnly').checked) base.mediaType = 'StillImage';
+        setStatus('Searching GBIF across ' + n + ' years…');
+        $('yearSummary').textContent = '';
         $('results').innerHTML = '';
         try {
-            render(await fetchAll(q.toString()), lat, lon, km);
+            const perYear = await Promise.all(years.map(y => fetchYear(y, base, kind)));
+            render(perYear, lat, lon, km, thisYear);
         } catch (e) {
             setStatus('Error: ' + e.message, true);
         }
     }
 
-    function render(recs, lat, lon, km) {
-        recs = recs.filter(r => r.decimalLatitude != null &&
-            haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude) <= km);
+    function render(perYear, lat, lon, km, thisYear) {
+        const yearCounts = new Map();
         const groups = new Map();
-        for (const r of recs) {
-            const key = r.speciesKey || r.taxonKey || r.scientificName;
-            if (!groups.has(key)) groups.set(key, { name: r.species || r.scientificName, common: r.vernacularName, group: r.class || r.kingdom, recs: [] });
-            const g = groups.get(key);
-            g.common = g.common || r.vernacularName;
-            g.recs.push(r);
+        let total = 0, anyCapped = false;
+        for (const { year, recs, capped } of perYear) {
+            anyCapped = anyCapped || capped;
+            const near = recs.filter(r => r.decimalLatitude != null &&
+                haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude) <= km);
+            yearCounts.set(year, near.length);
+            total += near.length;
+            for (const r of near) {
+                const key = r.speciesKey || r.taxonKey || r.scientificName;
+                if (!groups.has(key)) groups.set(key, { name: r.species || r.scientificName, common: r.vernacularName, group: r.class || r.kingdom, recs: [] });
+                const g = groups.get(key);
+                g.common = g.common || r.vernacularName;
+                g.recs.push(r);
+            }
         }
+        $('yearSummary').textContent = 'Records per year: ' +
+            [...yearCounts].map(([y, c]) => `${y}: ${c}`).join(' · ') +
+            (anyCapped ? ' (some years capped at 600 records; narrow the radius or window)' : '');
+
         const list = [...groups.values()].sort((a, b) => b.recs.length - a.recs.length);
         if (!list.length) {
             setStatus('');
-            $('results').innerHTML = '<p class="empty-state">No reports in this area and date range. Try a wider radius or more days.</p>';
+            $('results').innerHTML = '<p class="empty-state">No reports in this area and window. Try a wider radius or more years.</p>';
             return;
         }
-        setStatus(`${recs.length} records, ${list.length} taxa within ${km} km` +
-            (recs.length >= 1200 ? ' (capped at 1,200 records; narrow the radius or dates)' : ''));
+        setStatus(`${total} records, ${list.length} taxa within ${km} km`);
+
         $('results').innerHTML = list.map(g => {
+            g.recs.sort((a, b) => (b.eventDate || '').localeCompare(a.eventDate || ''));
+            const byYear = new Map();
+            g.recs.forEach(r => byYear.set(r._year, (byYear.get(r._year) || 0) + 1));
+            const yearBadges = [...byYear].sort((a, b) => b[0] - a[0])
+                .map(([y, c]) => `<span class="badge ${y === thisYear ? 'a' : 'b'}">${y} · ${c}</span>`).join('');
             const imgs = g.recs.flatMap(r => (r.media || [])
                 .filter(m => m.type === 'StillImage' && m.identifier)
-                .map(m => ({ src: m.identifier })));
+                .map(m => ({ src: m.identifier, year: r._year })));
             const rows = g.recs.slice(0, 5).map(r => {
                 const d = haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude).toFixed(1);
                 return `<div class="compact-list">
@@ -156,7 +199,7 @@
       </div>`;
             }).join('');
             const thumbs = imgs.slice(0, 6).map(i =>
-                `<a href="${esc(i.src)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" src="${esc(i.src)}" alt=""></a>`).join('');
+                `<a href="${esc(i.src)}" target="_blank" rel="noopener noreferrer" title="${i.year}"><img loading="lazy" src="${esc(i.src)}" alt=""></a>`).join('');
             return `<article class="card-row">
       <div>
         <strong class="card-title">${esc(g.common || g.name)}</strong>
@@ -165,8 +208,9 @@
       <div class="card-actions">
         <span class="chip">${g.recs.length} record${g.recs.length > 1 ? 's' : ''}</span>
         ${imgs.length ? `<span class="chip" data-kind="aisle" style="margin-left:0">${imgs.length} image${imgs.length > 1 ? 's' : ''}</span>` : ''}
-        ${g.group ? `<span class="badge a">${esc(g.group)}</span>` : ''}
+        ${g.group ? `<span class="badge a" style="margin-left:0">${esc(g.group)}</span>` : ''}
       </div>
+      <div class="sp-years">${yearBadges}</div>
       ${thumbs ? `<div class="sp-thumbs">${thumbs}</div>` : ''}
       <div class="sp-recs">${rows}${g.recs.length > 5 ? `<div class="note">+ ${g.recs.length - 5} more</div>` : ''}</div>
     </article>`;
@@ -176,12 +220,12 @@
     async function loadHouse() {
         const sb = window.supabaseClient;
         setStatus('Loading house location…');
-        const { data, error } = await sb.from('weather_location').select('lat, lon').limit(1).maybeSingle();
-        if (error || !data || data.lat == null || data.lon == null) {
+        const { data, error } = await sb.from('weather_location').select('lat, long').limit(1).maybeSingle();
+        if (error || !data || data.lat == null || data.long == null) {
             setStatus('Could not read weather_location' + (error ? ' (' + error.message + ')' : '') + '. Enter coordinates above.', true);
             return;
         }
-        const lat = +data.lat, lon = +data.lon;
+        const lat = +data.lat, lon = +data.long;
         $('lat').value = lat.toFixed(5); $('lon').value = lon.toFixed(5);
         search(lat, lon);
     }
@@ -191,7 +235,7 @@
         if (isNaN(lat) || isNaN(lon)) { setStatus('Enter valid coordinates.', true); return; }
         search(lat, lon);
     };
-    ['radius', 'days', 'imgOnly'].forEach(id => $(id).addEventListener('change', () => $('manual').click()));
+    ['window', 'years', 'radius', 'imgOnly'].forEach(id => $(id).addEventListener('change', () => $('manual').click()));
 
     $('go').onclick = () => {
         if (!navigator.geolocation) { setStatus('Geolocation not supported.', true); return; }
