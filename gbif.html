@@ -41,10 +41,10 @@
                     <option value="20">Past 20 years</option>
                 </select>
                 <select id="radius" aria-label="Radius">
-                    <option value="2" selected>2 km</option>
-                    <option value="5">5 km</option>
-                    <option value="10">10 km</option>
-                    <option value="25">25 km</option>
+                    <option value="0.804672" selected>.5 mile</option>
+                    <option value="1.609344">1 mile</option>
+                    <option value="3.218688">2 miles</option>
+                    <option value="8.04672">5 miles</option>
                 </select>
                 <label class="lst-priority-toggle"><input type="checkbox" id="imgOnly"> With images only</label>
             </div>
@@ -79,6 +79,10 @@
         const dLat = r(c - a), dLon = r(d - b);
         const h = Math.sin(dLat/2)**2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dLon/2)**2;
         return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    function kmToMiles(km) {
+        return km * 0.621371;
     }
 
     // Bounding-box WKT, counter-clockwise (GBIF requires this winding)
@@ -169,7 +173,7 @@
             $('results').innerHTML = '<p class="empty-state">No reports in this area and window. Try a wider radius or more years.</p>';
             return;
         }
-        setStatus(`${total} records, ${list.length} taxa within ${km} km`);
+        setStatus(`${total} records, ${list.length} taxa within ${kmToMiles(km).toFixed(1)} km`);
 
         $('results').innerHTML = list.map(g => {
             g.recs.sort((a, b) => (b.eventDate || '').localeCompare(a.eventDate || ''));
@@ -181,9 +185,9 @@
                 .filter(m => m.type === 'StillImage' && m.identifier)
                 .map(m => ({ src: m.identifier, year: r._year })));
             const rows = g.recs.slice(0, 5).map(r => {
-                const d = haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude).toFixed(1);
+                const d = kmToMiles(haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude)).toFixed(1);
                 return `<div class="compact-list">
-        <span>${esc((r.eventDate || '').slice(0, 10))} · ${d} km</span>
+        <span>${esc((r.eventDate || '').slice(0, 10))} · ${d} mi</span>
         <a href="https://www.gbif.org/occurrence/${r.key}" target="_blank" rel="noopener">GBIF record</a>
       </div>`;
             }).join('');
