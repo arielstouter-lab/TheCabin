@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nearby Sightings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Point this at your app's stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Only what the shared stylesheet doesn't cover, built from its tokens */
+        .sp-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+        .sp-thumbs img { width: 72px; height: 72px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--line); display: block; }
+        .sp-recs { display: flex; flex-direction: column; }
+        .sp-recs .compact-list { margin-bottom: 4px; }
+        .sp-recs a { color: var(--primary); font-weight: 600; white-space: nowrap; }
+        .sp-sci { font-style: italic; }
+        .coord-input { width: 110px; flex: 0 0 auto; }
+    </style>
+</head>
+<body>
+<main class="main-content">
+    <header class="topbar">
+        <div>
+            <h1>Nearby Sightings</h1>
+            <p>Species reported around the house, from GBIF</p>
+        </div>
+    </header>
+
+    <div class="content">
+        <section class="card">
+            <div class="card-head">
+                <h2 class="card-title">Search</h2>
+            </div>
+            <div class="add-item">
+                <select id="radius" aria-label="Radius">
+                    <option value="2">2 km</option>
+                    <option value="5" selected>5 km</option>
+                    <option value="10">10 km</option>
+                    <option value="25">25 km</option>
+                </select>
+                <select id="days" aria-label="Date range">
+                    <option value="7" selected>Last 7 days</option>
+                    <option value="14">Last 14 days</option>
+                    <option value="30">Last 30 days</option>
+                </select>
+                <label class="lst-priority-toggle"><input type="checkbox" id="imgOnly"> With images only</label>
+            </div>
+            <div class="add-item">
+                <input id="lat" class="text-input coord-input" type="number" step="any" placeholder="Lat">
+                <input id="lon" class="text-input coord-input" type="number" step="any" placeholder="Lon">
+                <button class="button-inline" id="manual">Search</button>
+                <button class="button-inline button-ghost" id="go">Use device location</button>
+            </div>
+            <div id="status" class="note"></div>
+        </section>
+
+        <div id="results" class="summary-grid"></div>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+    // If your app already creates a Supabase client, delete these two lines and reuse that one as `sb`.
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL', SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const API = 'https://api.gbif.org/v1/occurrence/search';
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function setStatus(msg, isError) {
+        const el = $('status');
+        el.className = isError ? 'form-error' : 'note';
+        el.textContent = msg;
+    }
+
+    function haversineKm(a, b, c, d) {
+        const R = 6371, r = x => x * Math.PI / 180;
+        const dLat = r(c - a), dLon = r(d - b);
+        const h = Math.sin(dLat/2)**2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dLon/2)**2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    // Bounding-box WKT, counter-clockwise (GBIF requires this winding)
+    function boxWkt(lat, lon, km) {
+        const dLat = km / 111.32;
+        const dLon = km / (111.32 * Math.cos(lat * Math.PI / 180));
+        const w = lon - dLon, e = lon + dLon, s = lat - dLat, n = lat + dLat;
+        return `POLYGON((${w} ${s},${e} ${s},${e} ${n},${w} ${n},${w} ${s}))`;
+    }
+
+    const iso = d => d.toISOString().slice(0, 10);
+
+    async function fetchAll(params, maxPages = 4) {
+        const out = [];
+        for (let p = 0; p < maxPages; p++) {
+            const res = await fetch(`${API}?${params}&limit=300&offset=${p * 300}`);
+            if (!res.ok) throw new Error('GBIF returned ' + res.status);
+            const data = await res.json();
+            out.push(...data.results);
+            if (data.endOfRecords) break;
+        }
+        return out;
+    }
+
+    async function search(lat, lon) {
+        const km = +$('radius').value, days = +$('days').value;
+        const end = new Date(), start = new Date(Date.now() - days * 864e5);
+        const q = new URLSearchParams({
+            geometry: boxWkt(lat, lon, km),
+            eventDate: `${iso(start)},${iso(end)}`,
+            occurrenceStatus: 'PRESENT',
+            hasCoordinate: 'true'
+        });
+        if ($('imgOnly').checked) q.set('mediaType', 'StillImage');
+        setStatus('Searching GBIF…');
+        $('results').innerHTML = '';
+        try {
+            render(await fetchAll(q.toString()), lat, lon, km);
+        } catch (e) {
+            setStatus('Error: ' + e.message, true);
+        }
+    }
+
+    function render(recs, lat, lon, km) {
+        recs = recs.filter(r => r.decimalLatitude != null &&
+            haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude) <= km);
+        const groups = new Map();
+        for (const r of recs) {
+            const key = r.speciesKey || r.taxonKey || r.scientificName;
+            if (!groups.has(key)) groups.set(key, { name: r.species || r.scientificName, common: r.vernacularName, group: r.class || r.kingdom, recs: [] });
+            const g = groups.get(key);
+            g.common = g.common || r.vernacularName;
+            g.recs.push(r);
+        }
+        const list = [...groups.values()].sort((a, b) => b.recs.length - a.recs.length);
+        if (!list.length) {
+            setStatus('');
+            $('results').innerHTML = '<p class="empty-state">No reports in this area and date range. Try a wider radius or more days.</p>';
+            return;
+        }
+        setStatus(`${recs.length} records, ${list.length} taxa within ${km} km` +
+            (recs.length >= 1200 ? ' (capped at 1,200 records; narrow the radius or dates)' : ''));
+        $('results').innerHTML = list.map(g => {
+            const imgs = g.recs.flatMap(r => (r.media || [])
+                .filter(m => m.type === 'StillImage' && m.identifier)
+                .map(m => ({ src: m.identifier })));
+            const rows = g.recs.slice(0, 5).map(r => {
+                const d = haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude).toFixed(1);
+                return `<div class="compact-list">
+        <span>${esc((r.eventDate || '').slice(0, 10))} · ${d} km</span>
+        <a href="https://www.gbif.org/occurrence/${r.key}" target="_blank" rel="noopener">GBIF record</a>
+      </div>`;
+            }).join('');
+            const thumbs = imgs.slice(0, 6).map(i =>
+                `<a href="${esc(i.src)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" src="${esc(i.src)}" alt=""></a>`).join('');
+            return `<article class="card-row">
+      <div>
+        <strong class="card-title">${esc(g.common || g.name)}</strong>
+        ${g.common ? `<div class="note sp-sci">${esc(g.name)}</div>` : ''}
+      </div>
+      <div class="card-actions">
+        <span class="chip">${g.recs.length} record${g.recs.length > 1 ? 's' : ''}</span>
+        ${imgs.length ? `<span class="chip" data-kind="aisle" style="margin-left:0">${imgs.length} image${imgs.length > 1 ? 's' : ''}</span>` : ''}
+        ${g.group ? `<span class="badge a">${esc(g.group)}</span>` : ''}
+      </div>
+      ${thumbs ? `<div class="sp-thumbs">${thumbs}</div>` : ''}
+      <div class="sp-recs">${rows}${g.recs.length > 5 ? `<div class="note">+ ${g.recs.length - 5} more</div>` : ''}</div>
+    </article>`;
+        }).join('');
+    }
+
+    async function loadHouse() {
+        setStatus('Loading house location…');
+        const { data, error } = await sb.from('weather_location').select('lat, long').limit(1).maybeSingle();
+        if (error || !data || data.lat == null || data.long == null) {
+            setStatus('Could not read weather_location' + (error ? ' (' + error.message + ')' : '') + '. Enter coordinates above.', true);
+            return;
+        }
+        const lat = +data.lat, lon = +data.long;
+        $('lat').value = lat.toFixed(5); $('lon').value = lon.toFixed(5);
+        search(lat, lon);
+    }
+
+    $('manual').onclick = () => {
+        const lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
+        if (isNaN(lat) || isNaN(lon)) { setStatus('Enter valid coordinates.', true); return; }
+        search(lat, lon);
+    };
+    ['radius', 'days', 'imgOnly'].forEach(id => $(id).addEventListener('change', () => $('manual').click()));
+
+    $('go').onclick = () => {
+        if (!navigator.geolocation) { setStatus('Geolocation not supported.', true); return; }
+        setStatus('Getting your location…');
+        navigator.geolocation.getCurrentPosition(
+            p => { $('lat').value = p.coords.latitude.toFixed(5); $('lon').value = p.coords.longitude.toFixed(5); search(p.coords.latitude, p.coords.longitude); },
+            e => setStatus('Location failed (' + e.message + '). Enter coordinates above.', true),
+            { timeout: 15000 }
+        );
+    };
+
+    loadHouse();
+</script>
+</body>
+</html>
