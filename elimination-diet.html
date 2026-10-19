@@ -42,6 +42,7 @@
                 <button type="button" class="tab" data-tab="meals"><span>Meals</span></button>
                 <button type="button" class="tab" data-tab="symptoms"><span>Symptoms</span></button>
                 <button type="button" class="tab" data-tab="ingredients"><span>Ingredients</span></button>
+                <button type="button" class="tab" data-tab="predictions"><span>Predictions</span></button>
             </div>
 
             <!-- Tab 1: Timeline -->
@@ -172,6 +173,66 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tab 5: Predictions -->
+            <div id="tab-predictions" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Likely Triggers</h2>
+                        <span class="note">Compares what you ate before each symptom with what you ate at the same time of day on other days</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="cc-add-form">
+                            <div class="picker">
+                                <label for="predGroup">Look at</label>
+                                <select class="text-input" id="predGroup">
+                                    <option value="tags">Tags (gluten, dairy, ...)</option>
+                                    <option value="ingredients">Individual ingredients</option>
+                                </select>
+                            </div>
+                            <div class="picker">
+                                <label for="predWindow">Eaten within</label>
+                                <select class="text-input" id="predWindow">
+                                    <option value="6">6 hours before</option>
+                                    <option value="12">12 hours before</option>
+                                    <option value="24" selected>24 hours before</option>
+                                    <option value="48">48 hours before</option>
+                                    <option value="72">72 hours before</option>
+                                </select>
+                            </div>
+                            <div class="picker">
+                                <label for="predSymptom">Symptom</label>
+                                <select class="text-input" id="predSymptom"><option value="">All symptoms</option></select>
+                            </div>
+                            <div class="picker">
+                                <label for="predSeverity">Minimum severity</label>
+                                <input type="number" class="text-input" id="predSeverity" min="1" max="10" value="1" />
+                            </div>
+                        </div>
+
+                        <p id="predSummary" class="note"></p>
+                        <p id="predEmpty" class="empty-state" hidden></p>
+
+                        <div class="table-wrap" id="predTableWrap" hidden>
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Food / tag</th>
+                                    <th>Signal</th>
+                                    <th class="col-num" title="Symptom events where it was eaten in the window before">Before symptoms</th>
+                                    <th class="col-num" title="Same time of day on other days with no symptom">Other days</th>
+                                    <th class="col-num" title="How much more often it appears before symptoms than at other times">Ratio</th>
+                                </tr>
+                                </thead>
+                                <tbody id="predBody"></tbody>
+                            </table>
+                        </div>
+
+                        <p class="note">This finds patterns, not proof. Foods eaten together (a pasta dish with cheese) can share the blame, and gaps in logging skew the results. Use it to pick one suspect to remove or re-test, and review the results with a clinician or dietitian. A ratio of 1&times; means no difference; below 1&times; means it was eaten less often before symptoms.</p>
+                    </div>
+                </div>
+            </div>
+
         </section>
     </main>
 </div>
