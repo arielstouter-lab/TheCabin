@@ -68,6 +68,7 @@
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const iso = d => d.toISOString().slice(0, 10);
 
+
     function setStatus(msg, isError) {
         const el = $('status');
         el.className = isError ? 'form-error' : 'note';
@@ -148,6 +149,138 @@
         }
     }
 
+    function renderSpeciesCard(g) {
+        g.recs.sort((a, b) =>
+            (b.eventDate || '').localeCompare(a.eventDate || '')
+        );
+
+        const byYear = new Map();
+
+        g.recs.forEach(r => {
+            byYear.set(
+                r._year,
+                (byYear.get(r._year) || 0) + 1
+            );
+        });
+
+        const yearBadges = [...byYear]
+            .sort((a, b) => b[0] - a[0])
+            .map(([y, c]) =>
+                `<span class="badge b">${y} · ${c}</span>`
+            )
+            .join('');
+
+        const imgs = g.recs.flatMap(r =>
+            (r.media || [])
+                .filter(m => m.type === 'StillImage' && m.identifier)
+                .map(m => ({
+                    src: m.identifier,
+                    year: r._year
+                }))
+        );
+
+        const rows = g.recs.slice(0, 5).map(r => {
+
+                const miles = kmToMiles(
+                    haversineKm(
+                        parseFloat($('lat').value),
+                        parseFloat($('lon').value),
+                        r.decimalLatitude,
+                        r.decimalLongitude
+                    )
+                ).toFixed(1);
+
+                return `
+                <div class="compact-list">
+                    <span>
+                        ${(r.eventDate || '').slice(0, 10)}
+                        · ${miles} mi
+                    </span>
+                    <a
+                        href="https://www.gbif.org/occurrence/${r.key}"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        GBIF record
+                    </a>
+                </div>
+            `;
+            })
+            .join('');
+
+        const thumbs = imgs
+            .slice(0, 6)
+            .map(i => `
+            <a
+                href="${esc(i.src)}"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="${i.year}"
+            >
+                <img
+                    loading="lazy"
+                    src="${esc(i.src)}"
+                    alt=""
+                >
+            </a>
+        `)
+            .join('');
+
+        return `
+        <article class="card-row">
+            <div>
+                <strong class="card-title">
+                    ${esc(g.common || g.name)}
+                </strong>
+
+                ${g.common
+            ? `<div class="note sp-sci">${esc(g.name)}</div>`
+            : ''
+        }
+            </div>
+
+            <div class="card-actions">
+                <span class="chip">
+                    ${g.recs.length}
+                    record${g.recs.length !== 1 ? 's' : ''}
+                </span>
+
+                ${imgs.length
+            ? `
+                    <span class="chip" data-kind="aisle">
+                        ${imgs.length}
+                        image${imgs.length !== 1 ? 's' : ''}
+                    </span>
+                    `
+            : ''
+        }
+            </div>
+
+            <div class="sp-years">
+                ${yearBadges}
+            </div>
+
+            ${thumbs
+            ? `<div class="sp-thumbs">${thumbs}</div>`
+            : ''
+        }
+
+            <div class="sp-recs">
+                ${rows}
+
+                ${g.recs.length > 5
+            ? `
+                    <div class="note">
+                        + ${g.recs.length - 5} more
+                    </div>
+                    `
+            : ''
+        }
+            </div>
+        </article>
+    `;
+    }
+
     function render(perYear, lat, lon, km, thisYear) {
         const yearCounts = new Map();
         const groups = new Map();
@@ -160,7 +293,7 @@
             total += near.length;
             for (const r of near) {
                 const key = r.speciesKey || r.taxonKey || r.scientificName;
-                if (!groups.has(key)) groups.set(key, { name: r.species || r.scientificName, common: r.vernacularName, group: r.class || r.kingdom, recs: [] });
+                if (!groups.has(key)) groups.set(key, { name: r.species || r.scientificName, common: r.vernacularName, kingdom: r.kingdom, class: r.class, recs: [] });
                 const g = groups.get(key);
                 g.common = g.common || r.vernacularName;
                 g.recs.push(r);
@@ -176,41 +309,62 @@
             $('results').innerHTML = '<p class="empty-state">No reports in this area and window. Try a wider radius or more years.</p>';
             return;
         }
-        setStatus(`${total} records, ${list.length} taxa within ${kmToMiles(km).toFixed(1)} km`);
+        setStatus(`${total} records, ${list.length} taxa within ${kmToMiles(km).toFixed(1)} miles`);
 
-        $('results').innerHTML = list.map(g => {
-            g.recs.sort((a, b) => (b.eventDate || '').localeCompare(a.eventDate || ''));
-            const byYear = new Map();
-            g.recs.forEach(r => byYear.set(r._year, (byYear.get(r._year) || 0) + 1));
-            const yearBadges = [...byYear].sort((a, b) => b[0] - a[0])
-                .map(([y, c]) => `<span class="badge ${y === thisYear ? 'a' : 'b'}">${y} · ${c}</span>`).join('');
-            const imgs = g.recs.flatMap(r => (r.media || [])
-                .filter(m => m.type === 'StillImage' && m.identifier)
-                .map(m => ({ src: m.identifier, year: r._year })));
-            const rows = g.recs.slice(0, 5).map(r => {
-                const d = kmToMiles(haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude)).toFixed(1);
-                return `<div class="compact-list">
-        <span>${esc((r.eventDate || '').slice(0, 10))} · ${d} mi</span>
-        <a href="https://www.gbif.org/occurrence/${r.key}" target="_blank" rel="noopener">GBIF record</a>
-      </div>`;
-            }).join('');
-            const thumbs = imgs.slice(0, 6).map(i =>
-                `<a href="${esc(i.src)}" target="_blank" rel="noopener noreferrer" title="${i.year}"><img loading="lazy" src="${esc(i.src)}" alt=""></a>`).join('');
-            return `<article class="card-row">
-      <div>
-        <strong class="card-title">${esc(g.common || g.name)}</strong>
-        ${g.common ? `<div class="note sp-sci">${esc(g.name)}</div>` : ''}
-      </div>
-      <div class="card-actions">
-        <span class="chip">${g.recs.length} record${g.recs.length > 1 ? 's' : ''}</span>
-        ${imgs.length ? `<span class="chip" data-kind="aisle" style="margin-left:0">${imgs.length} image${imgs.length > 1 ? 's' : ''}</span>` : ''}
-        ${g.group ? `<span class="badge a" style="margin-left:0">${esc(g.group)}</span>` : ''}
-      </div>
-      <div class="sp-years">${yearBadges}</div>
-      ${thumbs ? `<div class="sp-thumbs">${thumbs}</div>` : ''}
-      <div class="sp-recs">${rows}${g.recs.length > 5 ? `<div class="note">+ ${g.recs.length - 5} more</div>` : ''}</div>
-    </article>`;
-        }).join('');
+        const taxonomy = new Map();
+
+        for (const species of groups.values()) {
+            const kingdom = species.kingdom || 'Unknown';
+            const taxClass = species.class || 'Unknown';
+
+            if (!taxonomy.has(kingdom)) {
+                taxonomy.set(kingdom, new Map());
+            }
+
+            const classMap = taxonomy.get(kingdom);
+
+            if (!classMap.has(taxClass)) {
+                classMap.set(taxClass, []);
+            }
+
+            classMap.get(taxClass).push(species);
+        }
+
+        $('results').innerHTML =
+            [...taxonomy.entries()]
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([kingdom, classes]) => {
+
+                    const kingdomCount =
+                        [...classes.values()]
+                            .reduce((sum, arr) => sum + arr.length, 0);
+
+                    return `
+                <details class="card kingdom-group">
+                    <summary>
+                        <strong>${esc(kingdom)}</strong>
+                        <span class="chip">${kingdomCount} taxa</span>
+                    </summary>
+
+                    ${[...classes.entries()]
+                        .sort((a, b) => a[0].localeCompare(b[0]))
+                        .map(([taxClass, species]) => `
+                            <details class="class-group">
+                                <summary>
+                                    <strong>${esc(taxClass)}</strong>
+                                    <span class="chip">${species.length} taxa</span>
+                                </summary>
+
+                                ${species
+                            .sort((a, b) => b.recs.length - a.recs.length)
+                            .map(g => renderSpeciesCard(g))
+                            .join('')}
+                            </details>
+                        `).join('')}
+                </details>
+            `;
+                })
+                .join('');
     }
 
     async function loadHouse() {
