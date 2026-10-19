@@ -1065,8 +1065,6 @@ body.cal-page {
 .sp-recs .compact-list { margin-bottom: 4px; }
 .sp-recs a { color: var(--primary); font-weight: 600; white-space: nowrap; }
 .sp-sci { font-style: italic; }
-.sp-years { display: flex; flex-wrap: wrap; gap: 4px; }
-.sp-years .badge { margin-left: 0; }
 
 /* 7. OVERLAYS & PORTALS */
 .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; max-width: 380px; width: calc(100% - 48px); pointer-events: none; }

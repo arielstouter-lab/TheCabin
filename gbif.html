@@ -9,17 +9,6 @@
     <script src="app.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        .sp-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
-        .sp-thumbs img { width: 72px; height: 72px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--line); display: block; }
-        .sp-recs { display: flex; flex-direction: column; }
-        .sp-recs .compact-list { margin-bottom: 4px; }
-        .sp-recs a { color: var(--primary); font-weight: 600; white-space: nowrap; }
-        .sp-sci { font-style: italic; }
-        .sp-years { display: flex; flex-wrap: wrap; gap: 4px; }
-        .sp-years .badge { margin-left: 0; }
-        .coord-input { width: 110px; flex: 0 0 auto; }
-    </style>
 </head>
 <body class="app-page">
 <main class="main-content">
@@ -210,7 +199,7 @@
         ${imgs.length ? `<span class="chip" data-kind="aisle" style="margin-left:0">${imgs.length} image${imgs.length > 1 ? 's' : ''}</span>` : ''}
         ${g.group ? `<span class="badge a" style="margin-left:0">${esc(g.group)}</span>` : ''}
       </div>
-      <div class="sp-years">${yearBadges}</div>
+      <div class="sp-thumbs">${yearBadges}</div>
       ${thumbs ? `<div class="sp-thumbs">${thumbs}</div>` : ''}
       <div class="sp-recs">${rows}${g.recs.length > 5 ? `<div class="note">+ ${g.recs.length - 5} more</div>` : ''}</div>
     </article>`;
