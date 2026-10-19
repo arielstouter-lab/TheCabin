@@ -199,7 +199,7 @@
         ${imgs.length ? `<span class="chip" data-kind="aisle" style="margin-left:0">${imgs.length} image${imgs.length > 1 ? 's' : ''}</span>` : ''}
         ${g.group ? `<span class="badge a" style="margin-left:0">${esc(g.group)}</span>` : ''}
       </div>
-      <div class="sp-thumbs">${yearBadges}</div>
+      <div class="sp-years">${yearBadges}</div>
       ${thumbs ? `<div class="sp-thumbs">${thumbs}</div>` : ''}
       <div class="sp-recs">${rows}${g.recs.length > 5 ? `<div class="note">+ ${g.recs.length - 5} more</div>` : ''}</div>
     </article>`;
