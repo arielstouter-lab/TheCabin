@@ -1058,6 +1058,16 @@ body.cal-page {
   border: 1px solid rgba(0,0,0,.1);
 }
 
+/* GBIF */
+.sp-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-thumbs img { width: 72px; height: 72px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--line); display: block; }
+.sp-recs { display: flex; flex-direction: column; }
+.sp-recs .compact-list { margin-bottom: 4px; }
+.sp-recs a { color: var(--primary); font-weight: 600; white-space: nowrap; }
+.sp-sci { font-style: italic; }
+.sp-years { display: flex; flex-wrap: wrap; gap: 4px; }
+.sp-years .badge { margin-left: 0; }
+
 /* 7. OVERLAYS & PORTALS */
 .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; max-width: 380px; width: calc(100% - 48px); pointer-events: none; }
 

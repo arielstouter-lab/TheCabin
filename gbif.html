@@ -41,8 +41,8 @@
             </div>
             <div class="add-item">
                 <select id="window" aria-label="Date window">
-                    <option value="week" selected>This week (7 days to today)</option>
-                    <option value="around">Around today (±3 days)</option>
+                    <option value="week">This week (7 days to today)</option>
+                    <option value="around" selected>Around today (±3 days)</option>
                     <option value="month">This month</option>
                 </select>
                 <select id="years" aria-label="Years">
@@ -52,16 +52,16 @@
                     <option value="20">Past 20 years</option>
                 </select>
                 <select id="radius" aria-label="Radius">
-                    <option value="2">2 km</option>
-                    <option value="5" selected>5 km</option>
+                    <option value="2" selected>2 km</option>
+                    <option value="5">5 km</option>
                     <option value="10">10 km</option>
                     <option value="25">25 km</option>
                 </select>
                 <label class="lst-priority-toggle"><input type="checkbox" id="imgOnly"> With images only</label>
             </div>
             <div class="add-item">
-                <input id="lat" class="text-input coord-input" type="number" step="any" placeholder="Lat">
-                <input id="lon" class="text-input coord-input" type="number" step="any" placeholder="Lon">
+                <input id="lat" class="text-input" type="number" step="any" placeholder="Lat">
+                <input id="lon" class="text-input" type="number" step="any" placeholder="Lon">
                 <button class="button-inline" id="manual">Search</button>
                 <button class="button-inline button-ghost" id="go">Use device location</button>
             </div>
