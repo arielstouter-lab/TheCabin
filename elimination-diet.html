@@ -47,6 +47,16 @@
 
             <!-- Tab 1: Timeline -->
             <div id="tab-timeline" class="tab-pane">
+                <div class="card" id="attentionCard" hidden>
+                    <div class="card-head">
+                        <h2 class="card-title">Needs attention</h2>
+                        <span class="note">Last 7 days. Filling these in makes predictions more reliable.</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="attentionList"></div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Timeline</h2>
@@ -63,7 +73,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title" id="mealFormTitle">Log a Meal</h2>
-                        <span class="note">Pick frequent ingredients, type any ingredient, or add everything from a recipe</span>
+                        <span class="note">Pick frequent ingredients, type any ingredient, or add everything from a recipe. Tick "Meal not eaten" to record a skipped meal.</span>
                     </div>
                     <div class="card-body">
                         <form id="mealForm" class="cc-add-form">
@@ -71,6 +81,7 @@
                                 <input type="datetime-local" class="text-input" id="mealWhen" required />
                                 <input type="text" class="text-input" id="mealLabel" placeholder="Meal (e.g. Lunch)" />
                                 <input type="text" class="text-input note" id="mealNotes" placeholder="Notes (optional)" />
+                                <label class="note"><input type="checkbox" id="mealSkipped" /> Meal not eaten</label>
                             </div>
                             <div id="mealPicker" class="diet-picker"></div>
                             <button type="submit" class="button-inline" id="mealSubmit">Add meal</button>
@@ -94,11 +105,15 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title" id="symFormTitle">Log a Symptom</h2>
-                        <span class="note">Severity is 1 (mild) to 10 (severe)</span>
+                        <span class="note">Severity is 1 (mild) to 10 (severe). For a positive entry, 1 is okay and 10 is great.</span>
                     </div>
                     <div class="card-body">
                         <form id="symForm" class="cc-add-form">
                             <div class="cc-add-fields">
+                                <select class="text-input" id="symType">
+                                    <option value="negative">Symptom</option>
+                                    <option value="positive">Positive (felt good)</option>
+                                </select>
                                 <input type="datetime-local" class="text-input" id="symWhen" required />
                                 <input type="text" class="text-input" id="symName" list="symOptions" placeholder="Symptom" required />
                                 <datalist id="symOptions">
@@ -106,10 +121,14 @@
                                     <option>Diarrhea</option><option>Constipation</option><option>Reflux</option>
                                     <option>Gas</option><option>Pain</option>
                                 </datalist>
+                                <datalist id="symOptionsPositive">
+                                    <option>Felt fine</option><option>Normal digestion</option><option>Comfortable</option>
+                                    <option>Good appetite</option><option>Regular bowel movement</option><option>Good energy</option>
+                                </datalist>
                                 <input type="number" class="text-input" id="symSev" min="1" max="10" value="3" placeholder="Severity" />
                                 <input type="text" class="text-input note" id="symNotes" placeholder="Notes (optional)" />
                             </div>
-                            <button type="submit" class="button-inline" id="symSubmit">Add symptom</button>
+                            <button type="submit" class="button-inline" id="symSubmit">Add entry</button>
                             <button type="button" class="button-inline button-ghost" id="symCancel" hidden>Cancel edit</button>
                         </form>
                     </div>
@@ -219,8 +238,8 @@
                                 <tr>
                                     <th>Food / tag</th>
                                     <th>Signal</th>
-                                    <th class="col-num" title="Symptom events where it was eaten in the window before">Before symptoms</th>
-                                    <th class="col-num" title="Same time of day on other days with no symptom">Other days</th>
+                                    <th class="col-num" title="Symptom events where it was eaten in the window before (weighted by data confidence)">Before symptoms</th>
+                                    <th class="col-num" title="Same time of day on other days with no symptom (weighted by data confidence)">Other days</th>
                                     <th class="col-num" title="How much more often it appears before symptoms than at other times">Ratio</th>
                                 </tr>
                                 </thead>
@@ -231,8 +250,32 @@
                         <p class="note">This finds patterns, not proof. Foods eaten together (a pasta dish with cheese) can share the blame, and gaps in logging skew the results. Use it to pick one suspect to remove or re-test, and review the results with a clinician or dietitian. A ratio of 1&times; means no difference; below 1&times; means it was eaten less often before symptoms.</p>
                     </div>
                 </div>
-            </div>
 
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Looks Safe So Far</h2>
+                        <span class="note">Eaten several times with no symptom following in the same window</span>
+                    </div>
+                    <div class="card-body">
+                        <p id="predSafeEmpty" class="empty-state" hidden></p>
+                        <div class="table-wrap" id="predSafeWrap" hidden>
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Food / tag</th>
+                                    <th class="col-num">Times eaten</th>
+                                    <th class="col-num">Followed by symptoms</th>
+                                    <th class="col-num" title="Times a positive entry was logged afterwards">Felt good after</th>
+                                    <th title="Lower when meals were missing or there were no symptom check-ins">Confidence</th>
+                                </tr>
+                                </thead>
+                                <tbody id="predSafeBody"></tbody>
+                            </table>
+                        </div>
+                        <p class="note">"Safe" only means nothing was logged afterwards. It is more trustworthy when you log symptoms or "felt fine" regularly, and less trustworthy for foods always eaten with a suspect.</p>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
 </div>
