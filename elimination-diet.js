@@ -1,8 +1,22 @@
 import { bindEvents } from './SharedJS/dom.js';
+import { renderPredictions } from './diet-predictions.js';
 
 // Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
 // same shared scripts that lists.html does before this module.
 const sb = window.supabaseClient;
+
+// ---------- tabs (hash-routed, same pattern as creditcards.js) ----------
+const TAB_KEYS = ['timeline', 'meals', 'symptoms', 'ingredients','predictions'];
+const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
+
+function switchTab(tabKey) {
+    document.querySelectorAll('#elimination-tabs .tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabKey));
+    TAB_KEYS.forEach(key => {
+        const pane = document.getElementById(`tab-${key}`);
+        if (pane) pane.hidden = key !== tabKey;
+    });
+}
+
 
 // ---------- allergen / trigger tagging ----------
 // kind: 'allergen' (top allergens) or 'trigger' (common GI triggers)
@@ -251,17 +265,6 @@ function renderTimeline() {
     $('timelineList').innerHTML = items.map(i => i.html).join('') || '<p>Nothing logged yet.</p>';
 }
 
-// ---------- tabs (hash-routed, same pattern as creditcards.js) ----------
-const TAB_KEYS = ['timeline', 'meals', 'symptoms', 'ingredients'];
-const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
-
-function switchTab(tabKey) {
-    document.querySelectorAll('#elimination-tabs .tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabKey));
-    TAB_KEYS.forEach(key => {
-        const pane = document.getElementById(`tab-${key}`);
-        if (pane) pane.hidden = key !== tabKey;
-    });
-}
 
 // ---------- declarative event map ----------
 bindEvents(document, {
@@ -291,6 +294,9 @@ bindEvents(document, {
             await updateIngredient(row.dataset.id, { is_frequent: checkEl.checked });
         }
     },
+
+    'change #predGroup, #predWindow, #predSymptom, #predSeverity': () => renderPredictions(state, chipClass),
+
     'submit #ingForm': async (e) => {
         e.preventDefault();
         await addIngredient($('ingName').value, { is_frequent: false });
@@ -400,6 +406,7 @@ function renderAll() {
     $('mealList').innerHTML = state.meals.map(mealHtml).join('') || '<p>No meals yet.</p>';
     $('symList').innerHTML = state.symptoms.map(symHtml).join('') || '<p>No symptoms yet.</p>';
     renderTimeline();
+    renderPredictions(state, chipClass);
 }
 
 $('mealWhen').value = nowLocal(); $('symWhen').value = nowLocal();
