@@ -1067,7 +1067,11 @@ body.cal-page {
 .sp-sci { font-style: italic; }
 .sp-years { display: flex; flex-wrap: wrap; gap: 4px; }
 .sp-years .badge { margin-left: 0; }
-
+.class-group {
+  margin-left: 1.5rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--line);
+}
 
 /* 7. OVERLAYS & PORTALS */
 .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; max-width: 380px; width: calc(100% - 48px); pointer-events: none; }
