@@ -3,10 +3,12 @@
 const API = 'https://api.gbif.org/v1/occurrence/search';
 const PAGE_SIZE = 300;
 const MAX_PAGES = 2;          // per year, so 600 records max
+const MAX_PAGES_ANY = 10;     // 'Any time' is one query for the whole span, so 3000 records max
 const MAX_ROWS = 5;           // record rows shown per species
 const MAX_THUMBS = 6;
-const CONCURRENCY = 3;        // GBIF times out when hit with too many requests at once
-const RETRIES = 2;            // retries for timeouts, 429s and 5xx errors
+const CONCURRENCY = 3;        // GBIF rate-limits (429) and times out when hit with too many requests
+const REQUEST_GAP_MS = 300;   // pause before each request
+const RETRIES = 4;            // retries for timeouts, 429s and 5xx errors
 const TIMEOUT_MS = 30000;
 
 const $ = id => document.getElementById(id);
@@ -50,11 +52,7 @@ function boxWkt(lat, lon, km) {
 function windowFor(kind, year) {
     const now = new Date(), m = now.getMonth(), d = now.getDate();
     let start, end;
-    if (kind === 'any') {
-        // whole calendar year
-        start = new Date(Date.UTC(year, 0, 1));
-        end = new Date(Date.UTC(year, 11, 31));
-    } else if (kind === 'month') {
+    if (kind === 'month') {
         start = new Date(Date.UTC(year, m, 1));
         end = new Date(Date.UTC(year, m + 1, 0));
     } else {
@@ -72,18 +70,25 @@ const isHttp = url => /^https?:\/\//i.test(url || '');
 // GET with a timeout and exponential backoff on timeouts, 429s and 5xx errors
 async function fetchJson(url) {
     for (let attempt = 0; ; attempt++) {
+        let waitMs = 2000 * 2 ** attempt;          // 2s, 4s, 8s, 16s
         try {
+            await sleep(REQUEST_GAP_MS);
             const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
             if (res.ok) return await res.json();
             const err = new Error('GBIF returned ' + res.status);
+            err.status = res.status;
             err.retry = res.status === 429 || res.status >= 500;
+            const retryAfter = +res.headers.get('Retry-After');   // null if CORS hides it
+            if (retryAfter > 0) waitMs = Math.max(waitMs, retryAfter * 1000);
             throw err;
         } catch (e) {
-            const retry = e.retry ?? true;   // network errors and timeouts are retryable
+            const retry = e.retry ?? true;         // network errors and timeouts are retryable
             if (!retry || attempt >= RETRIES) {
-                throw e.name === 'TimeoutError' ? new Error('GBIF timed out') : e;
+                if (e.name === 'TimeoutError') throw new Error('GBIF timed out');
+                if (e.status === 429) throw new Error('GBIF is rate limiting requests. Wait a minute and try again, or narrow the search.');
+                throw e;
             }
-            await sleep(1000 * 2 ** attempt);
+            await sleep(waitMs);
         }
     }
 }
@@ -102,19 +107,40 @@ async function mapLimit(items, limit, fn) {
     return results;
 }
 
-async function fetchYear(year, base, kind) {
+// Pages through one eventDate range ("start,end"); returns the records and whether the cap cut it short
+async function fetchRange(range, base, maxPages) {
     const params = new URLSearchParams(base);
-    params.set('eventDate', windowFor(kind, year));
+    params.set('eventDate', range);
 
     const recs = [];
     let capped = false;
-    for (let page = 0; page < MAX_PAGES; page++) {
+    for (let page = 0; page < maxPages; page++) {
         const data = await fetchJson(`${API}?${params}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`);
-        recs.push(...data.results.map(r => ({ ...r, _year: year })));
+        recs.push(...data.results);
         if (data.endOfRecords) break;
-        if (page === MAX_PAGES - 1) capped = true;
+        if (page === maxPages - 1) capped = true;
     }
-    return { year, recs, capped };
+    return { recs, capped };
+}
+
+// Same calendar window in each year: one query per year
+async function fetchYear(year, base, kind) {
+    const { recs, capped } = await fetchRange(windowFor(kind, year), base, MAX_PAGES);
+    return { year, recs: recs.map(r => ({ ...r, _year: year })), capped };
+}
+
+// Any time: a single query spanning the whole period, split back into years afterwards
+async function fetchAnyTime(years, base) {
+    const first = Math.min(...years), last = Math.max(...years);
+    const { recs, capped } = await fetchRange(`${first}-01-01,${last}-12-31`, base, MAX_PAGES_ANY);
+
+    const byYear = new Map(years.map(y => [y, []]));
+    for (const r of recs) {
+        const y = r.year ?? +(r.eventDate || '').slice(0, 4);
+        if (byYear.has(y)) byYear.get(y).push({ ...r, _year: y });
+    }
+    // The cap applies to the whole span, so flag every year
+    return years.map(y => ({ year: y, recs: byYear.get(y), capped }));
 }
 
 async function search(lat, lon) {
@@ -137,13 +163,18 @@ async function search(lat, lon) {
     $('results').replaceChildren();
 
     try {
-        let done = 0;
-        const perYear = await mapLimit(years, CONCURRENCY, async y => {
-            if (id !== searchId) throw new Error('superseded');
-            const result = await fetchYear(y, base, kind);
-            if (id === searchId) setStatus(`Searching GBIF… ${++done} of ${count} years`);
-            return result;
-        });
+        let perYear;
+        if (kind === 'any') {
+            perYear = await fetchAnyTime(years, base);
+        } else {
+            let done = 0;
+            perYear = await mapLimit(years, CONCURRENCY, async y => {
+                if (id !== searchId) throw new Error('superseded');
+                const result = await fetchYear(y, base, kind);
+                if (id === searchId) setStatus(`Searching GBIF… ${++done} of ${count} years`);
+                return result;
+            });
+        }
         if (id !== searchId) return;   // a newer search superseded this one
         render(perYear, { lat, lon, km });
     } catch (e) {
@@ -290,7 +321,7 @@ function render(perYear, origin) {
     $('yearSummary').textContent = 'Records per year: ' +
         [...yearCounts].map(([y, c]) => `${y}: ${c}`).join(' · ') +
         (anyCapped
-            ? ` (some years capped at ${PAGE_SIZE * MAX_PAGES} records; narrow the radius or window)`
+            ? ' (results capped, so some records are missing; narrow the radius or years)'
             : '');
 
     if (!groups.size) {
