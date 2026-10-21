@@ -77,6 +77,7 @@ const ALIASES = {
     fungus: ['Fungi', 'KINGDOM'],
     fungi: ['Fungi', 'KINGDOM'],
     plant: ['Plantae', 'KINGDOM'],
+    orchid: ['Orchidaceae', 'FAMILY'],
     animal: ['Animalia', 'KINGDOM'],
     bird: ['Aves', 'CLASS'],
     mammal: ['Mammalia', 'CLASS'],
