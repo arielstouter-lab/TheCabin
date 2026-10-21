@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Notes</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="SharedJS/head-loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="SharedJS/config.js" defer></script>
+    <script src="app.js" defer></script>
+    <script type="module" src="notes.js"></script>
+</head>
+
+<body class="app-page notes-page">
+<div class="app-shell">
+    <main class="main-content">
+        <a href="app.html" class="brand-link">
+            <div class="brand-mark"></div>
+        </a>
+
+        <header class="topbar gradient">
+            <div class="text-center">
+                <h1>RADAR</h1>
+                <p>Dated RADAR check-ins and sticky reminders</p>
+            </div>
+        </header>
+
+        <section class="content">
+
+            <!-- ============ Stickied reminders ============ -->
+            <div class="card" id="notes-pinned-card" hidden>
+                <div class="card-head">
+                    <h2 class="card-title">📌 Reminders</h2>
+                </div>
+                <div class="cal-events" id="notes-pinned"></div>
+            </div>
+
+            <!-- ============ Add / edit ============ -->
+            <div class="card">
+                <div class="card-head">
+                    <h2 class="card-title" id="notes-form-title">New note</h2>
+                </div>
+
+                <div class="add-item">
+                    <label for="notes-text" class="visually-hidden">Note</label>
+                    <textarea id="notes-text" class="text-input" rows="3" placeholder="Write a note"></textarea>
+                </div>
+
+                <div class="add-item">
+                    <label for="notes-date" class="visually-hidden">Date</label>
+                    <input type="date" id="notes-date" class="text-input" />
+
+                    <label for="notes-assignee" class="visually-hidden">Assign to</label>
+                    <select id="notes-assignee"></select>
+
+                    <label class="note">
+                        <input type="checkbox" id="notes-pinned-check" /> Sticky
+                    </label>
+                </div>
+
+                <div class="add-item">
+                    <button class="button-inline" id="notes-save">Add</button>
+                    <button class="button-inline" id="notes-cancel" hidden>Cancel</button>
+                </div>
+            </div>
+
+            <!-- ============ Dated notes ============ -->
+            <div class="card">
+                <div class="card-head">
+                    <h2 class="card-title">Notes</h2>
+                    <label class="note">
+                        Show:
+                        <select id="notes-filter"></select>
+                    </label>
+                </div>
+
+                <div id="notes-list"></div>
+                <p class="empty-state" id="notes-empty" hidden>No notes yet.</p>
+            </div>
+        </section>
+
+        <!-- ============ One date group ============ -->
+        <template id="tpl-note-group">
+            <div class="notes-group">
+                <h3 class="note" data-ref="heading"></h3>
+                <div class="cal-events" data-ref="items"></div>
+            </div>
+        </template>
+
+        <!-- ============ One note row (pinned and unpinned share it) ============ -->
+        <template id="tpl-note">
+            <div class="compact-list">
+                <button class="icon-delete" title="Toggle sticky" data-ref="pin">📌</button>
+                <span class="cal-event-title" data-ref="text" style="white-space: pre-wrap"></span>
+                <span class="cal-event-chips" data-ref="chips" hidden></span>
+                <button class="icon-delete" title="Edit" data-ref="edit">✎</button>
+                <button class="icon-delete" title="Remove" data-ref="del">✕</button>
+            </div>
+        </template>
+    </main>
+</div>
+</body>
+</html>
