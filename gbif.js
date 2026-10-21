@@ -50,7 +50,11 @@ function boxWkt(lat, lon, km) {
 function windowFor(kind, year) {
     const now = new Date(), m = now.getMonth(), d = now.getDate();
     let start, end;
-    if (kind === 'month') {
+    if (kind === 'any') {
+        // whole calendar year
+        start = new Date(Date.UTC(year, 0, 1));
+        end = new Date(Date.UTC(year, 11, 31));
+    } else if (kind === 'month') {
         start = new Date(Date.UTC(year, m, 1));
         end = new Date(Date.UTC(year, m + 1, 0));
     } else {
