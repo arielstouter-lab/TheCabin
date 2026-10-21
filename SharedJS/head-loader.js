@@ -30,7 +30,7 @@ const THEMES = {
         wxSevereThunderstorm: "#292f45",
 
         flowLight: "#82000f",
-        flowHeavy: "#4e0009",
+        flowHeavy: "#63000c",
 
         /*Special one off colors*/
         navLabel: "#B8B5A8",
