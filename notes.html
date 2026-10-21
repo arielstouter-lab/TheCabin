@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Notes</title>
+    <title>Check-in</title>
     <link rel="stylesheet" href="styles.css">
     <script src="SharedJS/head-loader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -19,42 +19,72 @@
 
         <header class="topbar gradient">
             <div class="text-center">
-                <h1>Notes</h1>
-                <p>Dated notes and sticky reminders</p>
+                <h1>RADAR Check-in</h1>
+                <p>Monthly agenda, discussion items and action items</p>
             </div>
         </header>
 
         <section class="content">
 
-            <!-- ============ Stickied reminders ============ -->
-            <div class="card" id="notes-pinned-card" hidden>
+            <!-- ============ Standard agenda ============ -->
+            <div class="card">
                 <div class="card-head">
-                    <h2 class="card-title">📌 Reminders</h2>
+                    <h2 class="card-title">Agenda</h2>
                 </div>
-                <div class="cal-events" id="notes-pinned"></div>
+                <ol class="agenda-list" style="margin: 0; padding-left: 1.25rem; line-height: 1.7">
+                    <li>Appreciations</li>
+                    <li>Review last month's action items</li>
+                    <li>Discussion items</li>
+                    <li>Calendar and logistics for the coming month</li>
+                    <li>Anything else</li>
+                    <li>Schedule the next check-in</li>
+                </ol>
+            </div>
+
+            <!-- ============ Stickies: open action items ============ -->
+            <div class="card" id="notes-stickies-card" hidden>
+                <div class="card-head">
+                    <h2 class="card-title">📌 Action items</h2>
+                </div>
+                <div class="cal-events" id="notes-stickies"></div>
+            </div>
+
+            <!-- ============ Open discussion items ============ -->
+            <div class="card">
+                <div class="card-head">
+                    <h2 class="card-title">Discussion items</h2>
+                    <span class="note">Carried over until discussed</span>
+                </div>
+                <div class="cal-events" id="notes-discussion"></div>
+                <p class="empty-state" id="notes-discussion-empty" hidden>Nothing waiting to be discussed.</p>
             </div>
 
             <!-- ============ Add / edit ============ -->
             <div class="card">
                 <div class="card-head">
-                    <h2 class="card-title" id="notes-form-title">New note</h2>
+                    <h2 class="card-title" id="notes-form-title">Add</h2>
                 </div>
 
                 <div class="add-item">
-                    <label for="notes-text" class="visually-hidden">Note</label>
-                    <textarea id="notes-text" class="text-input" rows="3" placeholder="Write a note"></textarea>
+                    <label for="notes-text" class="visually-hidden">Text</label>
+                    <textarea id="notes-text" class="text-input" rows="3" placeholder="Write it here"></textarea>
                 </div>
 
                 <div class="add-item">
+                    <label for="notes-kind" class="visually-hidden">Type</label>
+                    <select id="notes-kind">
+                        <option value="discussion">Discussion item</option>
+                        <option value="action">Action item</option>
+                        <option value="note">Note</option>
+                    </select>
+
                     <label for="notes-date" class="visually-hidden">Date</label>
                     <input type="date" id="notes-date" class="text-input" />
 
-                    <label for="notes-assignee" class="visually-hidden">Assign to</label>
-                    <select id="notes-assignee"></select>
-
-                    <label class="note">
-                        <input type="checkbox" id="notes-pinned-check" /> Sticky
-                    </label>
+                    <span id="notes-assignee-wrap">
+                        <label for="notes-assignee" class="visually-hidden">Assign to</label>
+                        <select id="notes-assignee"></select>
+                    </span>
                 </div>
 
                 <div class="add-item">
@@ -63,10 +93,10 @@
                 </div>
             </div>
 
-            <!-- ============ Dated notes ============ -->
+            <!-- ============ History: everything by date ============ -->
             <div class="card">
                 <div class="card-head">
-                    <h2 class="card-title">Notes</h2>
+                    <h2 class="card-title">History</h2>
                     <label class="note">
                         Show:
                         <select id="notes-filter"></select>
@@ -74,7 +104,7 @@
                 </div>
 
                 <div id="notes-list"></div>
-                <p class="empty-state" id="notes-empty" hidden>No notes yet.</p>
+                <p class="empty-state" id="notes-empty" hidden>Nothing here yet.</p>
             </div>
         </section>
 
@@ -86,10 +116,11 @@
             </div>
         </template>
 
-        <!-- ============ One note row (pinned and unpinned share it) ============ -->
+        <!-- ============ One row, shared by every list on the page ============ -->
+        <!-- checkbox is shown for action and discussion items, hidden for plain notes -->
         <template id="tpl-note">
             <div class="compact-list">
-                <button class="icon-delete" title="Toggle sticky" data-ref="pin">📌</button>
+                <input type="checkbox" class="cal-event-check" data-ref="check" hidden />
                 <span class="cal-event-title" data-ref="text" style="white-space: pre-wrap"></span>
                 <span class="cal-event-chips" data-ref="chips" hidden></span>
                 <button class="icon-delete" title="Edit" data-ref="edit">✎</button>
