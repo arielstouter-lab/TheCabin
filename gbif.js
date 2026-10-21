@@ -1,6 +1,8 @@
 // Nearby Sightings: GBIF occurrences near the house, same calendar window across past years.
 
 const API = 'https://api.gbif.org/v1/occurrence/search';
+const SPECIES_API = 'https://api.gbif.org/v1/species';
+const BACKBONE = 'd7dddbf4-2cf0-4f39-9b2a-bb099caae36c';   // GBIF Backbone Taxonomy
 const PAGE_SIZE = 300;
 const MAX_PAGES = 2;          // per year, so 600 records max
 const MAX_PAGES_ANY = 10;     // 'Any time' is one query for the whole span, so 3000 records max
@@ -64,6 +66,79 @@ function windowFor(kind, year) {
 }
 
 const isHttp = url => /^https?:\/\//i.test(url || '');
+
+/* ---------- taxon limiter ---------- */
+
+// Everyday group names -> [scientific name, rank]. Anything else is looked up in GBIF.
+const ALIASES = {
+    mushroom: ['Agaricomycetes', 'CLASS'],   // most mushrooms, bracket fungi, puffballs
+    fungus: ['Fungi', 'KINGDOM'],
+    fungi: ['Fungi', 'KINGDOM'],
+    orchid: ['Orchidaceae', 'FAMILY'],
+    plant: ['Plantae', 'KINGDOM'],
+    animal: ['Animalia', 'KINGDOM'],
+    bird: ['Aves', 'CLASS'],
+    mammal: ['Mammalia', 'CLASS'],
+    reptile: ['Reptilia', 'CLASS'],
+    amphibian: ['Amphibia', 'CLASS'],
+    insect: ['Insecta', 'CLASS'],
+    spider: ['Araneae', 'ORDER']
+};
+
+const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+async function matchName(name, rank) {
+    const params = new URLSearchParams({ name });
+    if (rank) params.set('rank', rank);
+    const m = await fetchJson(`${SPECIES_API}/match?${params}`);
+    // HIGHERRANK means GBIF only matched a parent of what was typed
+    if (!m.usageKey || m.matchType === 'NONE' || m.matchType === 'HIGHERRANK') return null;
+    if (rank && m.rank !== rank) return null;
+    return {
+        key: m.acceptedUsageKey ?? m.usageKey,
+        label: `${m.canonicalName || m.scientificName} (${m.rank.toLowerCase()})`
+    };
+}
+
+// Turns the text box + rank dropdown into a GBIF taxonKey (or null for no limit)
+async function resolveTaxon() {
+    const text = $('taxon').value.trim();
+    if (!text) return null;
+    const rank = $('taxonRank').value;
+
+    setStatus('Looking up ' + text + '…');
+
+    if (rank) {
+        const hit = await matchName(titleCase(text), rank);
+        if (!hit) throw new Error(`No ${rank.toLowerCase()} named "${text}" found in GBIF.`);
+        return hit;
+    }
+
+    // Auto: everyday group name, then scientific name, then common (vernacular) name
+    const lower = text.toLowerCase();
+    const alias = ALIASES[lower] || ALIASES[lower.replace(/s$/, '')];
+    if (alias) {
+        const hit = await matchName(alias[0], alias[1]);
+        if (hit) return { ...hit, label: `${text} → ${hit.label}` };
+    }
+
+    const sci = await matchName(titleCase(text));
+    if (sci) return sci;
+
+    const params = new URLSearchParams({
+        q: text, qField: 'VERNACULAR', datasetKey: BACKBONE,
+        rank: 'SPECIES', status: 'ACCEPTED', limit: 1
+    });
+    const data = await fetchJson(`${SPECIES_API}/search?${params}`);
+    const top = data.results?.[0];
+    if (top) {
+        return {
+            key: top.nubKey ?? top.key,
+            label: `${text} → ${top.canonicalName || top.scientificName} (species)`
+        };
+    }
+    throw new Error(`Couldn't match "${text}" to a taxon. Try its scientific name, or pick a rank.`);
+}
 
 /* ---------- GBIF ---------- */
 
@@ -163,6 +238,11 @@ async function search(lat, lon) {
     $('results').replaceChildren();
 
     try {
+        const taxon = await resolveTaxon();
+        if (id !== searchId) return;
+        if (taxon) base.taxonKey = taxon.key;
+        setStatus(`Searching GBIF across ${count} years…`);
+
         let perYear;
         if (kind === 'any') {
             perYear = await fetchAnyTime(years, base);
@@ -176,7 +256,7 @@ async function search(lat, lon) {
             });
         }
         if (id !== searchId) return;   // a newer search superseded this one
-        render(perYear, { lat, lon, km });
+        render(perYear, { lat, lon, km, taxon });
     } catch (e) {
         if (id === searchId) setStatus('Error: ' + e.message, true);   // stale searches stay silent
     }
@@ -325,12 +405,13 @@ function render(perYear, origin) {
             : '');
 
     if (!groups.size) {
-        setStatus('');
+        setStatus(origin.taxon ? 'Limited to ' + origin.taxon.label : '');
         $('results').replaceChildren(clone('tpl-empty'));
         return;
     }
 
-    setStatus(`${total} records, ${groups.size} taxa within ${kmToMiles(origin.km).toFixed(1)} miles`);
+    setStatus(`${total} records, ${groups.size} taxa within ${kmToMiles(origin.km).toFixed(1)} miles` +
+        (origin.taxon ? ` · limited to ${origin.taxon.label}` : ''));
     $('results').replaceChildren(...buildTaxonomy(groups, origin));
 }
 

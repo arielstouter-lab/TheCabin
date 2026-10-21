@@ -55,6 +55,18 @@
             </div>
 
             <div class="add-item">
+                <select id="taxonRank" aria-label="Taxon rank">
+                    <option value="" selected>Any rank (auto)</option>
+                    <option value="KINGDOM">Kingdom</option>
+                    <option value="CLASS">Class</option>
+                    <option value="FAMILY">Family</option>
+                    <option value="GENUS">Genus</option>
+                </select>
+                <input id="taxon" class="text-input" type="text"
+                       placeholder="Limit to… e.g. Orchidaceae, mushrooms, Aves, Penstemon">
+            </div>
+
+            <div class="add-item">
                 <input id="lat" class="text-input" type="number" step="any" placeholder="Lat">
                 <input id="lon" class="text-input" type="number" step="any" placeholder="Lon">
                 <button class="button-inline" id="manual">Search</button>
