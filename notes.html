@@ -119,12 +119,14 @@
         <!-- ============ One row, shared by every list on the page ============ -->
         <!-- checkbox is shown for action and discussion items, hidden for plain notes -->
         <template id="tpl-note">
-            <div class="compact-list">
+            <div class="lst-item lst-item-row">
                 <input type="checkbox" class="cal-event-check" data-ref="check" hidden />
-                <span class="cal-event-title" data-ref="text" style="white-space: pre-wrap"></span>
-                <span class="cal-event-chips" data-ref="chips" hidden></span>
-                <button class="icon-delete" title="Edit" data-ref="edit">✎</button>
-                <button class="icon-delete" title="Remove" data-ref="del">✕</button>
+                <span class="lst-item-text" data-ref="text" style="white-space: pre-wrap"></span>
+                <div class="lst-actions">
+                    <span class="cal-event-chips" data-ref="chips" hidden></span>
+                    <button class="icon-delete" title="Edit" data-ref="edit">✎</button>
+                    <button class="icon-delete" title="Remove" data-ref="del">✕</button>
+                </div>
             </div>
         </template>
 
