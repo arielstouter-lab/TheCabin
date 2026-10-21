@@ -8,6 +8,8 @@ const MAX_PAGES = 2;          // per year, so 600 records max
 const MAX_PAGES_ANY = 10;     // 'Any time' is one query for the whole span, so 3000 records max
 const MAX_ROWS = 5;           // record rows shown per species
 const MAX_THUMBS = 6;
+const TILE = 256;
+const MAP_W = 288, MAP_H = 180;   // map thumbnail viewport, in px
 const CONCURRENCY = 2;        // GBIF rate-limits (429) and times out when hit with too many requests
 const REQUEST_GAP_MS = 300;   // pause before each request
 const RETRIES = 4;            // retries for timeouts, 429s and 5xx errors
@@ -74,7 +76,6 @@ const ALIASES = {
     mushroom: ['Agaricomycetes', 'CLASS'],   // most mushrooms, bracket fungi, puffballs
     fungus: ['Fungi', 'KINGDOM'],
     fungi: ['Fungi', 'KINGDOM'],
-    orchid: ['Orchidaceae', 'FAMILY'],
     plant: ['Plantae', 'KINGDOM'],
     animal: ['Animalia', 'KINGDOM'],
     bird: ['Aves', 'CLASS'],
@@ -296,6 +297,68 @@ function groupSpecies(perYear, { lat, lon, km }) {
     return { groups, yearCounts, total, anyCapped };
 }
 
+/* ---------- map thumbnails ---------- */
+
+// Zoom from the record's coordinate uncertainty: tighter fix = closer in
+function zoomFor(uncertaintyM) {
+    if (!(uncertaintyM > 0)) return 16;       // not reported
+    if (uncertaintyM <= 50) return 17;
+    if (uncertaintyM <= 250) return 16;
+    if (uncertaintyM <= 1000) return 15;
+    if (uncertaintyM <= 4000) return 14;
+    return 13;
+}
+
+// OpenStreetMap tiles stitched to fill the viewport, record centered, with an uncertainty circle
+function buildMap(r) {
+    const lat = Math.max(-85.0511, Math.min(85.0511, r.decimalLatitude));
+    const lon = r.decimalLongitude;
+    const u = r.coordinateUncertaintyInMeters;
+    const hasU = u > 0;
+    const z = zoomFor(u);
+    const n = 2 ** z;
+    const latRad = lat * Math.PI / 180;
+
+    // Record position in world pixels at this zoom; viewport is centered on it
+    const px = (lon + 180) / 360 * n * TILE;
+    const py = (1 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2 * n * TILE;
+    const left = px - MAP_W / 2, top = py - MAP_H / 2;
+
+    const map = clone('tpl-map');
+    const view = slot(map, 'view');
+    view.style.width = MAP_W + 'px';
+    view.style.height = MAP_H + 'px';
+
+    const tiles = slot(map, 'tiles');
+    for (let ty = Math.floor(top / TILE); ty <= Math.floor((top + MAP_H) / TILE); ty++) {
+        if (ty < 0 || ty >= n) continue;
+        for (let tx = Math.floor(left / TILE); tx <= Math.floor((left + MAP_W) / TILE); tx++) {
+            const img = document.createElement('img');
+            img.alt = '';
+            img.width = img.height = TILE;
+            img.style.left = (tx * TILE - left) + 'px';
+            img.style.top = (ty * TILE - top) + 'px';
+            img.src = `https://tile.openstreetmap.org/${z}/${((tx % n) + n) % n}/${ty}.png`;
+            tiles.append(img);
+        }
+    }
+
+    if (hasU) {
+        const metersPerPx = 156543.03392 * Math.cos(latRad) / n;
+        const radius = Math.max(u / metersPerPx, 6);
+        const acc = slot(map, 'acc');
+        acc.style.width = acc.style.height = (radius * 2) + 'px';
+        acc.style.left = (MAP_W / 2 - radius) + 'px';
+        acc.style.top = (MAP_H / 2 - radius) + 'px';
+        acc.hidden = false;
+    }
+
+    slot(map, 'caption').textContent = hasU
+        ? `Location uncertainty ±${Math.round(u)} m · zoom ${z}`
+        : `Uncertainty not reported · zoom ${z}`;
+    return map;
+}
+
 function buildRecordRow(r, origin) {
     const row = clone('tpl-record');
     const miles = kmToMiles(
@@ -303,6 +366,15 @@ function buildRecordRow(r, origin) {
     ).toFixed(1);
     slot(row, 'meta').textContent = `${(r.eventDate || '').slice(0, 10)} · ${miles} mi`;
     slot(row, 'link').href = `https://www.gbif.org/occurrence/${r.key}`;
+
+    // Tiles are only requested the first time the map is opened
+    const btn = slot(row, 'mapBtn'), holder = slot(row, 'map');
+    btn.addEventListener('click', () => {
+        if (!holder.firstChild) holder.append(buildMap(r));
+        holder.hidden = !holder.hidden;
+        btn.textContent = holder.hidden ? 'Map' : 'Hide map';
+        btn.setAttribute('aria-expanded', String(!holder.hidden));
+    });
     return row;
 }
 

@@ -12,6 +12,18 @@
     <script type="module" src="gbif.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Record map thumbnails (move into styles.css if you prefer) */
+        .sp-map { margin: 6px 0 10px; }
+        .sp-map-view { position: relative; overflow: hidden; border-radius: 8px; background: #e8e6df; max-width: 100%; }
+        .sp-map-view img { position: absolute; max-width: none; user-select: none; -webkit-user-drag: none; }
+        .sp-map-pin { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+            border-radius: 50%; background: #d33; border: 2px solid #fff; box-sizing: border-box; box-shadow: 0 0 3px rgba(0, 0, 0, .5); }
+        .sp-map-acc { position: absolute; border-radius: 50%; box-sizing: border-box;
+            border: 2px solid rgba(211, 51, 51, .85); background: rgba(211, 51, 51, .15); pointer-events: none; }
+        .sp-map-attr { position: absolute; right: 0; bottom: 0; padding: 1px 4px; font-size: 10px;
+            background: rgba(255, 255, 255, .8); color: #333; text-decoration: none; }
+    </style>
 </head>
 <body class="app-page">
 <main class="main-content">
@@ -55,8 +67,6 @@
             </div>
 
             <div class="add-item">
-                <input id="taxon" class="text-input" type="text"
-                       placeholder="Limit to… e.g. Orchidaceae, mushrooms, Aves, Penstemon">
                 <select id="taxonRank" aria-label="Taxon rank">
                     <option value="" selected>Any rank (auto)</option>
                     <option value="KINGDOM">Kingdom</option>
@@ -64,6 +74,8 @@
                     <option value="FAMILY">Family</option>
                     <option value="GENUS">Genus</option>
                 </select>
+                <input id="taxon" class="text-input" type="text"
+                       placeholder="Limit to… e.g. Orchidaceae, mushrooms, Aves, Penstemon">
             </div>
 
             <div class="add-item">
@@ -125,9 +137,27 @@
 </template>
 
 <template id="tpl-record">
-    <div class="compact-list">
-        <span data-slot="meta"></span>
-        <a data-slot="link" target="_blank" rel="noopener">GBIF record</a>
+    <div class="sp-rec">
+        <div class="compact-list">
+            <span data-slot="meta"></span>
+            <span>
+                <button type="button" class="button-inline button-ghost" data-slot="mapBtn" aria-expanded="false">Map</button>
+                <a data-slot="link" target="_blank" rel="noopener">GBIF record</a>
+            </span>
+        </div>
+        <div data-slot="map" hidden></div>
+    </div>
+</template>
+
+<template id="tpl-map">
+    <div class="sp-map">
+        <div class="sp-map-view" data-slot="view">
+            <div data-slot="tiles"></div>
+            <div class="sp-map-acc" data-slot="acc" hidden></div>
+            <div class="sp-map-pin"></div>
+            <a class="sp-map-attr" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>
+        </div>
+        <div class="note" data-slot="caption"></div>
     </div>
 </template>
 
