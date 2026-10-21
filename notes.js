@@ -8,6 +8,7 @@ const TABLES = window.TABLES || {};
 const todayStr = window.todayStr;
 
 // ---------- constants ----------
+// Add NOTES / HOUSEHOLD_PEOPLE to TABLES in config.js; these fallbacks keep it working until then.
 const NOTES_TABLE = TABLES.NOTES || 'household_notes';
 const PEOPLE_TABLE = TABLES.PEOPLE || 'household_people';
 const CACHE_KEY = 'thecabin_cached_notes';
@@ -154,9 +155,9 @@ function render(){
     $('notes-pinned').replaceChildren(...pinned.map(n => buildNoteRow(n, true)));
     $('notes-pinned-card').hidden = !pinned.length;
 
-    // everything else, grouped by date, newest first
+    // every note (stickied ones included), grouped by date, newest first
     const groups = {};
-    visible.filter(n => !n.pinned).sort(byNewest)
+    [...visible].sort(byNewest)
         .forEach(n => (groups[n.note_date] ||= []).push(n));
 
     $('notes-list').replaceChildren(...Object.keys(groups).sort().reverse().map(date => {
