@@ -6,7 +6,7 @@ const MAX_PAGES = 2;          // per year, so 600 records max
 const MAX_PAGES_ANY = 10;     // 'Any time' is one query for the whole span, so 3000 records max
 const MAX_ROWS = 5;           // record rows shown per species
 const MAX_THUMBS = 6;
-const CONCURRENCY = 3;        // GBIF rate-limits (429) and times out when hit with too many requests
+const CONCURRENCY = 2;        // GBIF rate-limits (429) and times out when hit with too many requests
 const REQUEST_GAP_MS = 300;   // pause before each request
 const RETRIES = 4;            // retries for timeouts, 429s and 5xx errors
 const TIMEOUT_MS = 30000;
@@ -368,12 +368,10 @@ async function loadHouse() {
     }
     $('lat').value = (+data.lat).toFixed(5);
     $('lon').value = (+data.lon).toFixed(5);
-    searchFromInputs();
+    setStatus('Ready. Choose your options and click Search.');
 }
 
 $('manual').addEventListener('click', searchFromInputs);
 $('go').addEventListener('click', useDeviceLocation);
-['window', 'years', 'radius', 'imgOnly'].forEach(id =>
-    $(id).addEventListener('change', searchFromInputs));
 
 loadHouse();
