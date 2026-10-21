@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nearby Sightings</title>
     <link rel="stylesheet" href="styles.css">
     <script src="SharedJS/head-loader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="SharedJS/database-config.js" defer></script>
     <script src="app.js" defer></script>
+    <script type="module" src="gbif.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -28,9 +31,9 @@
             <div class="card-head">
                 <h2 class="card-title">Search</h2>
             </div>
+
             <div class="add-item">
                 <select id="window" aria-label="Date window">
-                    <option value="week">This week (7 days to today)</option>
                     <option value="around" selected>Around today (±3 days)</option>
                     <option value="month">This month</option>
                 </select>
@@ -41,19 +44,22 @@
                     <option value="20">Past 20 years</option>
                 </select>
                 <select id="radius" aria-label="Radius">
-                    <option value="0.804672" selected>.5 mile</option>
                     <option value="1.609344">1 mile</option>
-                    <option value="3.218688">2 miles</option>
+                    <option value="3.218688" selected>2 miles</option>
                     <option value="8.04672">5 miles</option>
                 </select>
-                <label class="lst-priority-toggle"><input type="checkbox" id="imgOnly"> With images only</label>
+                <label class="lst-priority-toggle">
+                    <input type="checkbox" id="imgOnly"> With images only
+                </label>
             </div>
+
             <div class="add-item">
                 <input id="lat" class="text-input" type="number" step="any" placeholder="Lat">
                 <input id="lon" class="text-input" type="number" step="any" placeholder="Lon">
                 <button class="button-inline" id="manual">Search</button>
                 <button class="button-inline button-ghost" id="go">Use device location</button>
             </div>
+
             <div id="status" class="note"></div>
             <div id="yearSummary" class="note"></div>
         </section>
@@ -62,342 +68,62 @@
     </div>
 </main>
 
-<script>
-    const API = 'https://api.gbif.org/v1/occurrence/search';
-    const $ = id => document.getElementById(id);
-    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    const iso = d => d.toISOString().slice(0, 10);
+<!-- Templates: filled by gbif.js via data-slot -->
 
+<template id="tpl-kingdom">
+    <details class="card kingdom-group">
+        <summary>
+            <strong data-slot="name"></strong>
+            <span class="chip" data-slot="count"></span>
+        </summary>
+    </details>
+</template>
 
-    function setStatus(msg, isError) {
-        const el = $('status');
-        el.className = isError ? 'form-error' : 'note';
-        el.textContent = msg;
-    }
+<template id="tpl-class">
+    <details class="class-group">
+        <summary>
+            <strong data-slot="name"></strong>
+            <span class="chip" data-slot="count"></span>
+        </summary>
+    </details>
+</template>
 
-    function haversineKm(a, b, c, d) {
-        const R = 6371, r = x => x * Math.PI / 180;
-        const dLat = r(c - a), dLon = r(d - b);
-        const h = Math.sin(dLat/2)**2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dLon/2)**2;
-        return 2 * R * Math.asin(Math.sqrt(h));
-    }
+<template id="tpl-species">
+    <article class="card-row">
+        <div>
+            <strong class="card-title" data-slot="name"></strong>
+            <div class="note sp-sci" data-slot="sci" hidden></div>
+        </div>
+        <div class="card-actions">
+            <span class="chip" data-slot="records"></span>
+            <span class="chip" data-kind="aisle" data-slot="images" hidden></span>
+        </div>
+        <div class="sp-years" data-slot="years"></div>
+        <div class="sp-thumbs" data-slot="thumbs" hidden></div>
+        <div class="sp-recs">
+            <div data-slot="recs"></div>
+            <div class="note" data-slot="more" hidden></div>
+        </div>
+    </article>
+</template>
 
-    function kmToMiles(km) {
-        return km * 0.621371;
-    }
+<template id="tpl-year-badge">
+    <span class="badge b"></span>
+</template>
 
-    // Bounding-box WKT, counter-clockwise (GBIF requires this winding)
-    function boxWkt(lat, lon, km) {
-        const dLat = km / 111.32;
-        const dLon = km / (111.32 * Math.cos(lat * Math.PI / 180));
-        const w = lon - dLon, e = lon + dLon, s = lat - dLat, n = lat + dLat;
-        return `POLYGON((${w} ${s},${e} ${s},${e} ${n},${w} ${n},${w} ${s}))`;
-    }
+<template id="tpl-record">
+    <div class="compact-list">
+        <span data-slot="meta"></span>
+        <a data-slot="link" target="_blank" rel="noopener">GBIF record</a>
+    </div>
+</template>
 
-    // The same calendar window, anchored to a given year
-    function windowFor(kind, year) {
-        const now = new Date(), m = now.getMonth(), d = now.getDate();
-        let s, e;
-        if (kind === 'month') {
-            s = new Date(Date.UTC(year, m, 1));
-            e = new Date(Date.UTC(year, m + 1, 0));
-        } else {
-            const back = kind === 'around' ? 3 : 6, fwd = kind === 'around' ? 3 : 0;
-            s = new Date(Date.UTC(year, m, d - back));
-            e = new Date(Date.UTC(year, m, d + fwd));
-        }
-        return `${iso(s)},${iso(e)}`;
-    }
+<template id="tpl-thumb">
+    <a target="_blank" rel="noopener noreferrer"><img loading="lazy" alt=""></a>
+</template>
 
-    async function fetchYear(year, base, kind, maxPages = 2) {
-        const params = new URLSearchParams(base);
-        params.set('eventDate', windowFor(kind, year));
-        const recs = [];
-        let capped = false;
-        for (let p = 0; p < maxPages; p++) {
-            const res = await fetch(`${API}?${params}&limit=300&offset=${p * 300}`);
-            if (!res.ok) throw new Error('GBIF returned ' + res.status);
-            const data = await res.json();
-            recs.push(...data.results.map(r => ({ ...r, _year: year })));
-            if (data.endOfRecords) break;
-            if (p === maxPages - 1) capped = true;
-        }
-        return { year, recs, capped };
-    }
-
-    async function search(lat, lon) {
-        const km = +$('radius').value, kind = $('window').value, n = +$('years').value;
-        const thisYear = new Date().getFullYear();
-        const years = Array.from({ length: n }, (_, i) => thisYear - i);
-        const base = {
-            geometry: boxWkt(lat, lon, km),
-            occurrenceStatus: 'PRESENT',
-            hasCoordinate: 'true'
-        };
-        if ($('imgOnly').checked) base.mediaType = 'StillImage';
-        setStatus('Searching GBIF across ' + n + ' years…');
-        $('yearSummary').textContent = '';
-        $('results').innerHTML = '';
-        try {
-            const perYear = [];
-            for (const y of years) {
-                perYear.push(await fetchYear(y, base, kind));
-            }
-            render(perYear, lat, lon, km, thisYear);
-        } catch (e) {
-            setStatus('Error: ' + e.message, true);
-        }
-    }
-
-    function renderSpeciesCard(g) {
-        g.recs.sort((a, b) =>
-            (b.eventDate || '').localeCompare(a.eventDate || '')
-        );
-
-        const byYear = new Map();
-
-        g.recs.forEach(r => {
-            byYear.set(
-                r._year,
-                (byYear.get(r._year) || 0) + 1
-            );
-        });
-
-        const yearBadges = [...byYear]
-            .sort((a, b) => b[0] - a[0])
-            .map(([y, c]) =>
-                `<span class="badge b">${y} · ${c}</span>`
-            )
-            .join('');
-
-        const imgs = g.recs.flatMap(r =>
-            (r.media || [])
-                .filter(m => m.type === 'StillImage' && m.identifier)
-                .map(m => ({
-                    src: m.identifier,
-                    year: r._year
-                }))
-        );
-
-        const rows = g.recs.slice(0, 5).map(r => {
-
-                const miles = kmToMiles(
-                    haversineKm(
-                        parseFloat($('lat').value),
-                        parseFloat($('lon').value),
-                        r.decimalLatitude,
-                        r.decimalLongitude
-                    )
-                ).toFixed(1);
-
-                return `
-                <div class="compact-list">
-                    <span>
-                        ${(r.eventDate || '').slice(0, 10)}
-                        · ${miles} mi
-                    </span>
-                    <a
-                        href="https://www.gbif.org/occurrence/${r.key}"
-                        target="_blank"
-                        rel="noopener"
-                    >
-                        GBIF record
-                    </a>
-                </div>
-            `;
-            })
-            .join('');
-
-        const thumbs = imgs
-            .slice(0, 6)
-            .map(i => `
-            <a
-                href="${esc(i.src)}"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="${i.year}"
-            >
-                <img
-                    loading="lazy"
-                    src="${esc(i.src)}"
-                    alt=""
-                >
-            </a>
-        `)
-            .join('');
-
-        return `
-        <article class="card-row">
-            <div>
-                <strong class="card-title">
-                    ${esc(g.common || g.name)}
-                </strong>
-
-                ${g.common
-            ? `<div class="note sp-sci">${esc(g.name)}</div>`
-            : ''
-        }
-            </div>
-
-            <div class="card-actions">
-                <span class="chip">
-                    ${g.recs.length}
-                    record${g.recs.length !== 1 ? 's' : ''}
-                </span>
-
-                ${imgs.length
-            ? `
-                    <span class="chip" data-kind="aisle">
-                        ${imgs.length}
-                        image${imgs.length !== 1 ? 's' : ''}
-                    </span>
-                    `
-            : ''
-        }
-            </div>
-
-            <div class="sp-years">
-                ${yearBadges}
-            </div>
-
-            ${thumbs
-            ? `<div class="sp-thumbs">${thumbs}</div>`
-            : ''
-        }
-
-            <div class="sp-recs">
-                ${rows}
-
-                ${g.recs.length > 5
-            ? `
-                    <div class="note">
-                        + ${g.recs.length - 5} more
-                    </div>
-                    `
-            : ''
-        }
-            </div>
-        </article>
-    `;
-    }
-
-    function render(perYear, lat, lon, km, thisYear) {
-        const yearCounts = new Map();
-        const groups = new Map();
-        let total = 0, anyCapped = false;
-        for (const { year, recs, capped } of perYear) {
-            anyCapped = anyCapped || capped;
-            const near = recs.filter(r => r.decimalLatitude != null &&
-                haversineKm(lat, lon, r.decimalLatitude, r.decimalLongitude) <= km);
-            yearCounts.set(year, near.length);
-            total += near.length;
-            for (const r of near) {
-                const key = r.speciesKey || r.taxonKey || r.scientificName;
-                if (!groups.has(key)) groups.set(key, { name: r.species || r.scientificName, common: r.vernacularName, kingdom: r.kingdom, class: r.class, recs: [] });
-                const g = groups.get(key);
-                g.common = g.common || r.vernacularName;
-                g.recs.push(r);
-            }
-        }
-        $('yearSummary').textContent = 'Records per year: ' +
-            [...yearCounts].map(([y, c]) => `${y}: ${c}`).join(' · ') +
-            (anyCapped ? ' (some years capped at 600 records; narrow the radius or window)' : '');
-
-        const list = [...groups.values()].sort((a, b) => b.recs.length - a.recs.length);
-        if (!list.length) {
-            setStatus('');
-            $('results').innerHTML = '<p class="empty-state">No reports in this area and window. Try a wider radius or more years.</p>';
-            return;
-        }
-        setStatus(`${total} records, ${list.length} taxa within ${kmToMiles(km).toFixed(1)} miles`);
-
-        const taxonomy = new Map();
-
-        for (const species of groups.values()) {
-            const kingdom = species.kingdom || 'Unknown';
-            const taxClass = species.class || 'Unknown';
-
-            if (!taxonomy.has(kingdom)) {
-                taxonomy.set(kingdom, new Map());
-            }
-
-            const classMap = taxonomy.get(kingdom);
-
-            if (!classMap.has(taxClass)) {
-                classMap.set(taxClass, []);
-            }
-
-            classMap.get(taxClass).push(species);
-        }
-
-        $('results').innerHTML =
-            [...taxonomy.entries()]
-                .sort((a, b) => a[0].localeCompare(b[0]))
-                .map(([kingdom, classes]) => {
-
-                    const kingdomCount =
-                        [...classes.values()]
-                            .reduce((sum, arr) => sum + arr.length, 0);
-
-                    return `
-                <details class="card kingdom-group">
-                    <summary>
-                        <strong>${esc(kingdom)}</strong>
-                        <span class="chip">${kingdomCount} taxa</span>
-                    </summary>
-
-                    ${[...classes.entries()]
-                        .sort((a, b) => a[0].localeCompare(b[0]))
-                        .map(([taxClass, species]) => `
-                            <details class="class-group">
-                                <summary>
-                                    <strong>${esc(taxClass)}</strong>
-                                    <span class="chip">${species.length} taxa</span>
-                                </summary>
-
-                                ${species
-                            .sort((a, b) => b.recs.length - a.recs.length)
-                            .map(g => renderSpeciesCard(g))
-                            .join('')}
-                            </details>
-                        `).join('')}
-                </details>
-            `;
-                })
-                .join('');
-    }
-
-    async function loadHouse() {
-        const sb = window.supabaseClient;
-        setStatus('Loading house location…');
-        const { data, error } = await sb.from('weather_location').select('lat, lon').limit(1).maybeSingle();
-        if (error || !data || data.lat == null || data.lon == null) {
-            setStatus('Could not read weather_location' + (error ? ' (' + error.message + ')' : '') + '. Enter coordinates above.', true);
-            return;
-        }
-        const lat = +data.lat, lon = +data.lon;
-        $('lat').value = lat.toFixed(5); $('lon').value = lon.toFixed(5);
-        search(lat, lon);
-    }
-
-    $('manual').onclick = () => {
-        const lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
-        if (isNaN(lat) || isNaN(lon)) { setStatus('Enter valid coordinates.', true); return; }
-        search(lat, lon);
-    };
-    ['window', 'years', 'radius', 'imgOnly'].forEach(id => $(id).addEventListener('change', () => $('manual').click()));
-
-    $('go').onclick = () => {
-        if (!navigator.geolocation) { setStatus('Geolocation not supported.', true); return; }
-        setStatus('Getting your location…');
-        navigator.geolocation.getCurrentPosition(
-            p => { $('lat').value = p.coords.latitude.toFixed(5); $('lon').value = p.coords.longitude.toFixed(5); search(p.coords.latitude, p.coords.longitude); },
-            e => setStatus('Location failed (' + e.message + '). Enter coordinates above.', true),
-            { timeout: 15000 }
-        );
-    };
-
-    window.addEventListener('DOMContentLoaded', loadHouse);
-</script>
+<template id="tpl-empty">
+    <p class="empty-state">No reports in this area and window. Try a wider radius or more years.</p>
+</template>
 </body>
 </html>
