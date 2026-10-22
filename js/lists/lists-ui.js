@@ -17,7 +17,7 @@ export function bindStepper(r, getValue, onChange){
 // Single place that builds the "Manage tags" link target.
 // returnTo defaults to this section's tab on the Lists page.
 export function manageHref(sec, returnTo = `lists.html#${sectionSlug(sec)}`){
-    return `managegroceries.html?section=${encodeURIComponent(sec.id)}` +
+    return `lists-manage.html?section=${encodeURIComponent(sec.id)}` +
         `&return=${encodeURIComponent(returnTo)}`;
 }
 

@@ -133,8 +133,8 @@ self.addEventListener('activate', (event) => {
 async function handleNavigate(event) {
     const req = event.request;
     const cache = await caches.open(CACHE_NAME);
-    // Key pages without their query string so managegroceries.html?section=…
-    // is served from the one cached managegroceries.html.
+    // Key pages without their query string so lists-manage.html?section=…
+    // is served from the one cached lists-manage.html.
     const key = stripSearch(req.url);
     const cached = await cache.match(key, { ignoreSearch: true });
 
