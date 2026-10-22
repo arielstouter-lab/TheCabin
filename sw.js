@@ -1,53 +1,82 @@
 // Lives at the site ROOT so its scope covers every page.
-const CACHE_NAME = 'thecabin-v9';
+const CACHE_NAME = 'thecabin-v10';
 const NAV_TIMEOUT_MS = 3500;
 
-const STATIC_ASSETS = [
+// HTML pages (all at the root).
+const PAGES = [
     './',
     'index.html',
     'login.html',
-    'login.js',
     'app.html',
-    'app.js',
     'calendar.html',
-    'calendar.js',
     'chores.html',
-    'chores.js',
-    'moving.html',
-    'moving.js',
-    'weather.html',
-    'weather.js',
     'creditcards.html',
-    'elimination-diet.html',
-    'elimination-diet.js',
+    'diet.html',
+    'gbif.html',
     'lists.html',
-    'managegroceries.html',
+    'lists-manage.html',
+    'moving.html',
+    'notes.html',
     'settings.html',
+    'weather.html'
+];
+
+// Everything under js/, grouped by folder. Keep these in sync with the
+// <script src> tags in the HTML files.
+const SCRIPTS = [
+    'js/app.js',
+    'js/login.js',
+
+    'js/shared/database-config.js',
+    'js/shared/dom.js',
+    'js/shared/head-loader.js',
+    'js/shared/settings.js',
+    'js/shared/speech-to-text.js',
+    'js/shared/summary-card.js',
+    'js/shared/sync.js',
+    'js/shared/ui.js',
+
+    'js/calendar/calendar.js',
+    'js/chores/chores.js',
+
+    'js/diet/diet-coverage.js',
+    'js/diet/diet-predictions.js',
+    'js/diet/diet-main.js',
+
+    'js/financial/category-row.js',
+    'js/financial/creditcards.js',
+    'js/financial/debt-engine-v2.js',
+    'js/financial/debts.js',
+    'js/financial/tracker.js',
+
+    'js/gbif/gbif.js',
+
+    'js/lists/lists-aisles.js',
+    'js/lists/lists-panel.js',
+    'js/lists/lists-pantry.js',
+    'js/lists/lists-recipes.js',
+    'js/lists/lists-state.js',
+    'js/lists/lists-ui.js',
+    'js/lists/lists-main.js',
+    'js/lists/lists-manage.js',
+
+    'js/moving/moving.js',
+    'js/notes/notes.js',
+    'js/weather/weather.js'
+];
+
+const OTHER_ASSETS = [
     'styles.css',
     'manifest.json',
-    'SharedJS/head-loader.js',
-    'SharedJS/config.js',
-    'SharedJS/dom.js',
-    'SharedJS/sync.js',
-    'SharedJS/settings.js',
-    'SharedJS/summary-card.js',
-    'SharedJS/speech-to-text.js',
-    'Financial/category-row.js',
-    'Financial/creditcards.js',
-    'Financial/debt-engine-v2.js',
-    'Financial/debts.js',
-    'Lists/lists.js',
-    'Lists/lists-panel.js',
-    'Lists/lists-pantry.js',
-    'Lists/lists-recipes.js',
-    'Lists/lists-state.js',
-    'Lists/managegroceries.js',
+    'Images/cabin-app-icon.png',
     'Images/pinecone.png',
     'Images/spring.jpg',
     'Images/summer.jpg',
     'Images/fall.jpg',
     'Images/winter.jpg'
 ];
+
+const STATIC_ASSETS = [...PAGES, ...SCRIPTS, ...OTHER_ASSETS];
 
 // Third-party files every page needs. supabase-js is a blocking <script> in
 // <head>, and the Google Fonts stylesheet is render-blocking: if either hangs

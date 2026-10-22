@@ -3,7 +3,7 @@
 // Field edits route through unified state action helpers with offline sync.
 
 import { state, addIngredientsToGroceries, saveRecipeField } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
+import { cloneFragment, cloneEl, refs, emptyState } from '../shared/dom.js';
 
 let recipeSearchQuery = '';
 

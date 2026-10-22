@@ -2,12 +2,12 @@ import {
     state, sb, loadAll, createSection, createListItem,
     updateListItem, deleteListItem, deleteListItems, onStateChange, stopRealtime,
     isStateTrusted
-} from './Lists/lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState, bindEvents } from './SharedJS/dom.js';
-import { initSync } from './SharedJS/sync.js';
-import { syncStatusHandler } from './SharedJS/ui.js';
-import { manageHref } from './Lists/lists-ui.js';
-import { openAisleIds, groupByAisle, buildAisleGroup } from './Lists/lists-aisles.js';
+} from '../lists/lists-state.js';
+import { cloneFragment, cloneEl, refs, emptyState, bindEvents } from '../shared/dom.js';
+import { initSync } from '../shared/sync.js';
+import { syncStatusHandler } from '../shared/ui.js';
+import { manageHref } from '../lists/lists-ui.js';
+import { openAisleIds, groupByAisle, buildAisleGroup } from '../lists/lists-aisles.js';
 
 const SECTION_NAME = 'Moving';
 

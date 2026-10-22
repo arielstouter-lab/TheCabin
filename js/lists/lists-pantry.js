@@ -6,7 +6,7 @@ import {
     state, createListItem, updateListItem, deleteListItem,
     requestRender, addIngredientsToGroceries
 } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
+import { cloneFragment, cloneEl, refs, emptyState } from '../shared/dom.js';
 import { fillSlots, bindStepper, manageHref } from './lists-ui.js';
 import { openAisleIds, groupByAisle, buildAisleGroup } from './lists-aisles.js';
 

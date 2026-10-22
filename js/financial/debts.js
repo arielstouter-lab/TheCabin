@@ -8,13 +8,13 @@
 //
 // Math lives in debt-engine-v2.js; this file is UI + Supabase only.
 
-import { cloneEl, refs, bindEvents } from '../SharedJS/dom.js';
-import { renderSummaryCards } from '../SharedJS/summary-card.js';
+import { cloneEl, refs, bindEvents } from '../shared/dom.js';
+import { renderSummaryCards } from '../shared/summary-card.js';
 import {
     amortizedPayment, minimumPayment, amortizationSchedule, scheduledBalanceAt,
     simulate, effectiveApr, ymToIndex, addMonths, isYm, MAX_MONTHS
 } from './debt-engine-v2.js';
-import { fmt$, el, setStatus, captureDetailsState, restoreDetailsState } from '../SharedJS/ui.js';
+import { fmt$, el, setStatus, captureDetailsState, restoreDetailsState } from '../shared/ui.js';
 
 const sb = window.supabaseClient;
 const TABLES = window.TABLES;

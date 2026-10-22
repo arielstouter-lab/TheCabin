@@ -1,4 +1,4 @@
-import { bindEvents } from './SharedJS/dom.js';
+import { bindEvents } from '../shared/dom.js';
 import { renderPredictions } from './diet-predictions.js';
 import { renderAttention } from './diet-coverage.js';
 

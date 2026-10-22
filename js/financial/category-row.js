@@ -6,8 +6,8 @@
 // Needs #tpl-category-row present in the page. Sits next to dom.js at
 // the app root so any page can import it the same way.
 
-import { cloneEl, refs, focusAtEnd } from '../SharedJS/dom.js';
-import { fmt$ as defaultFmt } from '../SharedJS/ui.js';
+import { cloneEl, refs, focusAtEnd } from '../shared/dom.js';
+import { fmt$ as defaultFmt } from '../shared/ui.js';
 
 // row: { id, category|name, frequency, amount, notes, monthly_spend }
 // onUpdate(id, patch) / onDelete(id) are called with just the changed field(s).

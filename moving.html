@@ -3,11 +3,11 @@
 <head>
     <title>Moving</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="SharedJS/head-loader.js"></script>
+    <script src="js/shared/head-loader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="SharedJS/database-config.js" defer></script>
-    <script src="app.js" defer></script>
-    <script type="module" src="moving.js" defer></script>
+    <script src="js/shared/database-config.js" defer></script>
+    <script src="js/app.js" defer></script>
+    <script type="module" src="js/moving/moving.js" defer></script>
 </head>
 
 <!--
@@ -41,7 +41,7 @@
                 <h2 class="card-title" data-ref="title"></h2>
                 <div class="card-actions">
                     <button type="button" class="button-inline" data-ref="clearBtn" hidden>Clear checked</button>
-                    <a href="managegroceries.html" class="button-inline" data-ref="manageLink">Manage tags</a>
+                    <a href="lists-manage.html" class="button-inline" data-ref="manageLink">Manage tags</a>
                 </div>
             </div>
             <div class="lst-items" data-ref="items" data-empty="No moving items yet."></div>

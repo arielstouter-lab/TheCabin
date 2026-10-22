@@ -1,5 +1,5 @@
-import { cloneEl, refs } from '../SharedJS/dom.js';
-import { fmt$, setStatus } from '../SharedJS/ui.js';
+import { cloneEl, refs } from '../shared/dom.js';
+import { fmt$, setStatus } from '../shared/ui.js';
 
 const sb = window.supabaseClient;
 const TABLES = window.TABLES;

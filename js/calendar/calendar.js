@@ -1,6 +1,6 @@
-import { writeOrQueue, nowStamp, getPendingOp, initSync } from './SharedJS/sync.js';
-import { bindEvents, cloneEl, refs } from './SharedJS/dom.js';
-import { makeChip, setStatus, syncStatusHandler } from './SharedJS/ui.js';
+import { writeOrQueue, nowStamp, getPendingOp, initSync } from '../shared/sync.js';
+import { bindEvents, cloneEl, refs } from '../shared/dom.js';
+import { makeChip, setStatus, syncStatusHandler } from '../shared/ui.js';
 
 // This file is a module, so everything below is already module-scoped.
 const sb = window.supabaseClient;

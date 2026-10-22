@@ -1,9 +1,9 @@
-import { cloneEl, refs } from '../SharedJS/dom.js';
+import { cloneEl, refs } from '../shared/dom.js';
 import { buildCategoryRow } from './category-row.js';
 import { initDebts, loadDebtData, renderDebts } from './debts.js';
 import { addMonths, isYm } from './debt-engine-v2.js';
 import { initTracker, loadTrackerData, renderTracker, TRACKER_TABLE } from './tracker.js';
-import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../SharedJS/ui.js';
+import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../shared/ui.js';
 
 const sb = window.supabaseClient;
 const TABLES = window.TABLES;

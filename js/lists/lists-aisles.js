@@ -3,7 +3,7 @@
 // group is a collapsible <details> built from <template id="tpl-aisle-group">.
 
 import { state } from './lists-state.js';
-import { cloneEl, refs } from '../SharedJS/dom.js';
+import { cloneEl, refs } from '../shared/dom.js';
 
 // Aisle ids of the groups that are currently open, so a re-render can restore them.
 export function openAisleIds(){

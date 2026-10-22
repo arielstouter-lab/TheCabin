@@ -3,11 +3,11 @@
 <head>
     <title>Lists</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="SharedJS/head-loader.js"></script>
+    <script src="js/shared/head-loader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="SharedJS/database-config.js" defer></script>
-    <script src="app.js" defer></script>
-    <script type="module" src="Lists/lists.js" defer></script>
+    <script src="js/shared/database-config.js" defer></script>
+    <script src="js/app.js" defer></script>
+    <script type="module" src="js/lists/lists-main.js" defer></script>
 </head>
 
 <!--
@@ -83,7 +83,7 @@
                 <h2 class="card-title" data-ref="title"></h2>
                 <div class="card-actions">
                     <button type="button" class="button-inline" data-ref="clearBtn" hidden>Clear checked</button>
-                    <a href="managegroceries.html" class="button-inline" data-ref="manageLink">Manage tags</a>
+                    <a href="lists-manage.html" class="button-inline" data-ref="manageLink">Manage tags</a>
                 </div>
             </div>
             <div class="lst-items" data-ref="items" data-empty="Nothing here yet."></div>
@@ -112,7 +112,7 @@
                         <input type="checkbox" role="switch" data-ref="tagsToggle" />
                         <span>Tags</span>
                     </label>
-                    <a href="managegroceries.html" class="button-inline" data-ref="manageLink" hidden>Manage tags</a>
+                    <a href="lists-manage.html" class="button-inline" data-ref="manageLink" hidden>Manage tags</a>
                     <button type="button" class="icon-delete" title="Remove tab" data-ref="deleteTab" hidden>✕</button>
                 </div>
             </div>
@@ -152,7 +152,7 @@
             <div class="card-head">
                 <h2 class="card-title" data-ref="title"></h2>
                 <div class="card-actions">
-                    <a href="managegroceries.html" class="button-inline" data-ref="manageLink">Manage tags</a>
+                    <a href="lists-manage.html" class="button-inline" data-ref="manageLink">Manage tags</a>
                 </div>
             </div>
             <div class="lst-items" data-ref="items" data-empty="Nothing in the pantry yet."></div>

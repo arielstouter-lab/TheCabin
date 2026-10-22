@@ -11,7 +11,7 @@ import {
     deleteSection, updateSectionTagsEnabled,
     personName, dueClass, saveToLocalCache, requestRender
 } from './lists-state.js';
-import { cloneFragment, cloneEl, refs, emptyState } from '../SharedJS/dom.js';
+import { cloneFragment, cloneEl, refs, emptyState } from '../shared/dom.js';
 import { makeChip, manageHref, fillPersonOptions, setStatus } from './lists-ui.js';
 
 // ---- Row actions ---------------------------------------------------------

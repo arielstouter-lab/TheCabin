@@ -1,10 +1,10 @@
 // Lists-specific UI helpers. Generic ones (chips, slots, status toasts) live in
 // SharedJS/ui.js and are re-exported here so the panels keep a single import.
 
-import { cloneEl } from '../SharedJS/dom.js';
+import { cloneEl } from '../shared/dom.js';
 import { sectionSlug } from './lists-state.js';
 
-export { makeChip, fillSlots, setStatus } from '../SharedJS/ui.js';
+export { makeChip, fillSlots, setStatus } from '../shared/ui.js';
 
 // Wires a quantity stepper (tpl-stepper refs) to a value.
 // getValue() returns the current number; onChange(next) is called with the new one.
