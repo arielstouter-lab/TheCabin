@@ -316,7 +316,7 @@ function buildMap(r) {
     const lon = r.decimalLongitude;
     const u = r.coordinateUncertaintyInMeters;
     const hasU = u > 0;
-    const z = zoomFor(u);
+    const z = Math.max(3, Math.min(18, zoom ?? zoomFor(u)));
     const n = 2 ** z;
     const latRad = lat * Math.PI / 180;
 
@@ -357,6 +357,15 @@ function buildMap(r) {
     slot(map, 'caption').textContent = hasU
         ? `Location uncertainty ±${Math.round(u)} m · zoom ${z}`
         : `Uncertainty not reported · zoom ${z}`;
+
+    const { decimalLatitude: la, decimalLongitude: lo } = r;
+    slot(map, 'osm').href =
+        `https://www.openstreetmap.org/?mlat=${la}&mlon=${lo}#map=17/${la}/${lo}`;
+    slot(map, 'sat').href =
+        `https://www.google.com/maps/@?api=1&map_action=map&center=${la},${lo}&zoom=18&basemap=satellite`;
+    slot(map, 'zoomOut').addEventListener('click', () => map.replaceWith(buildMap(r, z - 1)));
+    slot(map, 'zoomIn').addEventListener('click', () => map.replaceWith(buildMap(r, z + 1)));
+
     return map;
 }
 
