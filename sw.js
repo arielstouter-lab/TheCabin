@@ -1,5 +1,5 @@
 // Lives at the site ROOT so its scope covers every page.
-const CACHE_NAME = 'thecabin-v10';
+const CACHE_NAME = 'thecabin-v11';
 const NAV_TIMEOUT_MS = 3500;
 
 // HTML pages (all at the root).
@@ -40,8 +40,9 @@ const SCRIPTS = [
     'js/chores/chores.js',
 
     'js/diet/diet-coverage.js',
-    'js/diet/diet-predictions.js',
+    'js/diet/diet-export.js',
     'js/diet/diet-main.js',
+    'js/diet/diet-predictions.js',
 
     'js/financial/category-row.js',
     'js/financial/creditcards.js',

@@ -3,7 +3,7 @@ import { renderPredictions } from './diet-predictions.js';
 import { renderAttention } from './diet-coverage.js';
 import { exportTimelineCsv } from './diet-export.js';
 
-// Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
+// Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - diet.html must load the
 // same shared scripts that lists.html does before this module.
 const sb = window.supabaseClient;
 

@@ -1,4 +1,4 @@
-// Timeline export for elimination-diet: one CSV with every meal, not-eaten meal and symptom, oldest first,
+// Timeline export for diet-main: one CSV with every meal, not-eaten meal and symptom, oldest first,
 // plus a few columns that tell a reader (or an AI) how complete the log was around each row.
 //
 // type values:  meal | meal_not_eaten | symptom | positive_symptom

@@ -170,7 +170,7 @@ if (savedTheme && THEMES[savedTheme]) {
 
 (function() {
     const scriptUrl = new URL(document.currentScript.src);
-    const appBase = scriptUrl.pathname.replace(/SharedJS\/head-loader\.js$/, '');
+    const appBase = scriptUrl.pathname.replace(/shared\/head-loader\.js$/, '');
 
     const commonTags = `
         <meta charset="UTF-8" />

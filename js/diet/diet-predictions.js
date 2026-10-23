@@ -1,4 +1,4 @@
-// Predictions tab for elimination-diet.js.
+// Predictions tab for diet-main.js.
 //
 // Triggers (case-crossover comparison): for every symptom, look at what was eaten in the preceding N
 // hours, then at the same clock time on the 7 days before and after (days with no symptom around that

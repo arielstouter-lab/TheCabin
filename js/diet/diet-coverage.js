@@ -1,4 +1,4 @@
-// Coverage helpers for elimination-diet: which meals / symptom check-ins are missing, and how much
+// Coverage helpers for diet-main: which meals / symptom check-ins are missing, and how much
 // that should lower confidence in predictions. Used by the "Needs attention" card and diet-predictions.js.
 
 export const HOUR = 3600e3, DAY = 24 * HOUR;
@@ -98,7 +98,7 @@ export function buildConfidence(state, now = Date.now()) {
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const dayLabel = t => new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
-// "Needs attention" card on the Timeline tab. Buttons carry data-* attributes handled in elimination-diet.js.
+// "Needs attention" card on the Timeline tab. Buttons carry data-* attributes handled in diet-main.js.
 export function renderAttention(state) {
     const card = document.getElementById('attentionCard'), list = document.getElementById('attentionList');
     if (!card || !list) return;

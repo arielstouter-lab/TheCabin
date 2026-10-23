@@ -1,5 +1,5 @@
 // Lists-specific UI helpers. Generic ones (chips, slots, status toasts) live in
-// SharedJS/ui.js and are re-exported here so the panels keep a single import.
+// shared/ui.js and are re-exported here so the panels keep a single import.
 
 import { cloneEl } from '../shared/dom.js';
 import { sectionSlug } from './lists-state.js';

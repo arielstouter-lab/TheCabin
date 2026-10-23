@@ -1,6 +1,6 @@
 // sync.js — offline write outbox with last-write-wins conflict resolution.
 // Shared by any page that writes to Supabase (lists, moving, creditcards, ...).
-// Sits in SharedJS alongside dom.js.
+// Sits in shared alongside dom.js.
 //
 // How it works (write-ahead outbox):
 // - Every write is stamped with a client-side `updated_at` (the moment of the
