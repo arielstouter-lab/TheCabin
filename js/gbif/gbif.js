@@ -115,15 +115,18 @@ async function matchName(name, rank) {
 // Handles both [name, rank] and [[name, rank], ...]
 async function matchAlias(alias, text) {
     const pairs = Array.isArray(alias[0]) ? alias : [alias];
-    const hits = [];
-    for (const [name, rank] of pairs) {      // sequential, to be kind to GBIF's rate limit
+    const hits = [], misses = [];
+    for (const [name, rank] of pairs) {
         const hit = await matchName(name, rank);
         if (hit) hits.push(hit);
+        else misses.push(name);
     }
+    if (misses.length) console.warn('No GBIF match for:', misses.join(', '));
     if (!hits.length) return null;
     return {
         key: hits.map(h => h.key),
-        label: `${text} → ${hits.map(h => h.label).join(', ')}`
+        label: `${text} → ${hits.map(h => h.label).join(', ')}` +
+            (misses.length ? ` (not found: ${misses.join(', ')})` : '')
     };
 }
 
