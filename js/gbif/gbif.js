@@ -72,6 +72,13 @@ const isHttp = url => /^https?:\/\//i.test(url || '');
 /* ---------- taxon limiter ---------- */
 
 // Everyday group names -> [scientific name, rank]. Anything else is looked up in GBIF.
+const RAPTORS = [
+    ['Accipitriformes', 'ORDER'],   // hawks, eagles, kites, osprey
+    ['Falconiformes', 'ORDER'],     // falcons, caracaras
+    ['Cathartiformes', 'ORDER'],    // New World vultures
+    ['Strigiformes', 'ORDER']       // owls (delete this line to exclude them)
+];
+
 const ALIASES = {
     mushroom: ['Agaricomycetes', 'CLASS'],   // most mushrooms, bracket fungi, puffballs
     fungus: ['Fungi', 'KINGDOM'],
@@ -84,7 +91,10 @@ const ALIASES = {
     reptile: ['Reptilia', 'CLASS'],
     amphibian: ['Amphibia', 'CLASS'],
     insect: ['Insecta', 'CLASS'],
-    spider: ['Araneae', 'ORDER']
+    spider: ['Araneae', 'ORDER'],
+    raptor: RAPTORS,
+    'bird of prey': RAPTORS,
+    'birds of prey': RAPTORS
 };
 
 const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
@@ -99,6 +109,21 @@ async function matchName(name, rank) {
     return {
         key: m.acceptedUsageKey ?? m.usageKey,
         label: `${m.canonicalName || m.scientificName} (${m.rank.toLowerCase()})`
+    };
+}
+
+// Handles both [name, rank] and [[name, rank], ...]
+async function matchAlias(alias, text) {
+    const pairs = Array.isArray(alias[0]) ? alias : [alias];
+    const hits = [];
+    for (const [name, rank] of pairs) {      // sequential, to be kind to GBIF's rate limit
+        const hit = await matchName(name, rank);
+        if (hit) hits.push(hit);
+    }
+    if (!hits.length) return null;
+    return {
+        key: hits.map(h => h.key),
+        label: `${text} → ${hits.map(h => h.label).join(', ')}`
     };
 }
 
@@ -120,8 +145,8 @@ async function resolveTaxon() {
     const lower = text.toLowerCase();
     const alias = ALIASES[lower] || ALIASES[lower.replace(/s$/, '')];
     if (alias) {
-        const hit = await matchName(alias[0], alias[1]);
-        if (hit) return { ...hit, label: `${text} → ${hit.label}` };
+        const hit = await matchAlias(alias, text);
+        if (hit) return hit;
     }
 
     const sci = await matchName(titleCase(text));
@@ -186,9 +211,12 @@ async function mapLimit(items, limit, fn) {
 
 // Pages through one eventDate range ("start,end"); returns the records and whether the cap cut it short
 async function fetchRange(range, base, maxPages) {
-    const params = new URLSearchParams(base);
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(base)) {
+        (Array.isArray(v) ? v : [v]).forEach(x => params.append(k, x));
+    }
     params.set('eventDate', range);
-
+    
     const recs = [];
     let capped = false;
     for (let page = 0; page < maxPages; page++) {
@@ -311,7 +339,7 @@ function zoomFor(uncertaintyM) {
 }
 
 // OpenStreetMap tiles stitched to fill the viewport, record centered, with an uncertainty circle
-function buildMap(r) {
+function buildMap(r, zoom) {
     const lat = Math.max(-85.0511, Math.min(85.0511, r.decimalLatitude));
     const lon = r.decimalLongitude;
     const u = r.coordinateUncertaintyInMeters;
