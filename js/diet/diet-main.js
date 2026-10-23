@@ -1,6 +1,7 @@
 import { bindEvents } from '../shared/dom.js';
 import { renderPredictions } from './diet-predictions.js';
 import { renderAttention } from './diet-coverage.js';
+import { exportTimelineCsv } from './diet-export.js';
 
 // Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
 // same shared scripts that lists.html does before this module.
@@ -446,6 +447,15 @@ bindEvents(document, {
             await loadAll();
         } catch (err) {
             console.error('Failed to save symptom:', err);
+        }
+    },
+    'click #exportTimelineBtn': async () => {
+        try {
+            const rows = await exportTimelineCsv(sb, state.ingredients);
+            if (window.setStatus) window.setStatus(`Exported ${rows} rows.`);
+        } catch (err) {
+            console.error('Export failed:', err);
+            if (window.setStatus) window.setStatus('Could not export.');
         }
     },
     'click #elimination-tabs .tab': (e, btn) => {
