@@ -1,5 +1,5 @@
 import { bindEvents } from '../shared/dom.js';
-import { renderPredictions } from './diet-prediction.js';
+import { renderPredictions } from './diet-predictions.js';
 import { renderAttention } from './diet-coverage.js';
 import { exportTimelineCsv } from './diet-export.js';
 
