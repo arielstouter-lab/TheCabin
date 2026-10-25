@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Page check</title>
+    <style>
+        body{font-family:system-ui,sans-serif;padding:12px;max-width:720px;margin:0 auto}
+        input,button{font:inherit;padding:8px;margin:4px 0}
+        button{margin-right:6px}
+        pre{white-space:pre-wrap;word-break:break-word;font-size:13px;background:#f3f3f3;color:#111;padding:10px;border-radius:6px}
+    </style>
+</head>
+<body>
+<h2>Page check</h2>
+<p>Works for any page in the app. Put this file in the same folder as the page, type that page's file name below (for example lists.html), and tap Run.</p>
+<label>Page file name <input id="page" value="diet.html"></label><br>
+<button id="run">Run checks</button>
+<button id="copy">Copy results</button>
+<button id="reset">Reset service worker and cache</button>
+<pre id="out">Tap "Run checks".</pre>
+
+<script>
+const $ = id => document.getElementById(id);
+const lines = [];
+const log = s => { lines.push(s); $('out').textContent = lines.join('\n'); };
+const ok = (name, detail = '') => log('OK    ' + name + (detail ? '  ' + detail : ''));
+const bad = (name, detail = '') => log('FAIL  ' + name + (detail ? '  ' + detail : ''));
+
+// Fetch a URL and report status and content type. A missing script often comes back as a 200 web page
+// (text/html), which is what breaks module imports.
+async function probe(url, label) {
+    try {
+        const r = await fetch(url, { cache: 'no-store' });
+        const type = (r.headers.get('content-type') || '').split(';')[0];
+        const isJs = /javascript/.test(type);
+        const good = r.ok && (!/\.m?js$/.test(new URL(url).pathname) || isJs);
+        (good ? ok : bad)(label || url, `${r.status} ${type}`);
+        return r.ok ? await r.text() : null;
+    } catch (e) { bad(label || url, e.message); return null; }
+}
+
+async function run() {
+    lines.length = 0;
+    log('Page: ' + location.href);
+
+    // 1) Service worker and caches
+    try {
+        const regs = navigator.serviceWorker ? await navigator.serviceWorker.getRegistrations() : [];
+        log(`Service workers: ${regs.length}; controlling this page: ${!!(navigator.serviceWorker && navigator.serviceWorker.controller)}`);
+        log('Caches: ' + ((await caches.keys()).join(', ') || '(none)'));
+    } catch (e) { log('Service worker check failed: ' + e.message); }
+
+    // 2) Every script and stylesheet the diet page asks for
+    const pageUrl = new URL($('page').value.trim(), location.href).href;
+    log('\n-- Files requested by ' + $('page').value.trim() + ' --');
+    const html = await probe(pageUrl, $('page').value.trim());
+    let mainUrl = null;
+    if (html) {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        for (const el of doc.querySelectorAll('script[src], link[rel="stylesheet"][href]')) {
+            const ref = el.getAttribute('src') || el.getAttribute('href');
+            if (/^https?:\/\//.test(ref)) continue;                    // CDN files
+            const url = new URL(ref, pageUrl).href;
+            await probe(url, ref);
+            if (el.type === 'module') mainUrl = url;
+        }
+    }
+
+    // 3) Imports inside the page's module script, resolved from where that file lives
+    const wanted = new Map();                       // module url -> names the main module imports from it
+    if (mainUrl) {
+        log('\n-- Imports inside ' + mainUrl.split('/').slice(-3).join('/') + ' --');
+        const src = await probe(mainUrl, 'main module');
+        if (src) {
+            const re = /^\s*import\s+(?:([^'"]*?)\s+from\s+)?['"]([^'"]+)['"]/gm;
+            for (const m of src.matchAll(re)) {
+                const url = new URL(m[2], mainUrl).href;
+                await probe(url, m[2]);
+                const names = [...(m[1] || '').matchAll(/\{([^}]*)\}/g)].flatMap(b => b[1].split(','))
+                    .map(n => n.trim().split(/\s+as\s+/)[0]).filter(Boolean);
+                wanted.set(url, [...(wanted.get(url) || []), ...names]);
+            }
+        }
+    } else if (html) log('\nNo <script type="module"> found in that page, so there are no imports to check.');
+
+    // 4) Load each imported module for real and confirm it exports every name the main module asks for
+    if (wanted.size) log('\n-- Loading the modules it imports --');
+    for (const [url, names] of wanted) {
+        const label = url.split('/').slice(-2).join('/');
+        try {
+            const mod = await import(url);
+            const missing = names.filter(n => !(n in mod));
+            (missing.length ? bad : ok)(label, missing.length ? 'missing exports: ' + missing.join(', ') : 'exports: ' + Object.keys(mod).join(', '));
+        } catch (e) { bad(label, e.message); }
+    }
+    log('\nDone. Tap "Copy results" and paste them to me if anything says FAIL.');
+}
+
+$('run').onclick = run;
+$('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(lines.join('\n')); alert('Copied'); }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($('out')); getSelection().removeAllRanges(); getSelection().addRange(r); alert('Select and copy the text above'); }
+};
+$('reset').onclick = async () => {
+    if (!confirm('Unregister the service worker and delete its cached files? Your saved data is not touched. The next page load will fetch everything fresh.')) return;
+    const regs = navigator.serviceWorker ? await navigator.serviceWorker.getRegistrations() : [];
+    await Promise.all(regs.map(r => r.unregister()));
+    await Promise.all((await caches.keys()).map(k => caches.delete(k)));
+    log('Service worker unregistered and caches cleared. Close the app completely, reopen it, and load the diet page again.');
+};
+</script>
+</body>
+</html>
