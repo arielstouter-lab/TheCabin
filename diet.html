@@ -5,20 +5,22 @@
     <link rel="stylesheet" href="styles.css">
     <script src="js/shared/head-loader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/shared/database-config.js" defer></script>
+    <script src="js/shared/config.js" defer></script>
     <script src="js/app.js" defer></script>
     <script type="module" src="js/diet/diet-main.js"></script>
     <style>
         /* Page-specific only: chip toggle state and log rows. Everything else comes from styles.css. */
         .chip.off{opacity:.35}                          /* unselected tag / ingredient chips */
-        .chip[data-tag],.chip[data-id]{cursor:pointer}
+        .chip[data-tag],.chip[data-id],.chip[data-supp-quick]{cursor:pointer}
         .diet-row{padding:8px 0;border-bottom:1px solid #ddd}
         .diet-row small{color:#666}
         .diet-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-        .diet-row[data-meal-id],.diet-row[data-sym-id]{cursor:pointer}
+        .diet-row[data-meal-id],.diet-row[data-sym-id],.diet-row[data-supp-id]{cursor:pointer}
         .diet-row.editing{background:rgba(0,0,0,.06)}
         .diet-row .sev{font-weight:bold}
         .diet-picker{width:100%}
+        .star{cursor:pointer;font-size:1.25em;line-height:1;margin-right:4px;opacity:.5}
+        .star.on{opacity:1}
     </style>
 </head>
 
@@ -41,6 +43,7 @@
                 <button type="button" class="tab" data-tab="timeline"><span>Timeline</span></button>
                 <button type="button" class="tab" data-tab="meals"><span>Meals</span></button>
                 <button type="button" class="tab" data-tab="symptoms"><span>Symptoms</span></button>
+                <button type="button" class="tab" data-tab="supplements"><span>Supplements</span></button>
                 <button type="button" class="tab" data-tab="ingredients"><span>Ingredients</span></button>
                 <button type="button" class="tab" data-tab="predictions"><span>Predictions</span></button>
             </div>
@@ -65,7 +68,9 @@
                     <div class="card-body">
                         <div class="cc-add-form">
                             <button type="button" class="button-inline" id="exportTimelineBtn">Export CSV</button>
+                            <button type="button" class="button-inline button-ghost" id="copyTimelineBtn">Copy CSV</button>
                             <span class="note">Every meal and symptom (not just the ones shown below), for a spreadsheet or an AI assistant</span>
+                            <span class="note" id="exportStatus" role="status"></span>
                         </div>
                         <div id="timelineList"></div>
                     </div>
@@ -85,6 +90,14 @@
                                 <input type="datetime-local" class="text-input" id="mealWhen" required />
                                 <input type="text" class="text-input" id="mealLabel" placeholder="Meal (e.g. Lunch)" />
                                 <input type="text" class="text-input note" id="mealNotes" placeholder="Notes (optional)" />
+                                <select class="text-input" id="mealSize">
+                                    <option value="">Meal size</option>
+                                    <option value="snack">Snack</option>
+                                    <option value="small">Small</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="large">Large</option>
+                                    <option value="very large">Very large</option>
+                                </select>
                                 <label class="note"><input type="checkbox" id="mealSkipped" /> Meal not eaten</label>
                             </div>
                             <div id="mealPicker" class="diet-picker"></div>
@@ -130,11 +143,22 @@
                                     <option>Good appetite</option><option>Regular bowel movement</option><option>Good energy</option>
                                 </datalist>
                                 <input type="number" class="text-input" id="symSev" min="1" max="10" value="3" placeholder="Severity" />
+                                <select class="text-input" id="symBristol" hidden>
+                                    <option value="">Stool type (Bristol)</option>
+                                    <option value="1">1 - Separate hard lumps</option>
+                                    <option value="2">2 - Lumpy sausage</option>
+                                    <option value="3">3 - Sausage with cracks</option>
+                                    <option value="4">4 - Smooth, soft sausage</option>
+                                    <option value="5">5 - Soft blobs</option>
+                                    <option value="6">6 - Mushy, fluffy pieces</option>
+                                    <option value="7">7 - Watery, no solid pieces</option>
+                                </select>
                                 <input type="text" class="text-input note" id="symNotes" placeholder="Notes (optional)" />
                             </div>
                             <button type="submit" class="button-inline" id="symSubmit">Add entry</button>
                             <button type="button" class="button-inline button-ghost" id="symCancel" hidden>Cancel edit</button>
                         </form>
+                        <p class="note" id="bristolHelp" hidden>Bristol stool scale: 1-2 constipation, 3-4 normal, 5 soft and lacking shape, 6 mushy, 7 watery. Types 6-7 are generally what counts as diarrhea.</p>
                     </div>
                 </div>
 
@@ -144,6 +168,39 @@
                     </div>
                     <div class="card-body">
                         <div id="symList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Supplements -->
+            <div id="tab-supplements" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title" id="suppFormTitle">Log a Supplement</h2>
+                        <span class="note">Pills and other supplements. Tap a recent one to fill in its name and last dose.</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="suppQuick"></div>
+                        <form id="suppForm" class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="datetime-local" class="text-input" id="suppWhen" required />
+                                <input type="text" class="text-input" id="suppName" list="suppOptions" placeholder="Supplement (e.g. Magnesium)" required />
+                                <datalist id="suppOptions"></datalist>
+                                <input type="text" class="text-input" id="suppDose" placeholder="Dose (e.g. 200 mg)" />
+                                <input type="text" class="text-input note" id="suppNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button type="submit" class="button-inline" id="suppSubmit">Add supplement</button>
+                            <button type="button" class="button-inline button-ghost" id="suppCancel" hidden>Cancel edit</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Supplements</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="suppList"></div>
                     </div>
                 </div>
             </div>
@@ -189,7 +246,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Ingredients</h2>
-                        <span class="note">★ marks frequent ingredients, which show as one-tap chips when logging a meal</span>
+                        <span class="note">Tap the star to pin an ingredient as a one-tap chip when logging a meal. Your most-used ingredients also appear there automatically.</span>
                     </div>
                     <div class="card-body">
                         <div id="ingList"></div>
