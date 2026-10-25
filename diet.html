@@ -135,12 +135,12 @@
                                 <input type="text" class="text-input" id="symName" list="symOptions" placeholder="Symptom" required />
                                 <datalist id="symOptions">
                                     <option>Bloating</option><option>Cramping</option><option>Nausea</option>
-                                    <option>Diarrhea</option><option>Constipation</option><option>Reflux</option>
+                                    <option>Diarrhea</option><option>Constipation</option><option>Bowel movement</option><option>Reflux</option>
                                     <option>Gas</option><option>Pain</option>
                                 </datalist>
                                 <datalist id="symOptionsPositive">
                                     <option>Felt fine</option><option>Normal digestion</option><option>Comfortable</option>
-                                    <option>Good appetite</option><option>Regular bowel movement</option><option>Good energy</option>
+                                    <option>Good appetite</option><option>Bowel movement</option><option>Regular bowel movement</option><option>Good energy</option>
                                 </datalist>
                                 <input type="number" class="text-input" id="symSev" min="1" max="10" value="3" placeholder="Severity" />
                                 <select class="text-input" id="symBristol" hidden>
@@ -158,7 +158,7 @@
                             <button type="submit" class="button-inline" id="symSubmit">Add entry</button>
                             <button type="button" class="button-inline button-ghost" id="symCancel" hidden>Cancel edit</button>
                         </form>
-                        <p class="note" id="bristolHelp" hidden>Bristol stool scale: 1-2 constipation, 3-4 normal, 5 soft and lacking shape, 6 mushy, 7 watery. Types 6-7 are generally what counts as diarrhea.</p>
+                        <p class="note" id="bristolHelp" hidden>Bristol stool scale: 1-2 hard, 3-4 normal, 5 soft, 6 mushy, 7 watery. Types 1-2 and 6-7 are logged as symptoms; types 3-5 are logged as positive. A plain BM entry starts at type 5.</p>
                     </div>
                 </div>
 
