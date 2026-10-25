@@ -1,16 +1,20 @@
 import { bindEvents } from '../shared/dom.js';
-import { renderPredictions } from './diet-predictions.js';
+import { renderPredictions } from './diet-prediction.js';
 import { renderAttention } from './diet-coverage.js';
 import { exportTimelineCsv } from './diet-export.js';
 
-// Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - diet.html must load the
+// Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
 // same shared scripts that lists.html does before this module.
 const sb = window.supabaseClient;
 
 // ---------- allergen / trigger tagging ----------
 // kind: 'allergen' (top allergens) or 'trigger' (common GI triggers)
 const TAGS = {
-    dairy:        { kind: 'allergen', words: ['milk','cheese','butter','cream','yogurt','yoghurt','whey','casein','ghee','ice cream','sour cream','half and half'] },
+    // dairy = anything made from milk (milk proteins). lactose = milk sugar, so lactose-free milk is dairy but not lactose.
+    dairy:        { kind: 'allergen', words: ['milk','cheese','butter','cream','yogurt','yoghurt','whey','casein','ghee','ice cream','sour cream','half and half','buttermilk','kefir','paneer','custard','cheddar','parmesan','mozzarella','feta','brie','gouda','ricotta','mascarpone'],
+                    not: ['dairy[- ]free','non[- ]dairy','\\b(almond|oat|soy|coconut|rice|cashew|hemp|pea|plant)[- ]?(based )?(milk|cream|yogurt|yoghurt|cheese|butter)','\\b(peanut|almond|cashew|nut|cocoa|shea|apple|sunflower) butter','cream of tartar'] },
+    lactose:      { kind: 'allergen', words: ['milk','cream','ice cream','sour cream','half and half','yogurt','yoghurt','kefir','ricotta','mascarpone','cottage cheese','cream cheese','condensed milk','custard','buttermilk','whey'],
+                    not: ['lactose[- ]free','dairy[- ]free','non[- ]dairy','\\b(almond|oat|soy|coconut|rice|cashew|hemp|pea|plant)[- ]?(based )?(milk|cream|yogurt|yoghurt)','cream of tartar'] },
     gluten:       { kind: 'allergen', words: ['wheat','flour','bread','pasta','barley','rye','couscous','semolina','tortilla','noodle','breadcrumb','soy sauce','cracker','cake','cookie','muffin','pastry','pie','biscuit','scone','brownie','donut','doughnut','pancake','waffle','pizza','bagel','pretzel','bun','croissant','dumpling','cereal','granola','crust','dough','batter','macaroni','mac and cheese','spaghetti','lasagna','ravioli','pita','sandwich','burger','biscotti'] },
     egg:          { kind: 'allergen', words: ['egg','mayo','mayonnaise','meringue'] },
     soy:          { kind: 'allergen', words: ['soy','tofu','tempeh','edamame','miso'] },
@@ -25,7 +29,7 @@ const TAGS = {
     caffeine:     { kind: 'trigger', words: ['coffee','espresso','tea','chocolate','cocoa','cola','energy drink'] },
     alcohol:      { kind: 'trigger', words: ['wine','beer','vodka','whiskey','rum','tequila','liquor','bourbon'] },
     'fatty/fried':{ kind: 'trigger', words: ['fried','bacon','sausage','lard','deep-fried','fries'] },
-    sweetener:    { kind: 'trigger', words: ['sorbitol','xylitol','mannitol','erythritol','aspartame','sucralose','mio'] },
+    sweetener:    { kind: 'trigger', words: ['sorbitol','xylitol','mannitol','erythritol','aspartame','sucralose','stevia'] },
     carbonated:   { kind: 'trigger', words: ['soda','sparkling','seltzer','carbonated','tonic'] },
     acidic:       { kind: 'trigger', words: ['tomato','citrus','lemon','lime','orange','vinegar'] },
 };
@@ -33,7 +37,8 @@ const ALL_TAGS = Object.keys(TAGS);
 // Whole-word matching (optional plural), so "steak" doesn't hit "tea" and "eggplant" doesn't hit "egg".
 const WORD_RES = Object.fromEntries(ALL_TAGS.map(t => [t,
     new RegExp('\\b(?:' + TAGS[t].words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?:e?s)?\\b', 'i')]));
-const autoTag = name => ALL_TAGS.filter(t => WORD_RES[t].test(name));
+const NOT_RES = Object.fromEntries(ALL_TAGS.filter(t => TAGS[t].not).map(t => [t, new RegExp(TAGS[t].not.join('|'), 'i')]));
+const autoTag = name => ALL_TAGS.filter(t => WORD_RES[t].test(name) && !(NOT_RES[t] && NOT_RES[t].test(name)));
 // Learned tags: same matching as groceries' aisleIdForItemText (exact -> phrase -> partial),
 // reading diet_item_memory (item_key -> tags) instead of aisles.
 const gk = t => window.groceryKey(t);
@@ -59,7 +64,7 @@ async function rememberTags(name, tags) {
     if (error) console.error(error);
 }
 // Suspected triggers get the site's priority chip style; everything else is a plain chip.
-const PRIORITY_TAGS = new Set(['gluten', 'dairy', 'high-FODMAP', 'sweetener', 'fatty/fried']);
+const PRIORITY_TAGS = new Set(['gluten', 'dairy', 'lactose', 'high-FODMAP', 'sweetener', 'fatty/fried']);
 const chipClass = t => 'chip' + (PRIORITY_TAGS.has(t) ? ' priority-chip' : '');
 
 // ---------- helpers ----------
@@ -67,17 +72,18 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const fmt = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-const state = { memory: [], memoryLookup: new Map(), ingredients: [], meals: [], symptoms: [], recipes: [], picked: new Set() };
+const state = { memory: [], memoryLookup: new Map(), ingredients: [], meals: [], symptoms: [], recipes: [], supplements: [], picked: new Set() };
 
 // ---------- load ----------
 async function loadAll() {
     try {
-        const [ing, meals, sym, rec, mem] = await Promise.all([
+        const [ing, meals, sym, rec, mem, sup] = await Promise.all([
             sb.from('diet_ingredients').select('*').order('name'),
             sb.from('diet_meals').select('*, diet_meal_ingredients(ingredient_id)').order('eaten_at', { ascending: false }).limit(200),
             sb.from('diet_symptoms').select('*').order('occurred_at', { ascending: false }).limit(200),
             sb.from('list_recipes').select('*').order('name'),   // read-only; GI tables never write here
             sb.from('diet_item_memory').select('*'),
+            sb.from('diet_supplements').select('*').order('taken_at', { ascending: false }).limit(200),
         ]);
         state.memory = mem.data || [];
         rebuildMemoryLookup();
@@ -85,6 +91,7 @@ async function loadAll() {
         state.meals = meals.data || [];
         state.symptoms = sym.data || [];
         state.recipes = rec.data || [];
+        state.supplements = sup.data || [];
         renderAll();
     } catch (err) {
         console.error('Failed to load diet data:', err);
@@ -149,24 +156,37 @@ async function importRecipe(recipeId) {
 }
 
 function renderIngredients() {
+    const uses = usageCounts();
     $('recipeSelect').innerHTML = '<option value="">Import from recipe…</option>' +
         state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('');
     $('ingList').innerHTML = state.ingredients.map(i => `
     <div class="diet-row" data-id="${i.id}">
-      <label><input type="checkbox" class="freq" ${i.is_frequent ? 'checked' : ''}> ★</label>
-      <strong>${esc(i.name)}</strong>
+      <span class="star${i.is_frequent ? ' on' : ''}" data-star title="${i.is_frequent ? 'Starred: always shown when logging a meal. Tap to unstar.' : 'Tap to star: always show when logging a meal'}">${i.is_frequent ? '★' : '☆'}</span>
+      <strong>${esc(i.name)}</strong> <small>${uses.get(i.id) || 0}&times; logged</small>
       <div>${ALL_TAGS.map(t => `<span class="${chipClass(t)} ${i.tags.includes(t) ? '' : 'off'}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>
       <button type="button" class="icon-delete del" title="Delete ingredient">✕</button>
     </div>`).join('') || '<p>No ingredients yet.</p>';
 }
 
 // ---------- meals ----------
+// How many logged meals each ingredient appears in.
+function usageCounts() {
+    const counts = new Map();
+    state.meals.forEach(m => (m.diet_meal_ingredients || []).forEach(x => counts.set(x.ingredient_id, (counts.get(x.ingredient_id) || 0) + 1)));
+    return counts;
+}
+const TOP_USED = 6;       // most-used ingredients shown as chips automatically, besides starred ones
+const MIN_USES = 2;       // ...once they have appeared in at least this many meals
 function renderMealPicker() {
-    const frequent = state.ingredients.filter(i => i.is_frequent);
-    const picked = state.ingredients.filter(i => state.picked.has(i.id) && !i.is_frequent);
+    const uses = usageCounts();
+    const starred = state.ingredients.filter(i => i.is_frequent);
+    const common = state.ingredients.filter(i => !i.is_frequent && (uses.get(i.id) || 0) >= MIN_USES)
+        .sort((a, b) => uses.get(b.id) - uses.get(a.id)).slice(0, TOP_USED);
+    const shown = new Set([...starred, ...common].map(i => i.id));
+    const picked = state.ingredients.filter(i => state.picked.has(i.id) && !shown.has(i.id));
     $('mealPicker').innerHTML =
-        `<div><small>Frequent / selected (tap to toggle):</small><br>` +
-        [...frequent, ...picked].map(i => `<span class="chip ${state.picked.has(i.id) ? '' : 'off'}" data-id="${i.id}">${esc(i.name)}</span>`).join('') +
+        `<div><small>Starred, most used, and selected (tap to toggle):</small><br>` +
+        [...starred, ...common, ...picked].map(i => `<span class="chip ${state.picked.has(i.id) ? '' : 'off'}" data-id="${i.id}">${esc(i.name)}</span>`).join('') +
         `</div><input id="mealAdd" class="text-input" list="ingOptions" placeholder="Add any ingredient (new ones are created)" style="width:100%">
      <datalist id="ingOptions">${state.ingredients.map(i => `<option value="${esc(i.name)}">`).join('')}</datalist>
      <select id="mealRecipe" class="text-input"><option value="">Add all from recipe…</option>${state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('')}</select>`;
@@ -185,14 +205,14 @@ function setMealMode() {
 }
 function resetMealForm() {
     editMealId = null; state.picked.clear();
-    $('mealWhen').value = nowLocal(); $('mealLabel').value = ''; $('mealNotes').value = ''; $('mealSkipped').checked = false;
+    $('mealWhen').value = nowLocal(); $('mealLabel').value = ''; $('mealNotes').value = ''; $('mealSkipped').checked = false; $('mealSize').value = '';
     setMealMode();
 }
 function startEditMeal(id) {
     const m = state.meals.find(x => x.id === id); if (!m) return;
     editMealId = id;                                           // overwrites whatever was in the form
     $('mealWhen').value = toLocalInput(m.eaten_at); $('mealLabel').value = m.label || ''; $('mealNotes').value = m.notes || '';
-    $('mealSkipped').checked = !!m.skipped;
+    $('mealSkipped').checked = !!m.skipped; $('mealSize').value = m.meal_size || '';
     state.picked = new Set(m.diet_meal_ingredients.map(x => x.ingredient_id));
     setMealMode(); renderAll();
     location.hash = 'meals';
@@ -200,11 +220,18 @@ function startEditMeal(id) {
 }
 
 // Symptom form: "Symptom" entries are problems; "Positive" entries mean digestion felt good.
+const BRISTOL_RE = /diarrh|loose|stool|bowel|constip|\bbm\b|poop|toilet/i;
+function setBristolVisibility() {
+    const show = BRISTOL_RE.test($('symName').value) || !!$('symBristol').value;
+    $('symBristol').hidden = !show;
+    $('bristolHelp').hidden = !show;
+}
 function setSymType() {
     const positive = $('symType').value === 'positive';
     $('symName').setAttribute('list', positive ? 'symOptionsPositive' : 'symOptions');
     $('symName').placeholder = positive ? 'Positive (e.g. Felt fine)' : 'Symptom';
     $('symSev').placeholder = positive ? 'How good (1-10)' : 'Severity';
+    setBristolVisibility();
 }
 function setSymMode() {
     const editing = !!editSymId;
@@ -216,7 +243,7 @@ function setSymMode() {
 function resetSymForm() {
     editSymId = null;
     $('symType').value = 'negative';
-    $('symWhen').value = nowLocal(); $('symName').value = ''; $('symSev').value = 3; $('symNotes').value = '';
+    $('symWhen').value = nowLocal(); $('symName').value = ''; $('symSev').value = 3; $('symNotes').value = ''; $('symBristol').value = '';
     setSymMode();
 }
 function startEditSym(id) {
@@ -224,7 +251,7 @@ function startEditSym(id) {
     editSymId = id;
     $('symType').value = s.positive ? 'positive' : 'negative';
     $('symWhen').value = toLocalInput(s.occurred_at); $('symName').value = s.symptom || '';
-    $('symSev').value = s.severity ?? ''; $('symNotes').value = s.notes || '';
+    $('symSev').value = s.severity ?? ''; $('symNotes').value = s.notes || ''; $('symBristol').value = s.bristol ?? '';
     setSymMode(); renderAll();
     location.hash = 'symptoms';
     $('symForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -240,23 +267,65 @@ const mealHtml = m => {
     const body = m.skipped ? '' : `<div>${ings.map(i => esc(i.name)).join(', ')}</div>
     <div>${tags.map(t => `<span class="${chipClass(t)}">${esc(t)}</span>`).join('')}</div>`;
     return `<div class="diet-row${editMealId === m.id ? ' editing' : ''}" data-meal-id="${m.id}">
-    <div class="diet-row-top"><span><strong>${esc(m.label || 'Meal')}</strong> ${m.skipped ? '<span class="chip">Not eaten</span> ' : ''}<small>${fmt(m.eaten_at)}</small></span>
+    <div class="diet-row-top"><span><strong>${esc(m.label || 'Meal')}</strong> ${m.skipped ? '<span class="chip">Not eaten</span> ' : ''}${m.meal_size ? `<span class="chip">${esc(m.meal_size[0].toUpperCase() + m.meal_size.slice(1))}</span> ` : ''}<small>${fmt(m.eaten_at)}</small></span>
       <button type="button" class="icon-delete" title="Delete meal" data-del-meal="${m.id}">✕</button></div>
     ${body}
     ${m.notes ? `<small>${esc(m.notes)}</small>` : ''}</div>`;
 };
 
 const symHtml = (s, hint = '') => `<div class="diet-row${editSymId === s.id ? ' editing' : ''}" data-sym-id="${s.id}">
-  <div class="diet-row-top"><span><strong>${esc(s.symptom)}</strong> ${s.positive ? '<span class="chip">Positive</span> ' : ''}
+  <div class="diet-row-top"><span><strong>${esc(s.symptom)}</strong> ${s.positive ? '<span class="chip">Positive</span> ' : ''}${s.bristol ? `<span class="chip">Bristol ${s.bristol}</span> ` : ''}
     ${s.severity ? `<span class="sev">${s.severity}/10</span>` : ''} <small>${fmt(s.occurred_at)}</small></span>
     <button type="button" class="icon-delete" title="Delete entry" data-del-sym="${s.id}">✕</button></div>
   ${s.notes ? `<div><small>${esc(s.notes)}</small></div>` : ''}${hint}</div>`;
+
+// ---------- supplements (pills) ----------
+let editSuppId = null;
+function setSuppMode() {
+    const editing = !!editSuppId;
+    $('suppFormTitle').textContent = editing ? 'Edit Supplement' : 'Log a Supplement';
+    $('suppSubmit').textContent = editing ? 'Update supplement' : 'Add supplement';
+    $('suppCancel').hidden = !editing;
+}
+function resetSuppForm() {
+    editSuppId = null;
+    $('suppWhen').value = nowLocal(); $('suppName').value = ''; $('suppDose').value = ''; $('suppNotes').value = '';
+    setSuppMode();
+}
+function startEditSupp(id) {
+    const s = state.supplements.find(x => x.id === id); if (!s) return;
+    editSuppId = id;
+    $('suppWhen').value = toLocalInput(s.taken_at); $('suppName').value = s.name || '';
+    $('suppDose').value = s.dose || ''; $('suppNotes').value = s.notes || '';
+    setSuppMode(); renderAll();
+    location.hash = 'supplements';
+    $('suppForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+const suppHtml = (s, showTag = false) => `<div class="diet-row${editSuppId === s.id ? ' editing' : ''}" data-supp-id="${s.id}">
+  <div class="diet-row-top"><span><strong>${esc(s.name)}</strong> ${showTag ? '<span class="chip">Supplement</span> ' : ''}${s.dose ? `<span class="chip">${esc(s.dose)}</span> ` : ''}<small>${fmt(s.taken_at)}</small></span>
+    <button type="button" class="icon-delete" title="Delete supplement entry" data-del-supp="${s.id}">✕</button></div>
+  ${s.notes ? `<div><small>${esc(s.notes)}</small></div>` : ''}</div>`;
+function renderSupplements() {
+    // One-tap chips for the supplements you log most, with the dose from the latest entry (list is newest first).
+    const seen = new Map();
+    state.supplements.forEach(s => {
+        const key = (s.name || '').trim().toLowerCase(); if (!key) return;
+        const c = seen.get(key) || { name: s.name, dose: s.dose || '', n: 0 };
+        c.n++; seen.set(key, c);
+    });
+    const names = [...seen.values()];
+    $('suppQuick').innerHTML = names.sort((a, b) => b.n - a.n).slice(0, 8)
+        .map(c => `<span class="chip" data-supp-quick="${esc(c.name)}" data-dose="${esc(c.dose)}">${esc(c.name)}</span>`).join('');
+    $('suppOptions').innerHTML = names.map(c => `<option value="${esc(c.name)}">`).join('');
+    $('suppList').innerHTML = state.supplements.map(s => suppHtml(s)).join('') || '<p>No supplements logged yet.</p>';
+}
 
 // ---------- timeline: meals + symptoms interleaved, with "meals in prior 6h" per symptom ----------
 function renderTimeline() {
     const WINDOW = 6 * 3600e3;
     const items = [
         ...state.meals.map(m => ({ t: new Date(m.eaten_at), html: mealHtml(m) })),
+        ...state.supplements.map(s => ({ t: new Date(s.taken_at), html: suppHtml(s, true) })),
         ...state.symptoms.map(s => {
             const t = new Date(s.occurred_at);
             let hint = '';
@@ -272,7 +341,7 @@ function renderTimeline() {
 }
 
 // ---------- tabs (hash-routed, same pattern as creditcards.js) ----------
-const TAB_KEYS = ['timeline', 'meals', 'symptoms', 'ingredients', 'predictions'];
+const TAB_KEYS = ['timeline', 'meals', 'symptoms', 'supplements', 'ingredients', 'predictions'];
 const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
 
 function switchTab(tabKey) {
@@ -305,11 +374,10 @@ bindEvents(document, {
             console.error('Failed to delete ingredient:', err);
         }
     },
-    'change #ingList .freq': async (e, checkEl) => {
-        const row = checkEl.closest('.diet-row');
-        if (row) {
-            await updateIngredient(row.dataset.id, { is_frequent: checkEl.checked });
-        }
+    'click #ingList [data-star]': async (e, star) => {
+        const row = star.closest('.diet-row'); if (!row) return;
+        const ing = state.ingredients.find(i => i.id === row.dataset.id);
+        if (ing) await updateIngredient(ing.id, { is_frequent: !ing.is_frequent });
     },
     'submit #ingForm': async (e) => {
         e.preventDefault();
@@ -348,24 +416,52 @@ bindEvents(document, {
     },
     'change #mealSkipped': () => applySkippedUI(),
     'change #symType': () => setSymType(),
+    'input #symName': () => setBristolVisibility(),
     'click #mealCancel': () => { resetMealForm(); renderAll(); },
     'click #symCancel': () => { resetSymForm(); renderAll(); },
-    'click [data-del-meal], [data-del-sym]': async (e, del) => {
-        const isMeal = !!del.dataset.delMeal, id = del.dataset.delMeal || del.dataset.delSym;
-        if (!confirm(isMeal ? 'Delete this meal?' : 'Delete this entry?')) return;
+    'click [data-del-meal], [data-del-sym], [data-del-supp]': async (e, del) => {
+        const kind = del.dataset.delMeal ? 'meal' : del.dataset.delSym ? 'sym' : 'supp';
+        const id = del.dataset.delMeal || del.dataset.delSym || del.dataset.delSupp;
+        const table = { meal: 'diet_meals', sym: 'diet_symptoms', supp: 'diet_supplements' }[kind];
+        if (!confirm({ meal: 'Delete this meal?', sym: 'Delete this entry?', supp: 'Delete this supplement entry?' }[kind])) return;
         try {
-            const { error } = await sb.from(isMeal ? 'diet_meals' : 'diet_symptoms').delete().eq('id', id);
+            const { error } = await sb.from(table).delete().eq('id', id);
             if (error) return console.error(error);
-            if (isMeal && editMealId === id) resetMealForm();
-            if (!isMeal && editSymId === id) resetSymForm();
+            if (kind === 'meal' && editMealId === id) resetMealForm();
+            if (kind === 'sym' && editSymId === id) resetSymForm();
+            if (kind === 'supp' && editSuppId === id) resetSuppForm();
             await loadAll();
         } catch (err) {
             console.error('Failed to delete item:', err);
         }
     },
-    'click .diet-row[data-meal-id], .diet-row[data-sym-id]': (e, row) => {
+    'click .diet-row[data-meal-id], .diet-row[data-sym-id], .diet-row[data-supp-id]': (e, row) => {
         if (e.target.closest('button, a, input, select, label, textarea')) return;
-        row.dataset.mealId ? startEditMeal(row.dataset.mealId) : startEditSym(row.dataset.symId);
+        if (row.dataset.mealId) startEditMeal(row.dataset.mealId);
+        else if (row.dataset.symId) startEditSym(row.dataset.symId);
+        else startEditSupp(row.dataset.suppId);
+    },
+
+    // ---- Supplements ----
+    'click #suppQuick [data-supp-quick]': (e, chip) => {
+        $('suppName').value = chip.dataset.suppQuick; $('suppDose').value = chip.dataset.dose || '';
+    },
+    'click #suppCancel': () => { resetSuppForm(); renderAll(); },
+    'submit #suppForm': async (e) => {
+        e.preventDefault();
+        try {
+            const fields = { taken_at: new Date($('suppWhen').value).toISOString(), name: $('suppName').value.trim(),
+                dose: $('suppDose').value.trim() || null, notes: $('suppNotes').value || null };
+            if (!fields.name) return;
+            const { error } = editSuppId
+                ? await sb.from('diet_supplements').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editSuppId)
+                : await sb.from('diet_supplements').insert(fields);
+            if (error) return console.error(error);
+            resetSuppForm();
+            await loadAll();
+        } catch (err) {
+            console.error('Failed to save supplement:', err);
+        }
     },
 
     // ---- Needs attention card ----
@@ -412,7 +508,8 @@ bindEvents(document, {
             const skipped = $('mealSkipped').checked;
             const picked = skipped ? new Set() : state.picked;          // a meal not eaten has no ingredients
             const fields = { eaten_at: new Date($('mealWhen').value).toISOString(), label: $('mealLabel').value || null,
-                notes: $('mealNotes').value || null, skipped };
+                notes: $('mealNotes').value || null, skipped,
+                meal_size: skipped ? null : ($('mealSize').value || null) };
             if (editMealId) {
                 const { error } = await sb.from('diet_meals').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editMealId);
                 if (error) return console.error(error);
@@ -438,7 +535,7 @@ bindEvents(document, {
         e.preventDefault();
         try {
             const fields = { occurred_at: new Date($('symWhen').value).toISOString(), symptom: $('symName').value.trim(),
-                positive: $('symType').value === 'positive', severity: +$('symSev').value || null, notes: $('symNotes').value || null };
+                positive: $('symType').value === 'positive', severity: +$('symSev').value || null, bristol: +$('symBristol').value || null, notes: $('symNotes').value || null };
             const { error } = editSymId
                 ? await sb.from('diet_symptoms').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editSymId)
                 : await sb.from('diet_symptoms').insert(fields);
@@ -449,13 +546,15 @@ bindEvents(document, {
             console.error('Failed to save symptom:', err);
         }
     },
-    'click #exportTimelineBtn': async () => {
+    'click #exportTimelineBtn, #copyTimelineBtn': async (e, btn) => {
+        const status = $('exportStatus');
+        const say = msg => { if (status) status.textContent = msg; if (window.setStatus) window.setStatus(msg); };
+        say('Preparing export…');
         try {
-            const rows = await exportTimelineCsv(sb, state.ingredients);
-            if (window.setStatus) window.setStatus(`Exported ${rows} rows.`);
+            say(await exportTimelineCsv(sb, state.ingredients, btn.id === 'copyTimelineBtn' ? 'copy' : 'download'));
         } catch (err) {
             console.error('Export failed:', err);
-            if (window.setStatus) window.setStatus('Could not export.');
+            say('Could not export: ' + (err.message || err));
         }
     },
     'click #elimination-tabs .tab': (e, btn) => {
@@ -472,12 +571,13 @@ function renderAll() {
     renderIngredients(); renderMealPicker();
     $('mealList').innerHTML = state.meals.map(mealHtml).join('') || '<p>No meals yet.</p>';
     $('symList').innerHTML = state.symptoms.map(symHtml).join('') || '<p>No symptoms yet.</p>';
+    renderSupplements();
     renderTimeline();
     renderAttention(state);
     renderPredictions(state, chipClass);
 }
 
-$('mealWhen').value = nowLocal(); $('symWhen').value = nowLocal(); setSymType();
+$('mealWhen').value = nowLocal(); $('symWhen').value = nowLocal(); $('suppWhen').value = nowLocal(); setSymType();
 
 if (window.initAppPage) {
     window.initAppPage(loadAll);
