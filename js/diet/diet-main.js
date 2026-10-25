@@ -220,6 +220,15 @@ function startEditMeal(id) {
 }
 
 // Symptom form: "Symptom" entries are problems; "Positive" entries mean digestion felt good.
+// Bristol type decides whether an entry is a symptom or a positive: 1-2 and 6-7 are negative, 3-5 positive.
+const NEGATIVE_BRISTOL = [1, 2, 6, 7];
+const BM_RE = /\bbm\b|bowel movement/i;        // a plain BM entry defaults to Bristol 5
+function applyBristolPolarity() {
+    const b = +$('symBristol').value;
+    if (!b) return;
+    $('symType').value = NEGATIVE_BRISTOL.includes(b) ? 'negative' : 'positive';
+    setSymType();
+}
 const BRISTOL_RE = /diarrh|loose|stool|bowel|constip|\bbm\b|poop|toilet/i;
 function setBristolVisibility() {
     const show = BRISTOL_RE.test($('symName').value) || !!$('symBristol').value;
@@ -416,7 +425,11 @@ bindEvents(document, {
     },
     'change #mealSkipped': () => applySkippedUI(),
     'change #symType': () => setSymType(),
-    'input #symName': () => setBristolVisibility(),
+    'input #symName': () => {
+        if (BM_RE.test($('symName').value) && !$('symBristol').value) { $('symBristol').value = '5'; applyBristolPolarity(); }
+        setBristolVisibility();
+    },
+    'change #symBristol': () => applyBristolPolarity(),
     'click #mealCancel': () => { resetMealForm(); renderAll(); },
     'click #symCancel': () => { resetSymForm(); renderAll(); },
     'click [data-del-meal], [data-del-sym], [data-del-supp]': async (e, del) => {
@@ -534,8 +547,9 @@ bindEvents(document, {
     'submit #symForm': async (e) => {
         e.preventDefault();
         try {
+            const bristol = +$('symBristol').value || null;
             const fields = { occurred_at: new Date($('symWhen').value).toISOString(), symptom: $('symName').value.trim(),
-                positive: $('symType').value === 'positive', severity: +$('symSev').value || null, bristol: +$('symBristol').value || null, notes: $('symNotes').value || null };
+                positive: bristol ? !NEGATIVE_BRISTOL.includes(bristol) : $('symType').value === 'positive', severity: +$('symSev').value || null, bristol, notes: $('symNotes').value || null };
             const { error } = editSymId
                 ? await sb.from('diet_symptoms').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editSymId)
                 : await sb.from('diet_symptoms').insert(fields);
