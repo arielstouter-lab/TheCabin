@@ -12,6 +12,8 @@
         /* Page-specific only: chip toggle state and log rows. Everything else comes from styles.css. */
         .chip[data-tag],.chip[data-id],.chip[data-supp-quick]{cursor:pointer}
         #mealAdd{width:100%}
+        .chip[hidden],.diet-row [hidden]{display:none}
+        .attn-slot{margin-right:1em;white-space:nowrap}
         .diet-row{padding:8px 0;border-bottom:1px solid #ddd}
         .diet-row small{color:#666}
         .diet-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
@@ -28,124 +30,117 @@
     </style>
 </head>
 
-<!-- Templates: cloned and filled by js/diet/diet-tpl.js -->
+<!-- Templates: cloned by cloneEl() and filled through refs() -->
+<template id="tpl-empty"><p class="empty-state"></p></template>
 <template id="tpl-chip"><span class="chip"></span></template>
 
-<template id="tpl-empty"><p></p></template>
-
-<template id="tpl-attn-heading"><div class="eyebrow" data-field="text"></div></template>
-
-<template id="tpl-attn-meal">
-    <div class="diet-row">
-        <strong data-field="day"></strong>
-        <small data-field="count"></small>
-        <div data-slot="slots"></div>
-    </div>
-</template>
-
-<template id="tpl-attn-slot">
-    <span class="attn-slot">
-        <span data-field="name"></span>:
-        <button type="button" class="button-inline" data-skip-meal data-slot-name>Not eaten</button>
-        <button type="button" class="button-inline button-ghost" data-log-meal data-slot-name>Log it</button>
-    </span>
-</template>
-
-<template id="tpl-attn-sym">
-    <div class="diet-row">
-        <strong data-field="title"></strong>
-        <small>no symptom or positive entry</small>
-        <div>
-            <button type="button" class="button-inline" data-fine>Felt fine</button>
-            <button type="button" class="button-inline button-ghost" data-log-sym>Log symptom</button>
-        </div>
-    </div>
-</template>
-
-<template id="tpl-attn-more"><small data-field="text"></small></template>
-
-<template id="tpl-pred-line"><div data-field="text"></div></template>
-
-<template id="tpl-pred-row">
-    <tr>
-        <td data-slot="factor"></td>
-        <td><span data-field="signal"></span><span data-if="lowConf"> (low confidence)</span></td>
-        <td class="col-num" data-field="before"></td>
-        <td class="col-num" data-field="other"></td>
-        <td class="col-num" data-field="ratio"></td>
-    </tr>
-</template>
-
-<template id="tpl-safe-row">
-    <tr>
-        <td data-slot="factor"></td>
-        <td class="col-num" data-field="n"></td>
-        <td class="col-num" data-field="followed"></td>
-        <td class="col-num" data-field="good"></td>
-        <td data-field="level"></td>
-    </tr>
-</template>
-
 <template id="tpl-ingredient-row">
-    <div class="diet-row" data-id>
-        <span class="star" data-star></span>
-        <strong data-field="name"></strong>
-        <a href="#meals" class="use-link" data-if="used" data-filter-ingredient title="Show these meals" data-field="usedText"></a>
-        <small data-if="unused">0&times; logged</small>
-        <div data-slot="tags"></div>
+    <div class="diet-row">
+        <span class="star" data-ref="star" data-star></span>
+        <strong data-ref="name"></strong>
+        <a href="#meals" class="use-link" data-ref="used" data-filter-ingredient title="Show these meals"></a>
+        <small data-ref="unused" hidden>0&times; logged</small>
+        <div data-ref="tags"></div>
         <button type="button" class="icon-delete del" title="Delete ingredient">✕</button>
     </div>
 </template>
 
 <template id="tpl-meal-row">
-    <div class="diet-row" data-meal-id>
+    <div class="diet-row">
         <div class="diet-row-top">
             <span>
-                <strong data-field="label"></strong>
-                <span class="chip" data-if="skipped">Not eaten</span>
-                <span class="chip" data-if="size" data-field="size"></span>
-                <small data-field="when"></small>
+                <strong data-ref="label"></strong>
+                <span class="chip" data-ref="skipped" hidden>Not eaten</span>
+                <span class="chip" data-ref="size" hidden></span>
+                <small data-ref="when"></small>
             </span>
-            <button type="button" class="icon-delete" title="Delete meal" data-del-meal>✕</button>
+            <button type="button" class="icon-delete" data-ref="del" title="Delete meal">✕</button>
         </div>
-        <div data-if="hasBody">
-            <div data-field="ingredients"></div>
-            <div data-slot="tags"></div>
+        <div data-ref="body">
+            <div data-ref="ingredients"></div>
+            <div data-ref="tags"></div>
         </div>
-        <small data-if="notes" data-field="notes"></small>
+        <small data-ref="notes" hidden></small>
     </div>
 </template>
 
 <template id="tpl-symptom-row">
-    <div class="diet-row" data-sym-id>
+    <div class="diet-row">
         <div class="diet-row-top">
             <span>
-                <strong data-field="symptom"></strong>
-                <span class="chip" data-if="positive">Positive</span>
-                <span class="chip" data-if="bristol" data-field="bristolText"></span>
-                <span class="sev" data-if="severity" data-field="severityText"></span>
-                <small data-field="when"></small>
+                <strong data-ref="symptom"></strong>
+                <span class="chip" data-ref="positive" hidden>Positive</span>
+                <span class="chip" data-ref="bristol" hidden></span>
+                <span class="sev" data-ref="severity" hidden></span>
+                <small data-ref="when"></small>
             </span>
-            <button type="button" class="icon-delete" title="Delete entry" data-del-sym>✕</button>
+            <button type="button" class="icon-delete" data-ref="del" title="Delete entry">✕</button>
         </div>
-        <div data-if="notes"><small data-field="notes"></small></div>
-        <div data-if="hint"><small>Eaten in prior 6h:</small> <span data-slot="hintTags"></span></div>
+        <div data-ref="notes" hidden><small data-ref="notesText"></small></div>
+        <div data-ref="hint" hidden><small>Eaten in prior 6h:</small> <span data-ref="hintTags"></span></div>
     </div>
 </template>
 
 <template id="tpl-supp-row">
-    <div class="diet-row" data-supp-id>
+    <div class="diet-row">
         <div class="diet-row-top">
             <span>
-                <strong data-field="name"></strong>
-                <span class="chip" data-if="showTag">Supplement</span>
-                <span class="chip" data-if="dose" data-field="dose"></span>
-                <small data-field="when"></small>
+                <strong data-ref="name"></strong>
+                <span class="chip" data-ref="tag" hidden>Supplement</span>
+                <span class="chip" data-ref="dose" hidden></span>
+                <small data-ref="when"></small>
             </span>
-            <button type="button" class="icon-delete" title="Delete supplement entry" data-del-supp>✕</button>
+            <button type="button" class="icon-delete" data-ref="del" title="Delete supplement entry">✕</button>
         </div>
-        <div data-if="notes"><small data-field="notes"></small></div>
+        <div data-ref="notes" hidden><small data-ref="notesText"></small></div>
     </div>
+</template>
+
+<template id="tpl-attn-meal">
+    <div class="diet-row">
+        <strong data-ref="day"></strong>
+        <small data-ref="count"></small>
+        <div data-ref="slots"></div>
+    </div>
+</template>
+
+<template id="tpl-attn-slot">
+    <span class="attn-slot">
+        <span data-ref="name"></span>:
+        <button type="button" class="button-inline" data-ref="skip" data-skip-meal>Not eaten</button>
+        <button type="button" class="button-inline button-ghost" data-ref="log" data-log-meal>Log it</button>
+    </span>
+</template>
+
+<template id="tpl-attn-sym">
+    <div class="diet-row">
+        <strong data-ref="title"></strong>
+        <small>no symptom or positive entry</small>
+        <div>
+            <button type="button" class="button-inline" data-ref="fine" data-fine>Felt fine</button>
+            <button type="button" class="button-inline button-ghost" data-ref="log" data-log-sym>Log symptom</button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-pred-row">
+    <tr>
+        <td data-ref="factor"></td>
+        <td><span data-ref="signal"></span><span data-ref="lowConf" hidden> (low confidence)</span></td>
+        <td class="col-num" data-ref="before"></td>
+        <td class="col-num" data-ref="other"></td>
+        <td class="col-num" data-ref="ratio"></td>
+    </tr>
+</template>
+
+<template id="tpl-safe-row">
+    <tr>
+        <td data-ref="factor"></td>
+        <td class="col-num" data-ref="n"></td>
+        <td class="col-num" data-ref="followed"></td>
+        <td class="col-num" data-ref="good"></td>
+        <td data-ref="level"></td>
+    </tr>
 </template>
 
 <body class="app-page">

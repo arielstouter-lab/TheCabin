@@ -12,7 +12,8 @@
 // Safe foods: foods eaten several times where no symptom followed within the same window.
 
 import { HOUR, DAY, buildConfidence, mealGapDays, symptomGaps } from './diet-coverage.js';
-import { tpl, fill, slot, setOptions } from './diet-tpl.js';
+import { cloneEl, refs } from '../shared/dom.js';
+import { el } from '../shared/ui.js';
 
 const CLUSTER_GAP = 3 * HOUR;     // symptoms logged within 3h of each other count as one event
 const EXCLUDE_NEAR = 3 * HOUR;    // comparison times this close to a symptom aren't clean "no symptom" times
@@ -134,17 +135,17 @@ const n1 = n => +n.toFixed(1);                       // 3 -> 3, 2.5 -> 2.5
 const pct = (n, d) => (d ? Math.round(100 * n / d) : 0) + '%';
 const level = c => (c >= 0.8 ? 'High' : c >= 0.5 ? 'Medium' : 'Low');
 
-export function renderPredictions(state, tagChip) {
+export function renderPredictions(state, tagChip){
     const $ = id => document.getElementById(id);
-    if (!$('predBody')) return;
+    if(!$('predBody')) return;
 
     // Symptom filter lists logged (non-positive) symptom names, case-insensitive, keeping the selection.
     const seen = new Map();
     state.symptoms.filter(s => !s.positive).forEach(s => {
-        const n = (s.symptom || '').trim(); if (n && !seen.has(n.toLowerCase())) seen.set(n.toLowerCase(), n);
+        const n = (s.symptom || '').trim(); if(n && !seen.has(n.toLowerCase())) seen.set(n.toLowerCase(), n);
     });
     const sel = $('predSymptom'), cur = sel.value, names = [...seen.values()].sort();
-    setOptions(sel, names.map(n => [n, n]), true);          // "All symptoms" stays in the HTML
+    sel.replaceChildren(sel.firstElementChild, ...names.map(n => new Option(n, n)));   // "All symptoms" stays in the HTML
     sel.value = names.includes(cur) ? cur : '';
 
     const group = $('predGroup').value;
@@ -153,11 +154,11 @@ export function renderPredictions(state, tagChip) {
         minSeverity: +$('predSeverity').value || 1,
         symptom: sel.value, group,
     });
-    const label = f => (group === 'tags' ? tagChip(f) : f);      // append() accepts a node or a string
+    const label = f => (group === 'tags' ? tagChip(f) : f);      // append() takes a node or a string
 
     // ---- summary + confidence ----
     const lines = [];
-    if (res.events) {
+    if(res.events){
         lines.push(`Based on ${res.events} symptom event${res.events === 1 ? '' : 's'}` +
             (res.skipped ? ` (${res.skipped} skipped: no meals logged in that window)` : '') +
             ` compared with ${res.comparisons} matching times on other days.` +
@@ -165,25 +166,25 @@ export function renderPredictions(state, tagChip) {
         lines.push(`Data confidence: ${pct(res.confidence, 1)}.`);
     }
     const why = [];
-    if (res.skippedMeals) why.push(`${res.skippedMeals} meal${res.skippedMeals === 1 ? '' : 's'} marked not eaten (lowers confidence for the next 24 hours)`);
-    if (res.unresolvedDays) why.push(`${res.unresolvedDays} day${res.unresolvedDays === 1 ? '' : 's'} with fewer than 3 meals and nothing marked not eaten`);
+    if(res.skippedMeals) why.push(`${res.skippedMeals} meal${res.skippedMeals === 1 ? '' : 's'} marked not eaten (lowers confidence for the next 24 hours)`);
+    if(res.unresolvedDays) why.push(`${res.unresolvedDays} day${res.unresolvedDays === 1 ? '' : 's'} with fewer than 3 meals and nothing marked not eaten`);
     const symGapCount = symptomGaps(state).length, mealGapCount = mealGapDays(state).length;
-    if (symGapCount) why.push(`${symGapCount} symptom check-in block${symGapCount === 1 ? '' : 's'} with no entry in the last 7 days`);
-    if (why.length) lines.push(`Lowering confidence: ${why.join('; ')}. See Needs attention on the Timeline tab` + (mealGapCount ? ' to mark skipped meals.' : '.'));
-    $('predSummary').replaceChildren(...lines.map(text => fill(tpl('tpl-pred-line'), { text })));
+    if(symGapCount) why.push(`${symGapCount} symptom check-in block${symGapCount === 1 ? '' : 's'} with no entry in the last 7 days`);
+    if(why.length) lines.push(`Lowering confidence: ${why.join('; ')}. See Needs attention on the Timeline tab` + (mealGapCount ? ' to mark skipped meals.' : '.'));
+    $('predSummary').replaceChildren(...lines.map(text => el('div', text)));
 
     // ---- triggers ----
     $('predEmpty').hidden = res.rows.length > 0;
     $('predTableWrap').hidden = res.rows.length === 0;
-    $('predBody').replaceChildren(...res.rows.map(r => {
-        const row = fill(tpl('tpl-pred-row'), {
-            signal: SIGNAL_LABEL[r.signal],
-            lowConf: res.confidence < 0.6 && ['strong', 'possible'].includes(r.signal),
-            before: `${n1(r.a)} of ${n1(res.eventsEff)} (${pct(r.a, res.eventsEff)})`,
-            other: `${n1(r.c)} of ${n1(res.comparisonsEff)} (${pct(r.c, res.comparisonsEff)})`,
-            ratio: `${r.ratio.toFixed(1)}\u00d7`,
-        });
-        slot(row, 'factor').append(label(r.factor));
+    $('predBody').replaceChildren(...res.rows.map(x => {
+        const row = cloneEl('tpl-pred-row');
+        const r = refs(row);
+        r.factor.append(label(x.factor));
+        r.signal.textContent = SIGNAL_LABEL[x.signal];
+        r.lowConf.hidden = !(res.confidence < 0.6 && ['strong', 'possible'].includes(x.signal));
+        r.before.textContent = `${n1(x.a)} of ${n1(res.eventsEff)} (${pct(x.a, res.eventsEff)})`;
+        r.other.textContent = `${n1(x.c)} of ${n1(res.comparisonsEff)} (${pct(x.c, res.comparisonsEff)})`;
+        r.ratio.textContent = `${x.ratio.toFixed(1)}\u00d7`;
         return row;
     }));
 
@@ -191,8 +192,13 @@ export function renderPredictions(state, tagChip) {
     $('predSafeEmpty').hidden = res.safe.length > 0;
     $('predSafeWrap').hidden = res.safe.length === 0;
     $('predSafeBody').replaceChildren(...res.safe.map(s => {
-        const row = fill(tpl('tpl-safe-row'), { n: s.n, followed: s.followed, good: s.good, level: level(s.conf) });
-        slot(row, 'factor').append(label(s.factor));
+        const row = cloneEl('tpl-safe-row');
+        const r = refs(row);
+        r.factor.append(label(s.factor));
+        r.n.textContent = s.n;
+        r.followed.textContent = s.followed;
+        r.good.textContent = s.good;
+        r.level.textContent = level(s.conf);
         return row;
     }));
 }

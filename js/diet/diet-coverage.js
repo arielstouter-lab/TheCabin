@@ -1,6 +1,7 @@
 // Coverage helpers for diet-main: which meals / symptom check-ins are missing, and how much
 // that should lower confidence in predictions. Used by the "Needs attention" card and diet-predictions.js.
-import { tpl, fill, slot } from './diet-tpl.js';
+import { cloneEl, refs } from '../shared/dom.js';
+import { el } from '../shared/ui.js';
 
 export const HOUR = 3600e3, DAY = 24 * HOUR;
 export const MIN_MEALS_PER_DAY = 3;
@@ -100,37 +101,41 @@ const dayLabel = t => new Date(t).toLocaleDateString([], { weekday: 'short', mon
 const SHOW = 8;       // symptom check-in gaps listed before "…and N earlier blocks"
 
 // "Needs attention" card on the Timeline tab. Buttons carry data-* attributes handled in diet-main.js.
-export function renderAttention(state) {
+export function renderAttention(state){
     const card = document.getElementById('attentionCard'), list = document.getElementById('attentionList');
-    if (!card || !list) return;
+    if(!card || !list) return;
     const mealGaps = mealGapDays(state), symGaps = symptomGaps(state);
     card.hidden = !mealGaps.length && !symGaps.length;
 
     const nodes = [];
-    if (mealGaps.length) {
-        nodes.push(fill(tpl('tpl-attn-heading'), { text: `Days with fewer than ${MIN_MEALS_PER_DAY} meals` }));
-        for (const g of mealGaps) {
-            const row = fill(tpl('tpl-attn-meal'), { day: dayLabel(g.day), count: `${g.count} of ${MIN_MEALS_PER_DAY} meals logged` });
-            slot(row, 'slots').append(...g.missingSlots.map(s => {
-                const el = fill(tpl('tpl-attn-slot'), { name: s.name });
-                el.querySelector('[data-skip-meal]').dataset.skipMeal = atHour(g.day, s.at);
-                el.querySelector('[data-log-meal]').dataset.logMeal = atHour(g.day, s.at);
-                el.querySelectorAll('[data-slot-name]').forEach(b => { b.dataset.slotName = s.name; });
-                return el;
+    if(mealGaps.length){
+        nodes.push(el('div', `Days with fewer than ${MIN_MEALS_PER_DAY} meals`, 'eyebrow'));
+        mealGaps.forEach(g => {
+            const row = cloneEl('tpl-attn-meal');
+            const r = refs(row);
+            r.day.textContent = dayLabel(g.day);
+            r.count.textContent = `${g.count} of ${MIN_MEALS_PER_DAY} meals logged`;
+            r.slots.append(...g.missingSlots.map(s => {
+                const slotEl = cloneEl('tpl-attn-slot');
+                const sr = refs(slotEl);
+                sr.name.textContent = s.name;
+                sr.skip.dataset.skipMeal = sr.log.dataset.logMeal = atHour(g.day, s.at);
+                sr.skip.dataset.slotName = sr.log.dataset.slotName = s.name;
+                return slotEl;
             }));
             nodes.push(row);
-        }
+        });
     }
-    if (symGaps.length) {
-        nodes.push(fill(tpl('tpl-attn-heading'), { text: 'Symptom check-ins missing' }));
-        for (const g of symGaps.slice(0, SHOW)) {
-            const mid = (g.start + g.end) / 2;
-            const row = fill(tpl('tpl-attn-sym'), { title: `${dayLabel(g.day)} ${g.block.toLowerCase()}` });
-            row.querySelector('[data-fine]').dataset.fine = mid;
-            row.querySelector('[data-log-sym]').dataset.logSym = mid;
+    if(symGaps.length){
+        nodes.push(el('div', 'Symptom check-ins missing', 'eyebrow'));
+        symGaps.slice(0, SHOW).forEach(g => {
+            const row = cloneEl('tpl-attn-sym');
+            const r = refs(row);
+            r.title.textContent = `${dayLabel(g.day)} ${g.block.toLowerCase()}`;
+            r.fine.dataset.fine = r.log.dataset.logSym = (g.start + g.end) / 2;
             nodes.push(row);
-        }
-        if (symGaps.length > SHOW) nodes.push(fill(tpl('tpl-attn-more'), { text: `…and ${symGaps.length - SHOW} earlier blocks` }));
+        });
+        if(symGaps.length > SHOW) nodes.push(el('small', `…and ${symGaps.length - SHOW} earlier blocks`));
     }
     list.replaceChildren(...nodes);
 }

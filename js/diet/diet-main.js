@@ -2,7 +2,6 @@ import { bindEvents } from '../shared/dom.js';
 import { renderPredictions } from './diet-predictions.js';
 import { renderAttention } from './diet-coverage.js';
 import { exportTimelineCsv } from './diet-export.js';
-import { tpl, fill, slot, setOptions, renderList } from './diet-tpl.js';
 
 // Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
 // same shared scripts that lists.html does before this module.
@@ -69,21 +68,16 @@ async function rememberTags(name, tags) {
 // Suspected triggers get the site's priority chip style; everything else is a plain chip.
 const PRIORITY_TAGS = new Set(['gluten', 'dairy', 'lactose', 'high-FODMAP', 'sweetener', 'fatty/fried']);
 
-const setOn = (el, on = true) => { on ? delete el.dataset.state : (el.dataset.state = 'off'); return el; };
-const setKind = (el, t) => { PRIORITY_TAGS.has(t) ? (el.dataset.kind = 'priority') : delete el.dataset.kind; return el; };
+// ---------- chips ----------
+// Suspected triggers get the site's priority chip style; everything else is a plain chip.
+const PRIORITY_TAGS = new Set(['gluten', 'dairy', 'lactose', 'high-FODMAP', 'sweetener', 'fatty/fried']);
 
-const chip = (label, attrs = {}) => {                         // plain chip; attrs become data-* attributes
-    const el = tpl('tpl-chip');
-    el.textContent = label;
-    Object.assign(el.dataset, attrs);
-    return el;
-};
-// Tag chip: priority styling from the tag, data-state="off" when unselected, data-tag only when clickable.
-const tagChip = (t, { on = true, pick = false } = {}) => {
-    const el = setKind(chip(t), t);
-    if (pick) el.dataset.tag = t;
-    return setOn(el, on);
-};
+// Tag chip: priority styling from the tag, data-state="off" when unselected, data-tag only when tappable.
+function tagChip(t, on = true, pick = false){
+    const chip = makeChip(t, PRIORITY_TAGS.has(t) ? 'priority' : 'default', on ? '' : 'off');
+    if(pick) chip.dataset.tag = t;
+    return chip;
+}
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -92,6 +86,9 @@ const fmt = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeS
 const cap = s => s[0].toUpperCase() + s.slice(1);
 const state = { memory: [], memoryLookup: new Map(), ingredients: [], meals: [], symptoms: [], recipes: [], supplements: [], picked: new Set() };
 const recipeOptions = () => state.recipes.map(r => [r.id, r.name || r.title]);
+// Rebuilds a <select> after its placeholder <option>, which lives in the HTML.
+const fillSelect = (sel, pairs) => sel.replaceChildren(sel.firstElementChild, ...pairs.map(([value, text]) => new Option(text, value)));
+const showRows = (container, nodes, emptyText) => container.replaceChildren(...(nodes.length ? nodes : [emptyState(emptyText)]));
 
 // ---------- load ----------
 async function loadAll() {
@@ -176,23 +173,27 @@ async function importRecipe(recipeId) {
 
 const STAR_ON = 'Starred: always shown when logging a meal. Tap to unstar.';
 const STAR_OFF = 'Tap to star: always show when logging a meal';
-function ingRow(i, used) {
-    const row = tpl('tpl-ingredient-row');
-    fill(row, { name: i.name, used, unused: !used, usedText: `${used}\u00d7 logged` });
+
+function ingRow(i, used){
+    const row = cloneEl('tpl-ingredient-row');
+    const r = refs(row);
     row.dataset.id = i.id;
-    const star = row.querySelector('[data-star]');
-    star.classList.toggle('on', !!i.is_frequent);
-    star.textContent = i.is_frequent ? '★' : '☆';
-    star.title = i.is_frequent ? STAR_ON : STAR_OFF;
-    const link = row.querySelector('[data-filter-ingredient]');
-    if (link) link.dataset.filterIngredient = i.id;
-    slot(row, 'tags').append(...ALL_TAGS.map(t => tagChip(t, { on: i.tags.includes(t), pick: true })));
+    r.name.textContent = i.name;
+    r.used.hidden = !used;
+    r.used.textContent = `${used}\u00d7 logged`;
+    r.used.dataset.filterIngredient = i.id;
+    r.unused.hidden = !!used;
+    r.star.classList.toggle('on', !!i.is_frequent);
+    r.star.textContent = i.is_frequent ? '★' : '☆';
+    r.star.title = i.is_frequent ? STAR_ON : STAR_OFF;
+    r.tags.append(...ALL_TAGS.map(t => tagChip(t, i.tags.includes(t), true)));
     return row;
 }
-function renderIngredients() {
+
+function renderIngredients(){
     const uses = usageCounts();
-    setOptions($('recipeSelect'), recipeOptions(), true);
-    renderList($('ingList'), state.ingredients.map(i => ingRow(i, uses.get(i.id) || 0)));
+    fillSelect($('recipeSelect'), recipeOptions());
+    showRows($('ingList'), state.ingredients.map(i => ingRow(i, uses.get(i.id) || 0)), 'No ingredients yet.');
 }
 
 // ---------- meals ----------
@@ -204,18 +205,23 @@ function usageCounts() {
 }
 const TOP_USED = 6;       // most-used ingredients shown as chips automatically, besides starred ones
 const MIN_USES = 2;       // ...once they have appeared in at least this many meals
-function renderMealPicker() {
+
+function renderMealPicker(){
     const uses = usageCounts();
     const starred = state.ingredients.filter(i => i.is_frequent);
     const common = state.ingredients.filter(i => !i.is_frequent && (uses.get(i.id) || 0) >= MIN_USES)
         .sort((a, b) => uses.get(b.id) - uses.get(a.id)).slice(0, TOP_USED);
     const shown = new Set([...starred, ...common].map(i => i.id));
     const picked = state.ingredients.filter(i => state.picked.has(i.id) && !shown.has(i.id));
-    $('mealChips').replaceChildren(...[...starred, ...common, ...picked].map(i =>
-        setOn(chip(i.name, { id: i.id }), state.picked.has(i.id))));
-    setOptions($('ingOptions'), state.ingredients.map(i => [i.name]));
-    setOptions($('mealRecipe'), recipeOptions(), true);
+    $('mealChips').replaceChildren(...[...starred, ...common, ...picked].map(i => {
+        const chip = makeChip(i.name, 'default', state.picked.has(i.id) ? '' : 'off');
+        chip.dataset.id = i.id;
+        return chip;
+    }));
+    $('ingOptions').replaceChildren(...state.ingredients.map(i => new Option('', i.name)));
+    fillSelect($('mealRecipe'), recipeOptions());
 }
+
 // ---------- edit state: click a meal or symptom row to load it into its form ----------
 let editMealId = null, editSymId = null;
 let mealFilterId = null;      // ingredient id the Meals list is filtered to, or null for all meals
@@ -297,32 +303,81 @@ const mealTags = m => {
     const ings = ids.map(id => state.ingredients.find(i => i.id === id)).filter(Boolean);
     return { ings, tags: [...new Set(ings.flatMap(i => i.tags))] };
 };
-function mealRow(m) {
+
+function mealRow(m){
     const { ings, tags } = mealTags(m);
-    const row = tpl('tpl-meal-row');
-    fill(row, {
-        label: m.label || 'Meal', skipped: m.skipped, size: m.meal_size ? cap(m.meal_size) : '',
-        when: fmt(m.eaten_at), hasBody: !m.skipped, ingredients: ings.map(i => i.name).join(', '), notes: m.notes,
-    });
+    const row = cloneEl('tpl-meal-row');
+    const r = refs(row);
     row.dataset.mealId = m.id;
     row.classList.toggle('editing', editMealId === m.id);
-    row.querySelector('[data-del-meal]').dataset.delMeal = m.id;
-    slot(row, 'tags')?.append(...tags.map(t => tagChip(t)));
+    r.label.textContent = m.label || 'Meal';
+    r.skipped.hidden = !m.skipped;
+    r.size.hidden = !m.meal_size;
+    r.size.textContent = m.meal_size ? cap(m.meal_size) : '';
+    r.when.textContent = fmt(m.eaten_at);
+    r.del.dataset.delMeal = m.id;
+    r.body.hidden = !!m.skipped;
+    r.ingredients.textContent = ings.map(i => i.name).join(', ');
+    r.tags.append(...tags.map(t => tagChip(t)));
+    r.notes.hidden = !m.notes;
+    r.notes.textContent = m.notes || '';
     return row;
 }
 
 // hintTags: tags from meals in the prior 6h (timeline only)
-function symRow(s, hintTags = []) {
-    const row = tpl('tpl-symptom-row');
-    fill(row, {
-        symptom: s.symptom, positive: s.positive, bristol: s.bristol, bristolText: `Bristol ${s.bristol}`,
-        severity: s.severity, severityText: `${s.severity}/10`, when: fmt(s.occurred_at), notes: s.notes, hint: hintTags.length,
-    });
+function symRow(s, hintTags = []){
+    const row = cloneEl('tpl-symptom-row');
+    const r = refs(row);
     row.dataset.symId = s.id;
     row.classList.toggle('editing', editSymId === s.id);
-    row.querySelector('[data-del-sym]').dataset.delSym = s.id;
-    slot(row, 'hintTags')?.append(...hintTags.map(t => tagChip(t)));
+    r.symptom.textContent = s.symptom;
+    r.positive.hidden = !s.positive;
+    r.bristol.hidden = !s.bristol;
+    r.bristol.textContent = `Bristol ${s.bristol}`;
+    r.severity.hidden = !s.severity;
+    r.severity.textContent = `${s.severity}/10`;
+    r.when.textContent = fmt(s.occurred_at);
+    r.del.dataset.delSym = s.id;
+    r.notes.hidden = !s.notes;
+    r.notesText.textContent = s.notes || '';
+    r.hint.hidden = !hintTags.length;
+    r.hintTags.append(...hintTags.map(t => tagChip(t)));
     return row;
+}
+
+function suppRow(s, showTag = false){
+    const row = cloneEl('tpl-supp-row');
+    const r = refs(row);
+    row.dataset.suppId = s.id;
+    row.classList.toggle('editing', editSuppId === s.id);
+    r.name.textContent = s.name;
+    r.tag.hidden = !showTag;
+    r.dose.hidden = !s.dose;
+    r.dose.textContent = s.dose || '';
+    r.when.textContent = fmt(s.taken_at);
+    r.del.dataset.delSupp = s.id;
+    r.notes.hidden = !s.notes;
+    r.notesText.textContent = s.notes || '';
+    return row;
+}
+
+function renderSupplements(){
+    // One-tap chips for the supplements you log most, with the dose from the latest entry (list is newest first).
+    const seen = new Map();
+    state.supplements.forEach(s => {
+        const key = (s.name || '').trim().toLowerCase(); if(!key) return;
+        const c = seen.get(key) || { name: s.name, dose: s.dose || '', n: 0 };
+        c.n++; seen.set(key, c);
+    });
+    const names = [...seen.values()];
+    $('suppQuick').replaceChildren(...names.sort((a, b) => b.n - a.n).slice(0, 8).map(c => {
+        const chip = makeChip(c.name);
+        chip.dataset.suppQuick = c.name;
+        chip.dataset.dose = c.dose;
+        return chip;
+    }));
+    $('suppOptions').replaceChildren(...names.map(c => new Option('', c.name)));
+    showRows($('suppList'), state.supplements.map(s => suppRow(s)), 'No supplements logged yet.');
 }
 
 // ---------- supplements (pills) ----------
@@ -347,28 +402,6 @@ function startEditSupp(id) {
     location.hash = 'supplements';
     $('suppForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-function suppRow(s, showTag = false) {
-    const row = tpl('tpl-supp-row');
-    fill(row, { name: s.name, showTag, dose: s.dose, when: fmt(s.taken_at), notes: s.notes });
-    row.dataset.suppId = s.id;
-    row.classList.toggle('editing', editSuppId === s.id);
-    row.querySelector('[data-del-supp]').dataset.delSupp = s.id;
-    return row;
-}
-function renderSupplements() {
-    // One-tap chips for the supplements you log most, with the dose from the latest entry (list is newest first).
-    const seen = new Map();
-    state.supplements.forEach(s => {
-        const key = (s.name || '').trim().toLowerCase(); if (!key) return;
-        const c = seen.get(key) || { name: s.name, dose: s.dose || '', n: 0 };
-        c.n++; seen.set(key, c);
-    });
-    const names = [...seen.values()];
-    $('suppQuick').replaceChildren(...names.sort((a, b) => b.n - a.n).slice(0, 8)
-        .map(c => chip(c.name, { suppQuick: c.name, dose: c.dose })));
-    setOptions($('suppOptions'), names.map(c => [c.name]));
-    renderList($('suppList'), state.supplements.map(s => suppRow(s)));
-}
 
 // ---------- timeline: meals + symptoms interleaved, with "meals in prior 6h" per symptom ----------
 function renderTimeline() {
@@ -386,7 +419,7 @@ function renderTimeline() {
             return { t, node: symRow(s, tags) };
         }),
     ].sort((a, b) => b.t - a.t);
-    renderList($('timelineList'), items.map(i => i.node));
+    showRows($('timelineList'), items.map(i => i.node), 'Nothing logged yet.');
 }
 
 // ---------- tabs (hash-routed, same pattern as creditcards.js) ----------
@@ -616,13 +649,13 @@ bindEvents(document, {
     },
     'click #exportTimelineBtn, #copyTimelineBtn': async (e, btn) => {
         const status = $('exportStatus');
-        const say = msg => { if (status) status.textContent = msg; if (window.setStatus) window.setStatus(msg); };
+        const say = (msg, type = 'info') => { if(status) status.textContent = msg; setStatus(msg, type); };
         say('Preparing export…');
-        try {
+        try{
             say(await exportTimelineCsv(sb, state.ingredients, btn.id === 'copyTimelineBtn' ? 'copy' : 'download'));
-        } catch (err) {
+        } catch(err){
             console.error('Export failed:', err);
-            say('Could not export: ' + (err.message || err));
+            say('Could not export: ' + (err.message || err), 'error');
         }
     },
     'click #elimination-tabs .tab': (e, btn) => {
@@ -641,14 +674,15 @@ function renderAll() {
     const shownMeals = mealFilterId
         ? state.meals.filter(m => (m.diet_meal_ingredients || []).some(x => x.ingredient_id === mealFilterId))
         : state.meals;
-    renderList($('mealList'), shownMeals.map(mealRow), mealFilterId ? 'emptyFiltered' : 'empty');
+    showRows($('mealList'), shownMeals.map(mealRow),
+        mealFilterId ? 'No logged meals contain this ingredient.' : 'No meals yet.');
     $('mealFilterBar').hidden = !mealFilterId;
     if (mealFilterId) {
         const ing = state.ingredients.find(i => i.id === mealFilterId);
         $('mealFilterCount').textContent = `Showing ${shownMeals.length} meal${shownMeals.length === 1 ? '' : 's'} with`;
         $('mealFilterName').textContent = ing.name;
     }
-    renderList($('symList'), state.symptoms.map(s => symRow(s)));
+    showRows($('symList'), state.symptoms.map(s => symRow(s)), 'No symptoms yet.');
     renderSupplements();
     renderTimeline();
     renderAttention(state);
