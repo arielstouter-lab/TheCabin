@@ -10,8 +10,8 @@
     <script type="module" src="js/diet/diet-main.js"></script>
     <style>
         /* Page-specific only: chip toggle state and log rows. Everything else comes from styles.css. */
-        .chip.off{opacity:.35}                          /* unselected tag / ingredient chips */
         .chip[data-tag],.chip[data-id],.chip[data-supp-quick]{cursor:pointer}
+        #mealAdd{width:100%}
         .diet-row{padding:8px 0;border-bottom:1px solid #ddd}
         .diet-row small{color:#666}
         .diet-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
@@ -24,8 +24,129 @@
         #mealFilterBar[hidden]{display:none}
         .star{cursor:pointer;font-size:1.25em;line-height:1;margin-right:4px;opacity:.5}
         .star.on{opacity:1}
+        .attn-slot{margin-right:1em;white-space:nowrap}
     </style>
 </head>
+
+<!-- Templates: cloned and filled by js/diet/diet-tpl.js -->
+<template id="tpl-chip"><span class="chip"></span></template>
+
+<template id="tpl-empty"><p></p></template>
+
+<template id="tpl-attn-heading"><div class="eyebrow" data-field="text"></div></template>
+
+<template id="tpl-attn-meal">
+    <div class="diet-row">
+        <strong data-field="day"></strong>
+        <small data-field="count"></small>
+        <div data-slot="slots"></div>
+    </div>
+</template>
+
+<template id="tpl-attn-slot">
+    <span class="attn-slot">
+        <span data-field="name"></span>:
+        <button type="button" class="button-inline" data-skip-meal data-slot-name>Not eaten</button>
+        <button type="button" class="button-inline button-ghost" data-log-meal data-slot-name>Log it</button>
+    </span>
+</template>
+
+<template id="tpl-attn-sym">
+    <div class="diet-row">
+        <strong data-field="title"></strong>
+        <small>no symptom or positive entry</small>
+        <div>
+            <button type="button" class="button-inline" data-fine>Felt fine</button>
+            <button type="button" class="button-inline button-ghost" data-log-sym>Log symptom</button>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-attn-more"><small data-field="text"></small></template>
+
+<template id="tpl-pred-line"><div data-field="text"></div></template>
+
+<template id="tpl-pred-row">
+    <tr>
+        <td data-slot="factor"></td>
+        <td><span data-field="signal"></span><span data-if="lowConf"> (low confidence)</span></td>
+        <td class="col-num" data-field="before"></td>
+        <td class="col-num" data-field="other"></td>
+        <td class="col-num" data-field="ratio"></td>
+    </tr>
+</template>
+
+<template id="tpl-safe-row">
+    <tr>
+        <td data-slot="factor"></td>
+        <td class="col-num" data-field="n"></td>
+        <td class="col-num" data-field="followed"></td>
+        <td class="col-num" data-field="good"></td>
+        <td data-field="level"></td>
+    </tr>
+</template>
+
+<template id="tpl-ingredient-row">
+    <div class="diet-row" data-id>
+        <span class="star" data-star></span>
+        <strong data-field="name"></strong>
+        <a href="#meals" class="use-link" data-if="used" data-filter-ingredient title="Show these meals" data-field="usedText"></a>
+        <small data-if="unused">0&times; logged</small>
+        <div data-slot="tags"></div>
+        <button type="button" class="icon-delete del" title="Delete ingredient">✕</button>
+    </div>
+</template>
+
+<template id="tpl-meal-row">
+    <div class="diet-row" data-meal-id>
+        <div class="diet-row-top">
+            <span>
+                <strong data-field="label"></strong>
+                <span class="chip" data-if="skipped">Not eaten</span>
+                <span class="chip" data-if="size" data-field="size"></span>
+                <small data-field="when"></small>
+            </span>
+            <button type="button" class="icon-delete" title="Delete meal" data-del-meal>✕</button>
+        </div>
+        <div data-if="hasBody">
+            <div data-field="ingredients"></div>
+            <div data-slot="tags"></div>
+        </div>
+        <small data-if="notes" data-field="notes"></small>
+    </div>
+</template>
+
+<template id="tpl-symptom-row">
+    <div class="diet-row" data-sym-id>
+        <div class="diet-row-top">
+            <span>
+                <strong data-field="symptom"></strong>
+                <span class="chip" data-if="positive">Positive</span>
+                <span class="chip" data-if="bristol" data-field="bristolText"></span>
+                <span class="sev" data-if="severity" data-field="severityText"></span>
+                <small data-field="when"></small>
+            </span>
+            <button type="button" class="icon-delete" title="Delete entry" data-del-sym>✕</button>
+        </div>
+        <div data-if="notes"><small data-field="notes"></small></div>
+        <div data-if="hint"><small>Eaten in prior 6h:</small> <span data-slot="hintTags"></span></div>
+    </div>
+</template>
+
+<template id="tpl-supp-row">
+    <div class="diet-row" data-supp-id>
+        <div class="diet-row-top">
+            <span>
+                <strong data-field="name"></strong>
+                <span class="chip" data-if="showTag">Supplement</span>
+                <span class="chip" data-if="dose" data-field="dose"></span>
+                <small data-field="when"></small>
+            </span>
+            <button type="button" class="icon-delete" title="Delete supplement entry" data-del-supp>✕</button>
+        </div>
+        <div data-if="notes"><small data-field="notes"></small></div>
+    </div>
+</template>
 
 <body class="app-page">
 <div class="app-shell">
@@ -75,7 +196,7 @@
                             <span class="note">Every meal and symptom (not just the ones shown below), for a spreadsheet or an AI assistant</span>
                             <span class="note" id="exportStatus" role="status"></span>
                         </div>
-                        <div id="timelineList"></div>
+                        <div id="timelineList" data-empty="Nothing logged yet"></div>
                     </div>
                 </div>
             </div>
@@ -103,7 +224,15 @@
                                 </select>
                                 <label class="note"><input type="checkbox" id="mealSkipped" /> Meal not eaten</label>
                             </div>
-                            <div id="mealPicker" class="diet-picker"></div>
+                            <div id="mealPicker" class="diet-picker">
+                                <div>
+                                    <small>Starred, most used, and selected (tap to toggle):</small><br>
+                                    <span id="mealChips"></span>
+                                </div>
+                                <input id="mealAdd" class="text-input" list="ingOptions" placeholder="Add any ingredient (new ones are created)">
+                                <datalist id="ingOptions"></datalist>
+                                <select id="mealRecipe" class="text-input"><option value="">Add all from recipe…</option></select>
+                            </div>
                             <button type="submit" class="button-inline" id="mealSubmit">Add meal</button>
                             <button type="button" class="button-inline button-ghost" id="mealCancel" hidden>Cancel edit</button>
                         </form>
@@ -115,8 +244,11 @@
                         <h2 class="card-title">Meals</h2>
                     </div>
                     <div class="card-body">
-                        <div id="mealFilterBar" hidden></div>
-                        <div id="mealList"></div>
+                        <div id="mealFilterBar" hidden>
+                            <span class="note"><span id="mealFilterCount"></span> <strong id="mealFilterName"></strong></span>
+                            <button type="button" class="button-inline button-ghost" data-clear-meal-filter>Clear filter</button>
+                        </div>
+                        <div id="mealList" data-empty="No meals yet"></div>
                     </div>
                 </div>
             </div>
@@ -171,7 +303,7 @@
                         <h2 class="card-title">Symptoms</h2>
                     </div>
                     <div class="card-body">
-                        <div id="symList"></div>
+                        <div id="symList" data-empty="No symptoms yet"></div>
                     </div>
                 </div>
             </div>
@@ -204,7 +336,7 @@
                         <h2 class="card-title">Supplements</h2>
                     </div>
                     <div class="card-body">
-                        <div id="suppList"></div>
+                        <div id="suppList" data-empty="No supplements logged yet"></div>
                     </div>
                 </div>
             </div>
@@ -253,7 +385,7 @@
                         <span class="note">Tap the star to pin an ingredient as a one-tap chip when logging a meal. Your most-used ingredients also appear there automatically.</span>
                     </div>
                     <div class="card-body">
-                        <div id="ingList"></div>
+                        <div id="ingList" data-empty="No ingredients yet"></div>
                     </div>
                 </div>
             </div>
@@ -294,8 +426,8 @@
                             </div>
                         </div>
 
-                        <p id="predSummary" class="note"></p>
-                        <p id="predEmpty" class="empty-state" hidden></p>
+                        <div id="predSummary" class="note"></div>
+                        <p id="predEmpty" class="empty-state" hidden>Log meals with ingredients and some symptoms, then check back here</p>
 
                         <div class="table-wrap" id="predTableWrap" hidden>
                             <table class="cc-table">
@@ -322,7 +454,7 @@
                         <span class="note">Eaten several times with no symptom following in the same window</span>
                     </div>
                     <div class="card-body">
-                        <p id="predSafeEmpty" class="empty-state" hidden></p>
+                        <p id="predSafeEmpty" class="empty-state" hidden>Nothing yet. A food shows here after it has been eaten at least 3 times with symptom check-ins and nothing following</p>
                         <div class="table-wrap" id="predSafeWrap" hidden>
                             <table class="cc-table">
                                 <thead>

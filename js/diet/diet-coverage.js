@@ -1,5 +1,6 @@
 // Coverage helpers for diet-main: which meals / symptom check-ins are missing, and how much
 // that should lower confidence in predictions. Used by the "Needs attention" card and diet-predictions.js.
+import { tpl, fill, slot } from './diet-tpl.js';
 
 export const HOUR = 3600e3, DAY = 24 * HOUR;
 export const MIN_MEALS_PER_DAY = 3;
@@ -95,8 +96,8 @@ export function buildConfidence(state, now = Date.now()) {
     };
 }
 
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const dayLabel = t => new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+const SHOW = 8;       // symptom check-in gaps listed before "…and N earlier blocks"
 
 // "Needs attention" card on the Timeline tab. Buttons carry data-* attributes handled in diet-main.js.
 export function renderAttention(state) {
@@ -105,21 +106,31 @@ export function renderAttention(state) {
     const mealGaps = mealGapDays(state), symGaps = symptomGaps(state);
     card.hidden = !mealGaps.length && !symGaps.length;
 
-    const mealRows = mealGaps.map(g => `<div class="diet-row"><strong>${dayLabel(g.day)}</strong>
-    <small>${g.count} of ${MIN_MEALS_PER_DAY} meals logged</small>
-    <div>${g.missingSlots.map(s => `${s.name}:
-      <button type="button" class="button-inline" data-skip-meal="${atHour(g.day, s.at)}" data-slot="${s.name}">Not eaten</button>
-      <button type="button" class="button-inline button-ghost" data-log-meal="${atHour(g.day, s.at)}" data-slot="${s.name}">Log it</button>`).join(' &nbsp; ')}</div></div>`);
-
-    const SHOW = 8;
-    const symRows = symGaps.slice(0, SHOW).map(g => { const mid = (g.start + g.end) / 2;
-        return `<div class="diet-row"><strong>${dayLabel(g.day)} ${g.block.toLowerCase()}</strong>
-      <small>no symptom or positive entry</small>
-      <div><button type="button" class="button-inline" data-fine="${mid}">Felt fine</button>
-      <button type="button" class="button-inline button-ghost" data-log-sym="${mid}">Log symptom</button></div></div>`; });
-    if (symGaps.length > SHOW) symRows.push(`<small>…and ${symGaps.length - SHOW} earlier blocks</small>`);
-
-    list.innerHTML =
-        (mealRows.length ? `<div class="eyebrow">Days with fewer than ${MIN_MEALS_PER_DAY} meals</div>${mealRows.join('')}` : '') +
-        (symRows.length ? `<div class="eyebrow">Symptom check-ins missing</div>${symRows.join('')}` : '');
+    const nodes = [];
+    if (mealGaps.length) {
+        nodes.push(fill(tpl('tpl-attn-heading'), { text: `Days with fewer than ${MIN_MEALS_PER_DAY} meals` }));
+        for (const g of mealGaps) {
+            const row = fill(tpl('tpl-attn-meal'), { day: dayLabel(g.day), count: `${g.count} of ${MIN_MEALS_PER_DAY} meals logged` });
+            slot(row, 'slots').append(...g.missingSlots.map(s => {
+                const el = fill(tpl('tpl-attn-slot'), { name: s.name });
+                el.querySelector('[data-skip-meal]').dataset.skipMeal = atHour(g.day, s.at);
+                el.querySelector('[data-log-meal]').dataset.logMeal = atHour(g.day, s.at);
+                el.querySelectorAll('[data-slot-name]').forEach(b => { b.dataset.slotName = s.name; });
+                return el;
+            }));
+            nodes.push(row);
+        }
+    }
+    if (symGaps.length) {
+        nodes.push(fill(tpl('tpl-attn-heading'), { text: 'Symptom check-ins missing' }));
+        for (const g of symGaps.slice(0, SHOW)) {
+            const mid = (g.start + g.end) / 2;
+            const row = fill(tpl('tpl-attn-sym'), { title: `${dayLabel(g.day)} ${g.block.toLowerCase()}` });
+            row.querySelector('[data-fine]').dataset.fine = mid;
+            row.querySelector('[data-log-sym]').dataset.logSym = mid;
+            nodes.push(row);
+        }
+        if (symGaps.length > SHOW) nodes.push(fill(tpl('tpl-attn-more'), { text: `…and ${symGaps.length - SHOW} earlier blocks` }));
+    }
+    list.replaceChildren(...nodes);
 }

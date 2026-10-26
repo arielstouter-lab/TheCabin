@@ -97,6 +97,7 @@ textarea { font: inherit; }
   }
   &[data-state="due-soon"] { border-color: var(--ochre); color: var(--ochre); }
   &[data-state="overdue"] { border-color: var(--danger); color: var(--danger); }
+  &[data-state="off"] { opacity: .35; }
   &[data-kind="priority"] { background: var(--danger); color: var(--white); border-color: var(--danger); font-weight: 600; }
   &[data-kind="aisle"] { margin-left: auto; background: var(--card); color: var(--ink-soft); border-color: var(--line); white-space: nowrap; }
 }

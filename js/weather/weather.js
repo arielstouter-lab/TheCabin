@@ -223,7 +223,7 @@ function renderWeekForecast(raw){
     container.style.setProperty("--wf-overlay", `linear-gradient(180deg, ${stops})`);
 
     container.innerHTML = raw.daily.time.map((t, i) => {
-        const date = new Date(t);
+        const date = new Date(t + "T12:00:00");
         const info = codeInfo(raw.daily.weather_code[i], true);
         const moon = getMoonPhase(date);
         const dayLabel = i === 0 ? "Today" : date.toLocaleDateString([], { weekday: "short" });

@@ -2,6 +2,7 @@ import { bindEvents } from '../shared/dom.js';
 import { renderPredictions } from './diet-predictions.js';
 import { renderAttention } from './diet-coverage.js';
 import { exportTimelineCsv } from './diet-export.js';
+import { tpl, fill, slot, setOptions, renderList } from './diet-tpl.js';
 
 // Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
 // same shared scripts that lists.html does before this module.
@@ -63,16 +64,34 @@ async function rememberTags(name, tags) {
     const { error } = await sb.from('diet_item_memory').upsert(row, { onConflict: 'item_key' });
     if (error) console.error(error);
 }
+
+// ---------- chips ----------
 // Suspected triggers get the site's priority chip style; everything else is a plain chip.
 const PRIORITY_TAGS = new Set(['gluten', 'dairy', 'lactose', 'high-FODMAP', 'sweetener', 'fatty/fried']);
-const chipClass = t => 'chip' + (PRIORITY_TAGS.has(t) ? ' priority-chip' : '');
+
+const setOn = (el, on = true) => { on ? delete el.dataset.state : (el.dataset.state = 'off'); return el; };
+const setKind = (el, t) => { PRIORITY_TAGS.has(t) ? (el.dataset.kind = 'priority') : delete el.dataset.kind; return el; };
+
+const chip = (label, attrs = {}) => {                         // plain chip; attrs become data-* attributes
+    const el = tpl('tpl-chip');
+    el.textContent = label;
+    Object.assign(el.dataset, attrs);
+    return el;
+};
+// Tag chip: priority styling from the tag, data-state="off" when unselected, data-tag only when clickable.
+const tagChip = (t, { on = true, pick = false } = {}) => {
+    const el = setKind(chip(t), t);
+    if (pick) el.dataset.tag = t;
+    return setOn(el, on);
+};
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const fmt = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+const cap = s => s[0].toUpperCase() + s.slice(1);
 const state = { memory: [], memoryLookup: new Map(), ingredients: [], meals: [], symptoms: [], recipes: [], supplements: [], picked: new Set() };
+const recipeOptions = () => state.recipes.map(r => [r.id, r.name || r.title]);
 
 // ---------- load ----------
 async function loadAll() {
@@ -155,17 +174,25 @@ async function importRecipe(recipeId) {
     }
 }
 
+const STAR_ON = 'Starred: always shown when logging a meal. Tap to unstar.';
+const STAR_OFF = 'Tap to star: always show when logging a meal';
+function ingRow(i, used) {
+    const row = tpl('tpl-ingredient-row');
+    fill(row, { name: i.name, used, unused: !used, usedText: `${used}\u00d7 logged` });
+    row.dataset.id = i.id;
+    const star = row.querySelector('[data-star]');
+    star.classList.toggle('on', !!i.is_frequent);
+    star.textContent = i.is_frequent ? '★' : '☆';
+    star.title = i.is_frequent ? STAR_ON : STAR_OFF;
+    const link = row.querySelector('[data-filter-ingredient]');
+    if (link) link.dataset.filterIngredient = i.id;
+    slot(row, 'tags').append(...ALL_TAGS.map(t => tagChip(t, { on: i.tags.includes(t), pick: true })));
+    return row;
+}
 function renderIngredients() {
     const uses = usageCounts();
-    $('recipeSelect').innerHTML = '<option value="">Import from recipe…</option>' +
-        state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('');
-    $('ingList').innerHTML = state.ingredients.map(i => `
-    <div class="diet-row" data-id="${i.id}">
-      <span class="star${i.is_frequent ? ' on' : ''}" data-star title="${i.is_frequent ? 'Starred: always shown when logging a meal. Tap to unstar.' : 'Tap to star: always show when logging a meal'}">${i.is_frequent ? '★' : '☆'}</span>
-      <strong>${esc(i.name)}</strong> ${(uses.get(i.id) || 0) ? `<a href="#meals" class="use-link" data-filter-ingredient="${i.id}" title="Show these meals">${uses.get(i.id)}&times; logged</a>` : '<small>0&times; logged</small>'}
-      <div>${ALL_TAGS.map(t => `<span class="${chipClass(t)} ${i.tags.includes(t) ? '' : 'off'}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>
-      <button type="button" class="icon-delete del" title="Delete ingredient">✕</button>
-    </div>`).join('') || '<p>No ingredients yet.</p>';
+    setOptions($('recipeSelect'), recipeOptions(), true);
+    renderList($('ingList'), state.ingredients.map(i => ingRow(i, uses.get(i.id) || 0)));
 }
 
 // ---------- meals ----------
@@ -184,12 +211,10 @@ function renderMealPicker() {
         .sort((a, b) => uses.get(b.id) - uses.get(a.id)).slice(0, TOP_USED);
     const shown = new Set([...starred, ...common].map(i => i.id));
     const picked = state.ingredients.filter(i => state.picked.has(i.id) && !shown.has(i.id));
-    $('mealPicker').innerHTML =
-        `<div><small>Starred, most used, and selected (tap to toggle):</small><br>` +
-        [...starred, ...common, ...picked].map(i => `<span class="chip ${state.picked.has(i.id) ? '' : 'off'}" data-id="${i.id}">${esc(i.name)}</span>`).join('') +
-        `</div><input id="mealAdd" class="text-input" list="ingOptions" placeholder="Add any ingredient (new ones are created)" style="width:100%">
-     <datalist id="ingOptions">${state.ingredients.map(i => `<option value="${esc(i.name)}">`).join('')}</datalist>
-     <select id="mealRecipe" class="text-input"><option value="">Add all from recipe…</option>${state.recipes.map(r => `<option value="${esc(r.id)}">${esc(r.name || r.title)}</option>`).join('')}</select>`;
+    $('mealChips').replaceChildren(...[...starred, ...common, ...picked].map(i =>
+        setOn(chip(i.name, { id: i.id }), state.picked.has(i.id))));
+    setOptions($('ingOptions'), state.ingredients.map(i => [i.name]));
+    setOptions($('mealRecipe'), recipeOptions(), true);
 }
 // ---------- edit state: click a meal or symptom row to load it into its form ----------
 let editMealId = null, editSymId = null;
@@ -272,22 +297,33 @@ const mealTags = m => {
     const ings = ids.map(id => state.ingredients.find(i => i.id === id)).filter(Boolean);
     return { ings, tags: [...new Set(ings.flatMap(i => i.tags))] };
 };
-const mealHtml = m => {
+function mealRow(m) {
     const { ings, tags } = mealTags(m);
-    const body = m.skipped ? '' : `<div>${ings.map(i => esc(i.name)).join(', ')}</div>
-    <div>${tags.map(t => `<span class="${chipClass(t)}">${esc(t)}</span>`).join('')}</div>`;
-    return `<div class="diet-row${editMealId === m.id ? ' editing' : ''}" data-meal-id="${m.id}">
-    <div class="diet-row-top"><span><strong>${esc(m.label || 'Meal')}</strong> ${m.skipped ? '<span class="chip">Not eaten</span> ' : ''}${m.meal_size ? `<span class="chip">${esc(m.meal_size[0].toUpperCase() + m.meal_size.slice(1))}</span> ` : ''}<small>${fmt(m.eaten_at)}</small></span>
-      <button type="button" class="icon-delete" title="Delete meal" data-del-meal="${m.id}">✕</button></div>
-    ${body}
-    ${m.notes ? `<small>${esc(m.notes)}</small>` : ''}</div>`;
-};
+    const row = tpl('tpl-meal-row');
+    fill(row, {
+        label: m.label || 'Meal', skipped: m.skipped, size: m.meal_size ? cap(m.meal_size) : '',
+        when: fmt(m.eaten_at), hasBody: !m.skipped, ingredients: ings.map(i => i.name).join(', '), notes: m.notes,
+    });
+    row.dataset.mealId = m.id;
+    row.classList.toggle('editing', editMealId === m.id);
+    row.querySelector('[data-del-meal]').dataset.delMeal = m.id;
+    slot(row, 'tags')?.append(...tags.map(t => tagChip(t)));
+    return row;
+}
 
-const symHtml = (s, hint = '') => `<div class="diet-row${editSymId === s.id ? ' editing' : ''}" data-sym-id="${s.id}">
-  <div class="diet-row-top"><span><strong>${esc(s.symptom)}</strong> ${s.positive ? '<span class="chip">Positive</span> ' : ''}${s.bristol ? `<span class="chip">Bristol ${s.bristol}</span> ` : ''}
-    ${s.severity ? `<span class="sev">${s.severity}/10</span>` : ''} <small>${fmt(s.occurred_at)}</small></span>
-    <button type="button" class="icon-delete" title="Delete entry" data-del-sym="${s.id}">✕</button></div>
-  ${s.notes ? `<div><small>${esc(s.notes)}</small></div>` : ''}${hint}</div>`;
+// hintTags: tags from meals in the prior 6h (timeline only)
+function symRow(s, hintTags = []) {
+    const row = tpl('tpl-symptom-row');
+    fill(row, {
+        symptom: s.symptom, positive: s.positive, bristol: s.bristol, bristolText: `Bristol ${s.bristol}`,
+        severity: s.severity, severityText: `${s.severity}/10`, when: fmt(s.occurred_at), notes: s.notes, hint: hintTags.length,
+    });
+    row.dataset.symId = s.id;
+    row.classList.toggle('editing', editSymId === s.id);
+    row.querySelector('[data-del-sym]').dataset.delSym = s.id;
+    slot(row, 'hintTags')?.append(...hintTags.map(t => tagChip(t)));
+    return row;
+}
 
 // ---------- supplements (pills) ----------
 let editSuppId = null;
@@ -311,10 +347,14 @@ function startEditSupp(id) {
     location.hash = 'supplements';
     $('suppForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-const suppHtml = (s, showTag = false) => `<div class="diet-row${editSuppId === s.id ? ' editing' : ''}" data-supp-id="${s.id}">
-  <div class="diet-row-top"><span><strong>${esc(s.name)}</strong> ${showTag ? '<span class="chip">Supplement</span> ' : ''}${s.dose ? `<span class="chip">${esc(s.dose)}</span> ` : ''}<small>${fmt(s.taken_at)}</small></span>
-    <button type="button" class="icon-delete" title="Delete supplement entry" data-del-supp="${s.id}">✕</button></div>
-  ${s.notes ? `<div><small>${esc(s.notes)}</small></div>` : ''}</div>`;
+function suppRow(s, showTag = false) {
+    const row = tpl('tpl-supp-row');
+    fill(row, { name: s.name, showTag, dose: s.dose, when: fmt(s.taken_at), notes: s.notes });
+    row.dataset.suppId = s.id;
+    row.classList.toggle('editing', editSuppId === s.id);
+    row.querySelector('[data-del-supp]').dataset.delSupp = s.id;
+    return row;
+}
 function renderSupplements() {
     // One-tap chips for the supplements you log most, with the dose from the latest entry (list is newest first).
     const seen = new Map();
@@ -324,30 +364,29 @@ function renderSupplements() {
         c.n++; seen.set(key, c);
     });
     const names = [...seen.values()];
-    $('suppQuick').innerHTML = names.sort((a, b) => b.n - a.n).slice(0, 8)
-        .map(c => `<span class="chip" data-supp-quick="${esc(c.name)}" data-dose="${esc(c.dose)}">${esc(c.name)}</span>`).join('');
-    $('suppOptions').innerHTML = names.map(c => `<option value="${esc(c.name)}">`).join('');
-    $('suppList').innerHTML = state.supplements.map(s => suppHtml(s)).join('') || '<p>No supplements logged yet.</p>';
+    $('suppQuick').replaceChildren(...names.sort((a, b) => b.n - a.n).slice(0, 8)
+        .map(c => chip(c.name, { suppQuick: c.name, dose: c.dose })));
+    setOptions($('suppOptions'), names.map(c => [c.name]));
+    renderList($('suppList'), state.supplements.map(s => suppRow(s)));
 }
 
 // ---------- timeline: meals + symptoms interleaved, with "meals in prior 6h" per symptom ----------
 function renderTimeline() {
     const WINDOW = 6 * 3600e3;
     const items = [
-        ...state.meals.map(m => ({ t: new Date(m.eaten_at), html: mealHtml(m) })),
-        ...state.supplements.map(s => ({ t: new Date(s.taken_at), html: suppHtml(s, true) })),
+        ...state.meals.map(m => ({ t: new Date(m.eaten_at), node: mealRow(m) })),
+        ...state.supplements.map(s => ({ t: new Date(s.taken_at), node: suppRow(s, true) })),
         ...state.symptoms.map(s => {
             const t = new Date(s.occurred_at);
-            let hint = '';
+            let tags = [];
             if (!s.positive) {
                 const prior = state.meals.filter(m => { const d = t - new Date(m.eaten_at); return d >= 0 && d <= WINDOW; });
-                const tags = [...new Set(prior.flatMap(m => mealTags(m).tags))];
-                hint = tags.length ? `<div><small>Eaten in prior 6h:</small> ${tags.map(x => `<span class="${chipClass(x)}">${esc(x)}</span>`).join('')}</div>` : '';
+                tags = [...new Set(prior.flatMap(m => mealTags(m).tags))];
             }
-            return { t, html: symHtml(s, hint) };
+            return { t, node: symRow(s, tags) };
         }),
     ].sort((a, b) => b.t - a.t);
-    $('timelineList').innerHTML = items.map(i => i.html).join('') || '<p>Nothing logged yet.</p>';
+    renderList($('timelineList'), items.map(i => i.node));
 }
 
 // ---------- tabs (hash-routed, same pattern as creditcards.js) ----------
@@ -399,8 +438,8 @@ bindEvents(document, {
         e.preventDefault();
         await importRecipe($('recipeSelect').value);
     },
-    'click #mealPicker [data-id]': (e, chip) => {
-        const id = chip.dataset.id; if (!id) return;
+    'click #mealPicker [data-id]': (e, chipEl) => {
+        const id = chipEl.dataset.id; if (!id) return;
         state.picked.has(id) ? state.picked.delete(id) : state.picked.add(id);
         renderMealPicker();
     },
@@ -408,6 +447,7 @@ bindEvents(document, {
         if (input.value.trim()) {
             const ing = await addIngredient(input.value);
             if (ing) state.picked.add(ing.id);
+            input.value = '';                       // the input now persists across renders, so clear it here
             renderAll();
         }
     },
@@ -420,6 +460,7 @@ bindEvents(document, {
                     if (ing) state.picked.add(ing.id);
                 }
                 if (!$('mealLabel').value) $('mealLabel').value = r.name || r.title || '';
+                select.value = '';
                 renderAll();
             }
         }
@@ -457,8 +498,8 @@ bindEvents(document, {
     },
 
     // ---- Supplements ----
-    'click #suppQuick [data-supp-quick]': (e, chip) => {
-        $('suppName').value = chip.dataset.suppQuick; $('suppDose').value = chip.dataset.dose || '';
+    'click #suppQuick [data-supp-quick]': (e, chipEl) => {
+        $('suppName').value = chipEl.dataset.suppQuick; $('suppDose').value = chipEl.dataset.dose || '';
     },
     'click #suppCancel': () => { resetSuppForm(); renderAll(); },
     'submit #suppForm': async (e) => {
@@ -493,7 +534,7 @@ bindEvents(document, {
     'click #attentionList [data-skip-meal]': async (e, btn) => {
         try {
             const { error } = await sb.from('diet_meals').insert({
-                eaten_at: new Date(+btn.dataset.skipMeal).toISOString(), label: btn.dataset.slot, skipped: true });
+                eaten_at: new Date(+btn.dataset.skipMeal).toISOString(), label: btn.dataset.slotName, skipped: true });
             if (error) return console.error(error);
             await loadAll();
         } catch (err) {
@@ -503,7 +544,7 @@ bindEvents(document, {
     'click #attentionList [data-log-meal]': (e, btn) => {
         resetMealForm();
         $('mealWhen').value = toLocalInput(+btn.dataset.logMeal);
-        $('mealLabel').value = btn.dataset.slot || '';
+        $('mealLabel').value = btn.dataset.slotName || '';
         renderAll();
         location.hash = 'meals';
     },
@@ -525,7 +566,7 @@ bindEvents(document, {
     },
 
     // ---- Predictions controls ----
-    'change #predGroup, #predWindow, #predSymptom, #predSeverity': () => renderPredictions(state, chipClass),
+    'change #predGroup, #predWindow, #predSymptom, #predSeverity': () => renderPredictions(state, tagChip),
 
     'submit #mealForm': async (e) => {
         e.preventDefault();
@@ -600,19 +641,18 @@ function renderAll() {
     const shownMeals = mealFilterId
         ? state.meals.filter(m => (m.diet_meal_ingredients || []).some(x => x.ingredient_id === mealFilterId))
         : state.meals;
-    $('mealList').innerHTML = shownMeals.map(mealHtml).join('') || (mealFilterId ? '<p>No logged meals contain this ingredient.</p>' : '<p>No meals yet.</p>');
-    const bar = $('mealFilterBar');
-    bar.hidden = !mealFilterId;
+    renderList($('mealList'), shownMeals.map(mealRow), mealFilterId ? 'emptyFiltered' : 'empty');
+    $('mealFilterBar').hidden = !mealFilterId;
     if (mealFilterId) {
         const ing = state.ingredients.find(i => i.id === mealFilterId);
-        bar.innerHTML = `<span class="note">Showing ${shownMeals.length} meal${shownMeals.length === 1 ? '' : 's'} with <strong>${esc(ing.name)}</strong></span>
-            <button type="button" class="button-inline button-ghost" data-clear-meal-filter>Clear filter</button>`;
+        $('mealFilterCount').textContent = `Showing ${shownMeals.length} meal${shownMeals.length === 1 ? '' : 's'} with`;
+        $('mealFilterName').textContent = ing.name;
     }
-    $('symList').innerHTML = state.symptoms.map(symHtml).join('') || '<p>No symptoms yet.</p>';
+    renderList($('symList'), state.symptoms.map(s => symRow(s)));
     renderSupplements();
     renderTimeline();
     renderAttention(state);
-    renderPredictions(state, chipClass);
+    renderPredictions(state, tagChip);
 }
 
 $('mealWhen').value = nowLocal(); $('symWhen').value = nowLocal(); $('suppWhen').value = nowLocal(); setSymType();

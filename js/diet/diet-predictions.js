@@ -12,6 +12,7 @@
 // Safe foods: foods eaten several times where no symptom followed within the same window.
 
 import { HOUR, DAY, buildConfidence, mealGapDays, symptomGaps } from './diet-coverage.js';
+import { tpl, fill, slot, setOptions } from './diet-tpl.js';
 
 const CLUSTER_GAP = 3 * HOUR;     // symptoms logged within 3h of each other count as one event
 const EXCLUDE_NEAR = 3 * HOUR;    // comparison times this close to a symptom aren't clean "no symptom" times
@@ -128,12 +129,12 @@ const SIGNAL_LABEL = {
     strong: 'Strong signal', possible: 'Possible signal', none: 'No clear signal',
     lower: 'Eaten less before symptoms', early: 'Too early to say',
 };
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
 const n1 = n => +n.toFixed(1);                       // 3 -> 3, 2.5 -> 2.5
 const pct = (n, d) => (d ? Math.round(100 * n / d) : 0) + '%';
 const level = c => (c >= 0.8 ? 'High' : c >= 0.5 ? 'Medium' : 'Low');
 
-export function renderPredictions(state, chipClass) {
+export function renderPredictions(state, tagChip) {
     const $ = id => document.getElementById(id);
     if (!$('predBody')) return;
 
@@ -142,10 +143,9 @@ export function renderPredictions(state, chipClass) {
     state.symptoms.filter(s => !s.positive).forEach(s => {
         const n = (s.symptom || '').trim(); if (n && !seen.has(n.toLowerCase())) seen.set(n.toLowerCase(), n);
     });
-    const sel = $('predSymptom'), cur = sel.value;
-    sel.innerHTML = '<option value="">All symptoms</option>' +
-        [...seen.values()].sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-    sel.value = [...seen.values()].includes(cur) ? cur : '';
+    const sel = $('predSymptom'), cur = sel.value, names = [...seen.values()].sort();
+    setOptions(sel, names.map(n => [n, n]), true);          // "All symptoms" stays in the HTML
+    sel.value = names.includes(cur) ? cur : '';
 
     const group = $('predGroup').value;
     const res = analyze(state, {
@@ -153,7 +153,7 @@ export function renderPredictions(state, chipClass) {
         minSeverity: +$('predSeverity').value || 1,
         symptom: sel.value, group,
     });
-    const label = f => (group === 'tags' ? `<span class="${chipClass(f)}">${esc(f)}</span>` : esc(f));
+    const label = f => (group === 'tags' ? tagChip(f) : f);      // append() accepts a node or a string
 
     // ---- summary + confidence ----
     const lines = [];
@@ -170,27 +170,29 @@ export function renderPredictions(state, chipClass) {
     const symGapCount = symptomGaps(state).length, mealGapCount = mealGapDays(state).length;
     if (symGapCount) why.push(`${symGapCount} symptom check-in block${symGapCount === 1 ? '' : 's'} with no entry in the last 7 days`);
     if (why.length) lines.push(`Lowering confidence: ${why.join('; ')}. See Needs attention on the Timeline tab` + (mealGapCount ? ' to mark skipped meals.' : '.'));
-    $('predSummary').innerHTML = lines.map(esc).join('<br>');
+    $('predSummary').replaceChildren(...lines.map(text => fill(tpl('tpl-pred-line'), { text })));
 
     // ---- triggers ----
     $('predEmpty').hidden = res.rows.length > 0;
-    $('predEmpty').textContent = 'Log meals with ingredients and some symptoms, then check back here.';
     $('predTableWrap').hidden = res.rows.length === 0;
-    $('predBody').innerHTML = res.rows.map(r => `<tr>
-      <td>${label(r.factor)}</td>
-      <td>${SIGNAL_LABEL[r.signal]}${res.confidence < 0.6 && ['strong', 'possible'].includes(r.signal) ? ' (low confidence)' : ''}</td>
-      <td class="col-num">${n1(r.a)} of ${n1(res.eventsEff)} (${pct(r.a, res.eventsEff)})</td>
-      <td class="col-num">${n1(r.c)} of ${n1(res.comparisonsEff)} (${pct(r.c, res.comparisonsEff)})</td>
-      <td class="col-num">${r.ratio.toFixed(1)}&times;</td></tr>`).join('');
+    $('predBody').replaceChildren(...res.rows.map(r => {
+        const row = fill(tpl('tpl-pred-row'), {
+            signal: SIGNAL_LABEL[r.signal],
+            lowConf: res.confidence < 0.6 && ['strong', 'possible'].includes(r.signal),
+            before: `${n1(r.a)} of ${n1(res.eventsEff)} (${pct(r.a, res.eventsEff)})`,
+            other: `${n1(r.c)} of ${n1(res.comparisonsEff)} (${pct(r.c, res.comparisonsEff)})`,
+            ratio: `${r.ratio.toFixed(1)}\u00d7`,
+        });
+        slot(row, 'factor').append(label(r.factor));
+        return row;
+    }));
 
     // ---- safe foods ----
     $('predSafeEmpty').hidden = res.safe.length > 0;
-    $('predSafeEmpty').textContent = 'Nothing yet. A food shows here after it has been eaten at least 3 times with symptom check-ins and nothing following.';
     $('predSafeWrap').hidden = res.safe.length === 0;
-    $('predSafeBody').innerHTML = res.safe.map(s => `<tr>
-      <td>${label(s.factor)}</td>
-      <td class="col-num">${s.n}</td>
-      <td class="col-num">${s.followed}</td>
-      <td class="col-num">${s.good}</td>
-      <td>${level(s.conf)}</td></tr>`).join('');
+    $('predSafeBody').replaceChildren(...res.safe.map(s => {
+        const row = fill(tpl('tpl-safe-row'), { n: s.n, followed: s.followed, good: s.good, level: level(s.conf) });
+        slot(row, 'factor').append(label(s.factor));
+        return row;
+    }));
 }
