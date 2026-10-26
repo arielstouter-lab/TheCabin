@@ -12,9 +12,9 @@ const sb = window.supabaseClient;
 const TAGS = {
     // dairy = anything made from milk (milk proteins). lactose = milk sugar, so lactose-free milk is dairy but not lactose.
     dairy:        { kind: 'allergen', words: ['milk','cheese','butter','cream','yogurt','yoghurt','whey','casein','ghee','ice cream','sour cream','half and half','buttermilk','kefir','paneer','custard','cheddar','parmesan','mozzarella','feta','brie','gouda','ricotta','mascarpone'],
-                    not: ['dairy[- ]free','non[- ]dairy','\\b(almond|oat|soy|coconut|rice|cashew|hemp|pea|plant)[- ]?(based )?(milk|cream|yogurt|yoghurt|cheese|butter)','\\b(peanut|almond|cashew|nut|cocoa|shea|apple|sunflower) butter','cream of tartar'] },
+        not: ['dairy[- ]free','non[- ]dairy','\\b(almond|oat|soy|coconut|rice|cashew|hemp|pea|plant)[- ]?(based )?(milk|cream|yogurt|yoghurt|cheese|butter)','\\b(peanut|almond|cashew|nut|cocoa|shea|apple|sunflower) butter','cream of tartar'] },
     lactose:      { kind: 'allergen', words: ['milk','cream','ice cream','sour cream','half and half','yogurt','yoghurt','kefir','ricotta','mascarpone','cottage cheese','cream cheese','condensed milk','custard','buttermilk','whey'],
-                    not: ['lactose[- ]free','dairy[- ]free','non[- ]dairy','\\b(almond|oat|soy|coconut|rice|cashew|hemp|pea|plant)[- ]?(based )?(milk|cream|yogurt|yoghurt)','cream of tartar'] },
+        not: ['lactose[- ]free','dairy[- ]free','non[- ]dairy','\\b(almond|oat|soy|coconut|rice|cashew|hemp|pea|plant)[- ]?(based )?(milk|cream|yogurt|yoghurt)','cream of tartar'] },
     gluten:       { kind: 'allergen', words: ['wheat','flour','bread','pasta','barley','rye','couscous','semolina','tortilla','noodle','breadcrumb','soy sauce','cracker','cake','cookie','muffin','pastry','pie','biscuit','scone','brownie','donut','doughnut','pancake','waffle','pizza','bagel','pretzel','bun','croissant','dumpling','cereal','granola','crust','dough','batter','macaroni','mac and cheese','spaghetti','lasagna','ravioli','pita','sandwich','burger','biscotti'] },
     egg:          { kind: 'allergen', words: ['egg','mayo','mayonnaise','meringue'] },
     soy:          { kind: 'allergen', words: ['soy','tofu','tempeh','edamame','miso'] },
@@ -162,7 +162,7 @@ function renderIngredients() {
     $('ingList').innerHTML = state.ingredients.map(i => `
     <div class="diet-row" data-id="${i.id}">
       <span class="star${i.is_frequent ? ' on' : ''}" data-star title="${i.is_frequent ? 'Starred: always shown when logging a meal. Tap to unstar.' : 'Tap to star: always show when logging a meal'}">${i.is_frequent ? '★' : '☆'}</span>
-      <strong>${esc(i.name)}</strong> <small>${uses.get(i.id) || 0}&times; logged</small>
+      <strong>${esc(i.name)}</strong> ${(uses.get(i.id) || 0) ? `<a href="#meals" class="use-link" data-filter-ingredient="${i.id}" title="Show these meals">${uses.get(i.id)}&times; logged</a>` : '<small>0&times; logged</small>'}
       <div>${ALL_TAGS.map(t => `<span class="${chipClass(t)} ${i.tags.includes(t) ? '' : 'off'}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>
       <button type="button" class="icon-delete del" title="Delete ingredient">✕</button>
     </div>`).join('') || '<p>No ingredients yet.</p>';
@@ -193,6 +193,7 @@ function renderMealPicker() {
 }
 // ---------- edit state: click a meal or symptom row to load it into its form ----------
 let editMealId = null, editSymId = null;
+let mealFilterId = null;      // ingredient id the Meals list is filtered to, or null for all meals
 const toLocalInput = v => { const d = new Date(v); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
 function applySkippedUI() { $('mealPicker').hidden = $('mealSkipped').checked; }
@@ -477,6 +478,17 @@ bindEvents(document, {
         }
     },
 
+    // ---- Meal list filter (from the "N× logged" links on the Ingredients tab) ----
+    'click #ingList [data-filter-ingredient]': (e, link) => {
+        e.preventDefault();
+        mealFilterId = link.dataset.filterIngredient;
+        renderAll();
+        location.hash = 'meals';
+        switchTab('meals');                                   // the pane must be visible before scrolling to it
+        $('mealFilterBar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    'click [data-clear-meal-filter]': () => { mealFilterId = null; renderAll(); },
+
     // ---- Needs attention card ----
     'click #attentionList [data-skip-meal]': async (e, btn) => {
         try {
@@ -539,6 +551,7 @@ bindEvents(document, {
                     await sb.from('diet_meal_ingredients').insert([...picked].map(ingredient_id => ({ meal_id: meal.id, ingredient_id })));
             }
             resetMealForm();
+            mealFilterId = null;
             await loadAll();
         } catch (err) {
             console.error('Failed to save meal:', err);
@@ -583,7 +596,18 @@ if (document.getElementById('elimination-tabs')) {
 
 function renderAll() {
     renderIngredients(); renderMealPicker();
-    $('mealList').innerHTML = state.meals.map(mealHtml).join('') || '<p>No meals yet.</p>';
+    if (mealFilterId && !state.ingredients.some(i => i.id === mealFilterId)) mealFilterId = null;   // ingredient was deleted
+    const shownMeals = mealFilterId
+        ? state.meals.filter(m => (m.diet_meal_ingredients || []).some(x => x.ingredient_id === mealFilterId))
+        : state.meals;
+    $('mealList').innerHTML = shownMeals.map(mealHtml).join('') || (mealFilterId ? '<p>No logged meals contain this ingredient.</p>' : '<p>No meals yet.</p>');
+    const bar = $('mealFilterBar');
+    bar.hidden = !mealFilterId;
+    if (mealFilterId) {
+        const ing = state.ingredients.find(i => i.id === mealFilterId);
+        bar.innerHTML = `<span class="note">Showing ${shownMeals.length} meal${shownMeals.length === 1 ? '' : 's'} with <strong>${esc(ing.name)}</strong></span>
+            <button type="button" class="button-inline button-ghost" data-clear-meal-filter>Clear filter</button>`;
+    }
     $('symList').innerHTML = state.symptoms.map(symHtml).join('') || '<p>No symptoms yet.</p>';
     renderSupplements();
     renderTimeline();

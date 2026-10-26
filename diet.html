@@ -19,6 +19,9 @@
         .diet-row.editing{background:rgba(0,0,0,.06)}
         .diet-row .sev{font-weight:bold}
         .diet-picker{width:100%}
+        .use-link{font-size:.85em;text-decoration:underline;color:inherit;cursor:pointer}
+        #mealFilterBar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+        #mealFilterBar[hidden]{display:none}
         .star{cursor:pointer;font-size:1.25em;line-height:1;margin-right:4px;opacity:.5}
         .star.on{opacity:1}
     </style>
@@ -112,6 +115,7 @@
                         <h2 class="card-title">Meals</h2>
                     </div>
                     <div class="card-body">
+                        <div id="mealFilterBar" hidden></div>
                         <div id="mealList"></div>
                     </div>
                 </div>
