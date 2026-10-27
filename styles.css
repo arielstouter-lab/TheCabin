@@ -100,6 +100,7 @@ textarea { font: inherit; }
   &[data-state="off"] { opacity: .35; }
   &[data-kind="priority"] { background: var(--danger); color: var(--white); border-color: var(--danger); font-weight: 600; }
   &[data-kind="aisle"] { margin-left: auto; background: var(--card); color: var(--ink-soft); border-color: var(--line); white-space: nowrap; }
+  &[data-tag], &[data-id], &[data-supp-quick] { cursor: pointer; }
 }
 
 .chiplg input[type=number] { --chip-w: 58px; }
@@ -525,7 +526,7 @@ select { cursor: pointer; }
   &:focus { opacity: 0.7; }
 }
 
-[hidden] { display: none; !important}
+[hidden] { display: none !important;}
 
 .hidden {
   display: none;
@@ -824,7 +825,8 @@ body.cal-page {
 
 .lst-actions { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-.lst-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.lst-item-top,
+.diet-row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 
 .lst-item-text { font-size: var(--text-base); color: var(--ink); word-break: break-word; }
 
@@ -849,6 +851,16 @@ body.cal-page {
   user-select: none;
   input { margin: 0; }
 }
+
+/* --- Elimination Diet --- */
+.diet-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  &[data-meal-id], &[data-sym-id], &[data-supp-id] { cursor: pointer; }
+  &.editing { background: var(--success-bg); }
+}
+
+.diet-picker { width: 100%; }
 
 /* --- Weather Card & Forecast --- */
 .weather-card,
