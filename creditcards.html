@@ -43,6 +43,9 @@
                 <button type="button" class="tab" data-tab="tracker">
                     <span>Spending Tracker</span>
                 </button>
+                <button type="button" class="tab" data-tab="cardusage">
+                    <span>Card Usage</span>
+                </button>
             </div>
 
             <!-- Tab 1: Budget -->
@@ -910,6 +913,30 @@
                 </div>
             </div>
 
+            <!-- Tab 7: Card Usage -->
+<div id="tab-cardusage" class="tab-pane" hidden>
+    <div class="card">
+        <div class="card-head">
+            <h2 class="card-title">Which card for what</h2>
+            <span class="note">Last four digits only, never the full number</span>
+        </div>
+        <div class="card-body">
+            <div id="cardUsageList"></div>
+            <p id="cardUsageEmpty" class="empty-state" hidden>Nothing here yet &mdash; add your first one below.</p>
+
+            <div class="cc-add-form">
+                <div class="cc-add-fields">
+                    <input type="text" class="text-input" id="newUsageCard" placeholder="Card (e.g. Amex Gold)" />
+                    <input type="text" class="text-input" id="newUsageLast4" placeholder="Last 4" maxlength="4" inputmode="numeric" />
+                    <input type="text" class="text-input" id="newUsageFor" placeholder="Used for (e.g. Gas, Netflix)" />
+                    <input type="text" class="text-input note" id="newUsageNotes" placeholder="Notes (optional)" />
+                </div>
+                <button class="button-inline" id="addUsageBtn">Add</button>
+            </div>
+        </div>
+    </div>
+</div>
+
             <!-- ============ Templates ============ -->
 
             <!-- Shared components (also used by other pages that import
@@ -1191,6 +1218,18 @@
                     </td>
                 </tr>
             </template>
+
+            <template id="tpl-card-usage-row">
+    <div class="lst-item lst-item-row">
+        <span class="lst-item-text">
+            <strong data-ref="usedFor"></strong><span class="note" data-ref="notes"></span>
+        </span>
+        <div class="lst-actions">
+            <span class="cal-event-chips"><span class="chip" data-kind="default" data-ref="card"></span></span>
+            <button type="button" class="icon-delete" title="Delete" data-ref="del">✕</button>
+        </div>
+    </div>
+</template>
 
         </section>
     </main>
