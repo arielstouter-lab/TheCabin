@@ -24,6 +24,7 @@ window.TABLES = Object.freeze({
   DEBT_MONTH_MONEY: 'financial_debt_month_money',
   DEBT_SETTINGS: 'financial_debt_settings',
   BUDGET_SNAPSHOTS: 'financial_budget_snapshots',
+  CARD_USAGE: 'financial_card_usage',
   NOTES: 'household_notes'
 });
 
