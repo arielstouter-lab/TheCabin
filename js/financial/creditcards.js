@@ -4,6 +4,7 @@ import { initDebts, loadDebtData, renderDebts } from './debts.js';
 import { addMonths, isYm } from './debt-engine-v2.js';
 import { initTracker, loadTrackerData, renderTracker, TRACKER_TABLE } from './tracker.js';
 import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../shared/ui.js';
+import { initCardUsage, loadCardUsageData, renderCardUsage, CARD_USAGE_TABLE } from './card-usage.js';
 
 const sb = window.supabaseClient;
 const TABLES = window.TABLES;
@@ -1138,6 +1139,7 @@ function render() {
     renderDebts();
     renderProjection();
     renderTracker();
+    renderCardUsage();
     restoreDetailsState(open, document);
 }
 
@@ -1331,6 +1333,7 @@ function setupRealtime() {
         .on('postgres_changes', { event: '*', schema: 'public', table: TAX_TABLE }, () => debounceReload())
         .on('postgres_changes', { event: '*', schema: 'public', table: BUDGET_SNAPSHOT_TABLE }, () => debounceReload())
         .on('postgres_changes', { event: '*', schema: 'public', table: TRACKER_TABLE }, () => debounceReload())
+        .on('postgres_changes', { event: '*', schema: 'public', table: CARD_USAGE_TABLE }, () => debounceReload())
         .subscribe();
 }
 
@@ -1346,7 +1349,8 @@ function debounceReload() {
             loadIncomeTax(),
             loadDebtData(),
             loadBudgetSnapshots(),
-            loadTrackerData()
+            loadTrackerData(),
+            loadCardUsageData()
         ]);
         render();
     }, 400);
@@ -1378,6 +1382,8 @@ initDebts({
 initTracker({
     getSpendRows: () => spendRows()
 });
+
+initCardUsage();
 
 // -------------------------------------------------------------------
 // UI Event Handlers & Initialization
@@ -1523,7 +1529,7 @@ if (projectionDeleteMonthBtn) {
 // -------------------------------------------------------------------
 // Tabs — hash-routed
 // -------------------------------------------------------------------
-const TAB_KEYS = ['budget', 'comparison', 'rental', 'debt', 'projection', 'tracker'];
+const TAB_KEYS = ['budget', 'comparison', 'rental', 'debt', 'projection', 'tracker', 'cardusage'];
 const tabFromHash = () => (TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TAB_KEYS[0]);
 
 function switchTab(tabKey) {
