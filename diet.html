@@ -253,7 +253,39 @@
                 </div>
             </div>
 
-            <!-- Tab 6: Predictions -->
+            <!-- Tab 6: Eliminations -->
+            <div id="tab-eliminations" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Add Your Own</h2>
+                        <span class="note">Anything you want to try cutting out. Length is optional.</span>
+                    </div>
+                    <div class="card-body">
+                        <form id="elimForm" class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="elimName" placeholder="Food or group (e.g. Nightshades)" required />
+                                <input type="number" class="text-input" id="elimLength" min="1" step="1" placeholder="Length (days)" />
+                                <input type="text" class="text-input note" id="elimDetails" placeholder="What to avoid (optional)" />
+                            </div>
+                            <button type="submit" class="button-inline">Add</button>
+                        </form>
+                    </div>
+                </div>
+ 
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Elimination Plan</h2>
+                        <span class="note">Tick one when you have tried it, and use the notes to record what happened. Start today to count down its length.</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="elimList"></div>
+                        <p class="note">These are typical lengths, not medical advice. Cutting out whole food groups for weeks can leave nutrient gaps, so check with a clinician or dietitian. Eliminate one thing at a time when you can, reintroduce it on its own, and write down what happens. Do not re-test any food that has caused a severe reaction.</p>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Tab 7: Predictions -->
             <div id="tab-predictions" class="tab-pane" hidden>
                 <div class="card">
                     <div class="card-head">
@@ -452,5 +484,30 @@
         <td data-ref="level"></td>
     </tr>
 </template>
+    
+<template id="tpl-elim-item">
+    <div class="diet-row" data-state="idle">
+        <div class="diet-row-top">
+            <label class="lst-check-label">
+                <input type="checkbox" data-ref="tried" data-elim-tried />
+                <strong data-ref="name"></strong>
+            </label>
+            <button type="button" class="icon-delete" title="Delete" data-ref="del" data-elim-del>✕</button>
+        </div>
+        <div>
+            <span class="chip" data-ref="length"></span>
+            <span class="chip" data-ref="tag"></span>
+            <small data-ref="details"></small>
+        </div>
+        <div>
+            <small data-ref="progress"></small>
+            <button type="button" class="button-inline button-ghost" data-ref="start" data-elim-start>Start today</button>
+        </div>
+        <div>
+            <span class="note note-editable" contenteditable="true" data-placeholder="Notes: what happened?" data-ref="notes" data-elim-notes></span>
+        </div>
+    </div>
+</template>
+
 </body>
 </html>
