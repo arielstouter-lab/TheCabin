@@ -2,6 +2,7 @@
 // plus a few columns that tell a reader (or an AI) how complete the log was around each row.
 //
 // type values:  meal | meal_not_eaten | symptom | positive_symptom | supplement
+// pain 1-10 on symptoms; urgency 1-10 on bowel movements; legacy_severity = old severity not yet converted
 // bristol:      Bristol stool scale 1-7 on bowel-related symptom rows;  meal_size: snack/small/medium/large/very large
 // short_day:    TRUE on past days with fewer than 3 meal records (eaten or marked not eaten)
 // within_24h_after_not_eaten_meal: TRUE when a meal was marked not eaten in the 24h before this row
@@ -10,7 +11,7 @@ import { mealGapDays, dayStart, DAY } from './diet-coverage.js';
 
 export const COLUMNS = [
     'datetime_local', 'datetime_utc', 'weekday', 'type', 'meal_label', 'meal_size', 'ingredients', 'tags',
-    'supplement', 'dose', 'symptom', 'severity', 'bristol', 'notes',
+    'supplement', 'dose', 'symptom', 'pain', 'urgency', 'legacy_severity', 'bristol', 'notes',
     'meals_recorded_that_day', 'short_day', 'within_24h_after_not_eaten_meal',
 ];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -26,7 +27,7 @@ export function buildCsv({ meals, symptoms, supplements = [], ingredients }, now
     meals.forEach(m => { const k = dayStart(m.eaten_at); perDay.set(k, (perDay.get(k) || 0) + 1); });
     const shortDays = new Set(mealGapDays({ meals, symptoms }, now, Infinity).map(g => g.day));
     const notEaten = meals.filter(m => m.skipped).map(m => +new Date(m.eaten_at));
-    const blank = { label: '', size: '', items: '', tags: '', supp: '', dose: '', symptom: '', severity: '', bristol: '', notes: '' };
+    const blank = { label: '', size: '', items: '', tags: '', supp: '', dose: '', symptom: '', pain: '', urgency: '', legacySeverity: '', bristol: '', notes: '' };
 
     const events = [
         ...meals.map(m => {
@@ -35,7 +36,7 @@ export function buildCsv({ meals, symptoms, supplements = [], ingredients }, now
                 items: ings.map(i => i.name).join('; '), tags: [...new Set(ings.flatMap(i => i.tags || []))].join('; '), notes: m.notes };
         }),
         ...symptoms.map(s => ({ ...blank, t: +new Date(s.occurred_at), type: s.positive ? 'positive_symptom' : 'symptom',
-            symptom: s.symptom, severity: s.severity, bristol: s.bristol, notes: s.notes })),
+            symptom: s.symptom, pain: s.pain, urgency: s.urgency, legacySeverity: s.severity, bristol: s.bristol, notes: s.notes })),
         ...supplements.map(s => ({ ...blank, t: +new Date(s.taken_at), type: 'supplement', supp: s.name, dose: s.dose, notes: s.notes })),
     ].sort((a, b) => a.t - b.t);
 
@@ -43,7 +44,7 @@ export function buildCsv({ meals, symptoms, supplements = [], ingredients }, now
         const day = dayStart(e.t);
         return [
             localStamp(e.t), new Date(e.t).toISOString(), WEEKDAYS[new Date(e.t).getDay()], e.type, e.label, e.size, e.items, e.tags,
-            e.supp, e.dose, e.symptom, e.severity, e.bristol, e.notes,
+            e.supp, e.dose, e.symptom, e.pain, e.urgency, e.legacySeverity, e.bristol, e.notes,
             perDay.get(day) || 0, shortDays.has(day) ? 'TRUE' : 'FALSE',
             notEaten.some(g => g < e.t && e.t <= g + DAY) ? 'TRUE' : 'FALSE',
         ].map(cell).join(',');
