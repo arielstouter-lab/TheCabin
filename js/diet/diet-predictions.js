@@ -1,4 +1,4 @@
-// Predictions tab for diet-main.js.
+// Predictions tab for elimination-diet.js.
 //
 // Triggers (case-crossover comparison): for every symptom, look at what was eaten in the preceding N
 // hours, then at the same clock time on the 7 days before and after (days with no symptom around that
@@ -12,15 +12,13 @@
 // Safe foods: foods eaten several times where no symptom followed within the same window.
 
 import { HOUR, DAY, buildConfidence, mealGapDays, symptomGaps } from './diet-coverage.js';
-import { cloneEl, refs } from '../shared/dom.js';
-import { el } from '../shared/ui.js';
 
 const CLUSTER_GAP = 3 * HOUR;     // symptoms logged within 3h of each other count as one event
 const EXCLUDE_NEAR = 3 * HOUR;    // comparison times this close to a symptom aren't clean "no symptom" times
 const MAX_SHIFT_DAYS = 7;
 const MIN_EVENTS = 5;             // effective (weighted) events needed before results are more than "early"
 
-export function analyze(state, { windowHours = 24, minSeverity = 1, symptom = '', group = 'tags', now = Date.now() } = {}) {
+export function analyze(state, { windowHours = 24, minPain = 1, minUrgency = 1, symptom = '', group = 'tags', now = Date.now() } = {}) {
     const W = windowHours * HOUR;
     const model = buildConfidence(state, now);
     const ingById = new Map(state.ingredients.map(i => [i.id, i]));
@@ -35,7 +33,8 @@ export function analyze(state, { windowHours = 24, minSeverity = 1, symptom = ''
 
     const wanted = symptom.trim().toLowerCase();
     const neg = state.symptoms.filter(s => !s.positive)
-        .filter(s => (s.severity ?? minSeverity) >= minSeverity)
+        .filter(s => (s.pain ?? minPain) >= minPain)              // entries without a pain rating always pass
+        .filter(s => (s.urgency ?? minUrgency) >= minUrgency)     // same for urgency
         .filter(s => !wanted || (s.symptom || '').trim().toLowerCase() === wanted)
         .map(s => +new Date(s.occurred_at)).sort((a, b) => a - b);
     const positives = state.symptoms.filter(s => s.positive).map(s => +new Date(s.occurred_at));
@@ -130,35 +129,37 @@ const SIGNAL_LABEL = {
     strong: 'Strong signal', possible: 'Possible signal', none: 'No clear signal',
     lower: 'Eaten less before symptoms', early: 'Too early to say',
 };
-
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const n1 = n => +n.toFixed(1);                       // 3 -> 3, 2.5 -> 2.5
 const pct = (n, d) => (d ? Math.round(100 * n / d) : 0) + '%';
 const level = c => (c >= 0.8 ? 'High' : c >= 0.5 ? 'Medium' : 'Low');
 
-export function renderPredictions(state, tagChip){
+export function renderPredictions(state, chipClass) {
     const $ = id => document.getElementById(id);
-    if(!$('predBody')) return;
+    if (!$('predBody')) return;
 
     // Symptom filter lists logged (non-positive) symptom names, case-insensitive, keeping the selection.
     const seen = new Map();
     state.symptoms.filter(s => !s.positive).forEach(s => {
-        const n = (s.symptom || '').trim(); if(n && !seen.has(n.toLowerCase())) seen.set(n.toLowerCase(), n);
+        const n = (s.symptom || '').trim(); if (n && !seen.has(n.toLowerCase())) seen.set(n.toLowerCase(), n);
     });
-    const sel = $('predSymptom'), cur = sel.value, names = [...seen.values()].sort();
-    sel.replaceChildren(sel.firstElementChild, ...names.map(n => new Option(n, n)));   // "All symptoms" stays in the HTML
-    sel.value = names.includes(cur) ? cur : '';
+    const sel = $('predSymptom'), cur = sel.value;
+    sel.innerHTML = '<option value="">All symptoms</option>' +
+        [...seen.values()].sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    sel.value = [...seen.values()].includes(cur) ? cur : '';
 
     const group = $('predGroup').value;
     const res = analyze(state, {
         windowHours: +$('predWindow').value || 24,
-        minSeverity: +$('predSeverity').value || 1,
+        minPain: +$('predPain').value || 1,
+        minUrgency: +$('predUrgency').value || 1,
         symptom: sel.value, group,
     });
-    const label = f => (group === 'tags' ? tagChip(f) : f);      // append() takes a node or a string
+    const label = f => (group === 'tags' ? `<span class="${chipClass(f)}">${esc(f)}</span>` : esc(f));
 
     // ---- summary + confidence ----
     const lines = [];
-    if(res.events){
+    if (res.events) {
         lines.push(`Based on ${res.events} symptom event${res.events === 1 ? '' : 's'}` +
             (res.skipped ? ` (${res.skipped} skipped: no meals logged in that window)` : '') +
             ` compared with ${res.comparisons} matching times on other days.` +
@@ -166,39 +167,32 @@ export function renderPredictions(state, tagChip){
         lines.push(`Data confidence: ${pct(res.confidence, 1)}.`);
     }
     const why = [];
-    if(res.skippedMeals) why.push(`${res.skippedMeals} meal${res.skippedMeals === 1 ? '' : 's'} marked not eaten (lowers confidence for the next 24 hours)`);
-    if(res.unresolvedDays) why.push(`${res.unresolvedDays} day${res.unresolvedDays === 1 ? '' : 's'} with fewer than 3 meals and nothing marked not eaten`);
+    if (res.skippedMeals) why.push(`${res.skippedMeals} meal${res.skippedMeals === 1 ? '' : 's'} marked not eaten (lowers confidence for the next 24 hours)`);
+    if (res.unresolvedDays) why.push(`${res.unresolvedDays} day${res.unresolvedDays === 1 ? '' : 's'} with fewer than 3 meals and nothing marked not eaten`);
     const symGapCount = symptomGaps(state).length, mealGapCount = mealGapDays(state).length;
-    if(symGapCount) why.push(`${symGapCount} symptom check-in block${symGapCount === 1 ? '' : 's'} with no entry in the last 7 days`);
-    if(why.length) lines.push(`Lowering confidence: ${why.join('; ')}. See Needs attention on the Timeline tab` + (mealGapCount ? ' to mark skipped meals.' : '.'));
-    $('predSummary').replaceChildren(...lines.map(text => el('div', text)));
+    if (symGapCount) why.push(`${symGapCount} symptom check-in block${symGapCount === 1 ? '' : 's'} with no entry in the last 7 days`);
+    if (why.length) lines.push(`Lowering confidence: ${why.join('; ')}. See Needs attention on the Timeline tab` + (mealGapCount ? ' to mark skipped meals.' : '.'));
+    $('predSummary').innerHTML = lines.map(esc).join('<br>');
 
     // ---- triggers ----
     $('predEmpty').hidden = res.rows.length > 0;
+    $('predEmpty').textContent = 'Log meals with ingredients and some symptoms, then check back here.';
     $('predTableWrap').hidden = res.rows.length === 0;
-    $('predBody').replaceChildren(...res.rows.map(x => {
-        const row = cloneEl('tpl-pred-row');
-        const r = refs(row);
-        r.factor.append(label(x.factor));
-        r.signal.textContent = SIGNAL_LABEL[x.signal];
-        r.lowConf.hidden = !(res.confidence < 0.6 && ['strong', 'possible'].includes(x.signal));
-        r.before.textContent = `${n1(x.a)} of ${n1(res.eventsEff)} (${pct(x.a, res.eventsEff)})`;
-        r.other.textContent = `${n1(x.c)} of ${n1(res.comparisonsEff)} (${pct(x.c, res.comparisonsEff)})`;
-        r.ratio.textContent = `${x.ratio.toFixed(1)}\u00d7`;
-        return row;
-    }));
+    $('predBody').innerHTML = res.rows.map(r => `<tr>
+      <td>${label(r.factor)}</td>
+      <td>${SIGNAL_LABEL[r.signal]}${res.confidence < 0.6 && ['strong', 'possible'].includes(r.signal) ? ' (low confidence)' : ''}</td>
+      <td class="col-num">${n1(r.a)} of ${n1(res.eventsEff)} (${pct(r.a, res.eventsEff)})</td>
+      <td class="col-num">${n1(r.c)} of ${n1(res.comparisonsEff)} (${pct(r.c, res.comparisonsEff)})</td>
+      <td class="col-num">${r.ratio.toFixed(1)}&times;</td></tr>`).join('');
 
     // ---- safe foods ----
     $('predSafeEmpty').hidden = res.safe.length > 0;
+    $('predSafeEmpty').textContent = 'Nothing yet. A food shows here after it has been eaten at least 3 times with symptom check-ins and nothing following.';
     $('predSafeWrap').hidden = res.safe.length === 0;
-    $('predSafeBody').replaceChildren(...res.safe.map(s => {
-        const row = cloneEl('tpl-safe-row');
-        const r = refs(row);
-        r.factor.append(label(s.factor));
-        r.n.textContent = s.n;
-        r.followed.textContent = s.followed;
-        r.good.textContent = s.good;
-        r.level.textContent = level(s.conf);
-        return row;
-    }));
+    $('predSafeBody').innerHTML = res.safe.map(s => `<tr>
+      <td>${label(s.factor)}</td>
+      <td class="col-num">${s.n}</td>
+      <td class="col-num">${s.followed}</td>
+      <td class="col-num">${s.good}</td>
+      <td>${level(s.conf)}</td></tr>`).join('');
 }
