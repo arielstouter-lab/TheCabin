@@ -108,6 +108,31 @@ async function deleteEntry(id) {
     }
 }
 
+// Deletes every entry in the selected period (and clears any typed-but-unadded amounts)
+async function clearEntries() {
+    if (!sb) return false;
+    const count = tallyRows.filter(r => r.period_start === trackerStart).length;
+    if (!count) {
+        setStatus('Nothing to clear for this period.');
+        return false;
+    }
+    if (!confirm(`Delete all ${count} entr${count === 1 ? 'y' : 'ies'} for the period starting ${trackerStart}? This can't be undone.`)) return false;
+
+    try {
+        const { error } = await sb.from(TRACKER_TABLE).delete().eq('period_start', trackerStart);
+        if (error) throw error;
+        tallyRows = tallyRows.filter(r => r.period_start !== trackerStart);
+        document.querySelectorAll('#trackerGridBody input[type="number"]').forEach(i => { i.value = ''; });
+        renderTracker();
+        setStatus('Cleared spending tracker.');
+        return true;
+    } catch (err) {
+        console.error('Could not clear entries:', err);
+        setStatus('Could not clear entries.');
+        return false;
+    }
+}
+
 // -------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------
@@ -238,6 +263,9 @@ export function initTracker({ getSpendRows: spendRowsFn } = {}) {
             renderTracker();
         });
     }
+
+    const clearBtn = document.getElementById('trackerClearBtn');
+    if (clearBtn) clearBtn.addEventListener('click', clearEntries);
 
     const todayBtn = document.getElementById('trackerTodayBtn');
     if (todayBtn) {
