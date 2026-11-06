@@ -191,7 +191,7 @@ let reorderSaveToken = 0;
     async function setItemAisle(rawText, aisleId){
         const text = rawText.trim();
         if(!text) return;
-        const key = window.groceryKey(text);
+        const key = groceryKey(text);
         if(!key) return;
         const existingMemory = itemMemory.find(m => m.item_key === key);
 
@@ -204,7 +204,7 @@ let reorderSaveToken = 0;
             itemMemory = [...itemMemory, {item_key: key, aisle_id: aisleId || null, id: `pending-${key}`}];
         }
         groceryItems = groceryItems.map(i =>
-            window.groceryKey(i.text) === key ? {...i, aisle_id: aisleId || null} : i
+            groceryKey(i.text) === key ? {...i, aisle_id: aisleId || null} : i
         );
         render();
 
@@ -222,7 +222,7 @@ let reorderSaveToken = 0;
                 itemMemory = itemMemory.map(m => m.item_key === key ? data : m);
             }
 
-            const matchingIds = groceryItems.filter(i => window.groceryKey(i.text) === key).map(i => i.id);
+            const matchingIds = groceryItems.filter(i => groceryKey(i.text) === key).map(i => i.id);
             if(matchingIds.length){
                 const {error: itemsErr} = await sb.from(TABLES.LIST_ITEMS)
                     .update({aisle_id: aisleId || null, updated_at: nowIso})
@@ -278,12 +278,12 @@ let reorderSaveToken = 0;
 
     function renderMappings(){
         const listEl = document.getElementById('mg-mapping-list');
-        const q = window.groceryKey(mappingSearchQuery);
+        const q = groceryKey(mappingSearchQuery);
 
         const currentItems = groceryItems
             .filter(item => !item.checked)
-            .filter(item => !q || window.groceryKey(item.text).includes(q) || window.groceryKeysMatch(item.text, q))
-            .sort((a, b) => window.groceryKey(a.text).localeCompare(window.groceryKey(b.text)));
+            .filter(item => !q || groceryKey(item.text).includes(q) || groceryKeysMatch(item.text, q))
+            .sort((a, b) => groceryKey(a.text).localeCompare(groceryKey(b.text)));
 
         listEl.innerHTML = currentItems.length ? currentItems.map(item => `
           <div class="lst-item lst-item-row" data-item-row="${item.id}">
@@ -454,4 +454,3 @@ let reorderSaveToken = 0;
     });
 
     initAppPage(loadAll);
-})();
