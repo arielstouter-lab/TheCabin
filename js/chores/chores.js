@@ -1,8 +1,10 @@
 import { cloneEl, refs, emptyState, bindEvents } from '../shared/dom.js';
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
+import { setStatus } from '../shared/ui.js';
+import { initAppPage } from '../shared/auth.js';
 
 const DEFAULT_DISLIKE = 5;
-const sb = window.supabaseClient;
-const TABLES = window.TABLES;
 
 let state = null;
 const pendingSaves = {};
@@ -537,8 +539,4 @@ window.addEventListener('beforeunload', () => {
   if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
 });
 
-if(window.initAppPage){
-  window.initAppPage(load);
-} else {
-  document.addEventListener('app:ready', load, { once: true });
-}
+initAppPage(load);

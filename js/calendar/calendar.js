@@ -1,12 +1,10 @@
 import { writeOrQueue, nowStamp, getPendingOp, initSync } from '../shared/sync.js';
 import { bindEvents, cloneEl, refs } from '../shared/dom.js';
 import { makeChip, setStatus, syncStatusHandler } from '../shared/ui.js';
-
-// This file is a module, so everything below is already module-scoped.
-const sb = window.supabaseClient;
-const TABLES = window.TABLES;
-const todayStr = window.todayStr;
-const updateSeason = window.updateSeason || function(){};
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
+import { todayStr, updateSeason, initDragAndDrop } from '../app.js';
+import { initAppPage } from '../shared/auth.js';
 
 // ---------- constants ----------
 const MS_PER_DAY = 86400000;
@@ -678,8 +676,4 @@ function init(){
     setupRealtime();
 }
 
-if(window.initAppPage){
-    window.initAppPage(init);
-} else {
-    document.addEventListener('app:ready', init, { once: true });
-}
+initAppPage(init);

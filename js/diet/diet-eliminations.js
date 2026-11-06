@@ -6,6 +6,7 @@
 // All markup lives in elimination-diet.html (<template id="tpl-elim-item">); this file only fills it in.
 
 import { bindEvents, cloneEl, refs } from '../shared/dom.js';
+import { setStatus } from '../app.js';
 
 // Typical lengths used in elimination diets. `days` is the longest end of the range and drives the countdown.
 export const SUGGESTIONS = [
@@ -50,7 +51,7 @@ let rows = [];                       // saved rows from diet_eliminations
 export const fmtLength = days => !days ? '' : days % 7 === 0 ? `${days / 7} week${days === 7 ? '' : 's'}` : `${days} day${days === 1 ? '' : 's'}`;
 const fmtDate = d => d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 const localToday = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
-const say = msg => { if (window.setStatus) window.setStatus(msg); };
+const say = msg => { setStatus(msg); };
 
 // Suggestions first (in list order), then your own, with anything already tried moved to the bottom.
 export function mergeItems(saved) {

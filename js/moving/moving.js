@@ -8,6 +8,7 @@ import { initSync } from '../shared/sync.js';
 import { syncStatusHandler } from '../shared/ui.js';
 import { manageHref } from '../lists/lists-ui.js';
 import { openAisleIds, groupByAisle, buildAisleGroup } from '../lists/lists-aisles.js';
+import { initAppPage } from '../shared/auth.js';
 
 const SECTION_NAME = 'Moving';
 
@@ -181,8 +182,4 @@ async function init() {
     render();
 }
 
-if (window.initAppPage) {
-    window.initAppPage(init);
-} else {
-    document.addEventListener('app:ready', init, { once: true });
-}
+initAppPage(init);

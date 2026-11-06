@@ -1,15 +1,15 @@
 import { writeOrQueue, nowStamp, initSync } from '../shared/sync.js';
+import { TABLES, RPC } from '../shared/database-config.js';
+import { supabase as sb } from '../shared/supabase.js';
+import { groceryKey, groceryKeysMatch, escapeHtml, setStatus, initDragAndDrop } from '../app.js';
+import { initAppPage } from '../shared/auth.js';
 
-(function(){
-    const sb = window.supabaseClient;
-    const TABLES = window.TABLES;
-
-    let groceries = null;
-    let groceryItems = [];
-    let aisles = [];
-    let itemMemory = [];
-    let mappingSearchQuery = '';
-    let reorderSaveToken = 0;
+let groceries = null;
+let groceryItems = [];
+let aisles = [];
+let itemMemory = [];
+let mappingSearchQuery = '';
+let reorderSaveToken = 0;
 
     function sortedAisles(){
         return [...aisles].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -453,9 +453,5 @@ import { writeOrQueue, nowStamp, initSync } from '../shared/sync.js';
         if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
     });
 
-    if(window.initAppPage){
-        window.initAppPage(loadAll);
-    } else {
-        document.addEventListener('app:ready', loadAll, { once: true });
-    }
+    initAppPage(loadAll);
 })();

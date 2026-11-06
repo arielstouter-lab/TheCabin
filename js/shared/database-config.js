@@ -1,9 +1,9 @@
-window.APP_CONFIG = {
+export const APP_CONFIG = {
   supabaseUrl: "https://pmwzyazfjyrukmngeqtd.supabase.co",
   supabaseKey: "sb_publishable_82P8lp-pnjJ0i6TubJMdyw_sd4nsfL1"
 };
 
-window.TABLES = Object.freeze({
+export const TABLES = Object.freeze({
   LIST_ITEMS: 'list_items',
   LIST_SECTIONS: 'list_sections',
   RECIPES: 'list_recipes',
@@ -28,7 +28,14 @@ window.TABLES = Object.freeze({
   NOTES: 'household_notes'
 });
 
-window.RPC = Object.freeze({
+export const RPC = Object.freeze({
   UPDATE_LIST_ITEM_ORDER: 'update_list_item_order',
   GET_EMAIL_FOR_USERNAME: 'get_email_for_username'
 });
+
+// Backward-compatibility bridge
+if (typeof window !== 'undefined') {
+  window.APP_CONFIG = APP_CONFIG;
+  window.TABLES = TABLES;
+  window.RPC = RPC;
+}

@@ -1,8 +1,9 @@
 import { cloneEl, refs } from '../shared/dom.js';
 import { setStatus } from '../shared/ui.js';
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
 
-const sb = window.supabaseClient;
-export const CARD_USAGE_TABLE = window.TABLES.CARD_USAGE;
+export const CARD_USAGE_TABLE = TABLES.CARD_USAGE;
 
 let usageRows = [];
 

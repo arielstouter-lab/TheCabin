@@ -5,9 +5,10 @@ import { addMonths, isYm } from './debt-engine-v2.js';
 import { initTracker, loadTrackerData, renderTracker, TRACKER_TABLE } from './tracker.js';
 import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../shared/ui.js';
 import { initCardUsage, loadCardUsageData, renderCardUsage, CARD_USAGE_TABLE } from './card-usage.js';
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
+import { initAppPage } from '../shared/auth.js';
 
-const sb = window.supabaseClient;
-const TABLES = window.TABLES;
 const CATEGORIES_TABLE = TABLES.CATEGORIES;
 const CARDS_TABLE = TABLES.CREDIT_CARDS;
 const REWARDS_TABLE = TABLES.CARD_REWARDS;
@@ -1553,4 +1554,4 @@ window.addEventListener('hashchange', () => switchTab(tabFromHash()));
 
 // Initial tab & start
 switchTab(tabFromHash());
-loadAll();
+initAppPage(loadAll);

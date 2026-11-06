@@ -1,5 +1,5 @@
 // Lives at the site ROOT so its scope covers every page.
-const CACHE_NAME = 'thecabin-v11';
+const CACHE_NAME = 'thecabin-v12';
 const NAV_TIMEOUT_MS = 3500;
 
 // HTML pages (all at the root).
@@ -11,6 +11,7 @@ const PAGES = [
     'calendar.html',
     'chores.html',
     'creditcards.html',
+    'debug.html',
     'diet.html',
     'gbif.html',
     'lists.html',
@@ -27,23 +28,28 @@ const SCRIPTS = [
     'js/app.js',
     'js/login.js',
 
+    'js/shared/auth.js',
     'js/shared/database-config.js',
     'js/shared/dom.js',
     'js/shared/head-loader.js',
     'js/shared/settings.js',
     'js/shared/speech-to-text.js',
     'js/shared/summary-card.js',
+    'js/shared/supabase.js',
     'js/shared/sync.js',
     'js/shared/ui.js',
 
     'js/calendar/calendar.js',
     'js/chores/chores.js',
 
+    'js/diet/diet-convert.js',
     'js/diet/diet-coverage.js',
+    'js/diet/diet-eliminations.js',
     'js/diet/diet-export.js',
     'js/diet/diet-main.js',
     'js/diet/diet-predictions.js',
 
+    'js/financial/card-usage.js',
     'js/financial/category-row.js',
     'js/financial/creditcards.js',
     'js/financial/debt-engine-v2.js',
@@ -83,7 +89,8 @@ const STATIC_ASSETS = [...PAGES, ...SCRIPTS, ...OTHER_ASSETS];
 // <head>, and the Google Fonts stylesheet is render-blocking: if either hangs
 // on a weak connection the page never paints.
 const CDN_ASSETS = [
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 ];
 const CDN_HOSTS = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 

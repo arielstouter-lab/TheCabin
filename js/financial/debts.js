@@ -15,9 +15,9 @@ import {
     simulate, effectiveApr, ymToIndex, addMonths, isYm, MAX_MONTHS
 } from './debt-engine-v2.js';
 import { fmt$, el, setStatus, captureDetailsState, restoreDetailsState } from '../shared/ui.js';
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
 
-const sb = window.supabaseClient;
-const TABLES = window.TABLES;
 const DEBTS_TABLE = TABLES.DEBTS;
 const SNAP_TABLE = TABLES.DEBT_SNAPSHOTS;
 const MONEY_TABLE = TABLES.DEBT_MONTH_MONEY;

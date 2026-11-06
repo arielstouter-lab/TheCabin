@@ -4,10 +4,9 @@ import { renderAttention } from './diet-coverage.js';
 import { exportTimelineCsv } from './diet-export.js';
 import { initEliminations, loadEliminations } from './diet-eliminations.js';
 import { initConversion, renderConversion } from './diet-convert.js';
-
-// Same globals lists.js uses (supabaseClient, groceryKey, groceryKeysMatch) - elimination-diet.html must load the
-// same shared scripts that lists.html does before this module.
-const sb = window.supabaseClient;
+import { supabase as sb } from '../shared/supabase.js';
+import { groceryKey, groceryKeysMatch, setStatus } from '../app.js';
+import { initAppPage } from '../shared/auth.js';
 
 // ---------- allergen / trigger tagging ----------
 // kind: 'allergen' (top allergens) or 'trigger' (common GI triggers)
@@ -43,7 +42,7 @@ const NOT_RES = Object.fromEntries(ALL_TAGS.filter(t => TAGS[t].not).map(t => [t
 const autoTag = name => ALL_TAGS.filter(t => WORD_RES[t].test(name) && !(NOT_RES[t] && NOT_RES[t].test(name)));
 // Learned tags: same matching as groceries' aisleIdForItemText (exact -> phrase -> partial),
 // reading diet_item_memory (item_key -> tags) instead of aisles.
-const gk = t => window.groceryKey(t);
+const gk = t => groceryKey(t);
 const rebuildMemoryLookup = () => { state.memoryLookup = new Map(state.memory.map(m => [gk(m.item_key), m.tags])); };
 function tagsFor(name) {
     const key = gk(name);
@@ -52,7 +51,7 @@ function tagsFor(name) {
     const longest = (a, b) => gk(b.item_key).length - gk(a.item_key).length;
     const hit =
         state.memory.filter(m => { const k = gk(m.item_key); return k && (key.includes(k) || k.includes(key)); }).sort(longest)[0] ||
-        state.memory.filter(m => window.groceryKeysMatch(name, m.item_key)).sort(longest)[0];
+        state.memory.filter(m => groceryKeysMatch(name, m.item_key)).sort(longest)[0];
     // Fuzzy hit: union with keyword guess so "garlic chicken" keeps garlic even if only "chicken" was saved.
     return hit ? [...new Set([...hit.tags, ...autoTag(name)])] : autoTag(name);
 }
@@ -626,8 +625,4 @@ function renderAll() {
 
 $('mealWhen').value = nowLocal(); $('symWhen').value = nowLocal(); $('suppWhen').value = nowLocal(); setSymType();
 
-if (window.initAppPage) {
-    window.initAppPage(loadAll);
-} else {
-    document.addEventListener('app:ready', loadAll, { once: true });
-}
+initAppPage(loadAll);

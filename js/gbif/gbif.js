@@ -1,4 +1,7 @@
 // Nearby Sightings: GBIF occurrences near the house, same calendar window across past years.
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
+import { initAppPage } from '../shared/auth.js';
 
 const API = 'https://api.gbif.org/v1/occurrence/search';
 const SPECIES_API = 'https://api.gbif.org/v1/species';
@@ -552,8 +555,9 @@ function useDeviceLocation() {
 
 async function loadHouse() {
     setStatus('Loading house location…');
-    const { data, error } = await window.supabaseClient
-        .from('weather_location').select('lat, lon').limit(1).maybeSingle();
+    const client = sb || window.supabaseClient;
+    const { data, error } = await client
+        .from(TABLES.WEATHER_LOCATION).select('lat, lon').limit(1).maybeSingle();
 
     if (error || !data || data.lat == null || data.lon == null) {
         setStatus('Could not read weather_location' +
@@ -568,4 +572,4 @@ async function loadHouse() {
 $('manual').addEventListener('click', searchFromInputs);
 $('go').addEventListener('click', useDeviceLocation);
 
-loadHouse();
+initAppPage(loadHouse);

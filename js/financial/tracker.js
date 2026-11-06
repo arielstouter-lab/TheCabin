@@ -1,8 +1,8 @@
 import { cloneEl, refs } from '../shared/dom.js';
 import { fmt$, setStatus } from '../shared/ui.js';
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
 
-const sb = window.supabaseClient;
-const TABLES = window.TABLES;
 export const TRACKER_TABLE = TABLES.SPENDING_TALLY || 'spending_tally';
 
 const TRACKER_START_KEY = 'ccTrackerPeriodStart';

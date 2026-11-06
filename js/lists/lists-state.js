@@ -2,10 +2,11 @@
 // Nothing in here touches the DOM except through setStatus / the render callback.
 
 import { writeOrQueue, pendingTypes, nowStamp, withTimeout, refreshQueue } from '../shared/sync.js';
+import { TABLES, RPC } from '../shared/database-config.js';
+import { supabase as sb } from '../shared/supabase.js';
+import { groceryKey, groceryKeysMatch } from '../app.js';
 
-export const TABLES = window.TABLES;
-export const RPC = window.RPC;
-export const sb = window.supabaseClient;
+export { TABLES, RPC, sb };
 export const PERMANENT_TABS = ['Groceries', 'Pantry', 'Recipes'];
 
 const CACHE_KEY = 'thecabin_cached_lists';

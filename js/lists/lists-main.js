@@ -10,6 +10,8 @@ import { renderListPanel, reorderItems } from './lists-panel.js';
 import { renderPantryPanel } from './lists-pantry.js';
 import { renderRecipesPanel } from './lists-recipes.js';
 import { initSync } from '../shared/sync.js';
+import { setStatus, initDragAndDrop } from '../app.js';
+import { initAppPage } from '../shared/auth.js';
 
 let activeSlug = null;
 
@@ -84,7 +86,7 @@ bindEvents(document, {
 });
 
 const panelEl = document.getElementById('lst-panel');
-window.initDragAndDrop(panelEl, {
+initDragAndDrop(panelEl, {
     canDrag: el => !el.classList.contains('checked'),
     onReorder: (fromIndex, toIndex) => {
         const sec = currentSection();
@@ -109,8 +111,4 @@ initSync(sb, {
     onChange: n => setStatus(n ? `${n} change${n === 1 ? '' : 's'} pending sync…` : '')
 });
 
-if(window.initAppPage){
-    window.initAppPage(loadAll);
-} else {
-    document.addEventListener('app:ready', loadAll, { once: true });
-}
+initAppPage(loadAll);

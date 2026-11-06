@@ -1,26 +1,31 @@
-const { createClient } = window.supabase;
+import {
+  initAuth,
+  initAppPage,
+  setupApp,
+  setupLogin,
+  resolveSession,
+  bootstrapAuth,
+  readStoredSession,
+  getInitial
+} from './shared/auth.js';
+import { supabase, supabaseClient } from './shared/supabase.js';
+import { APP_CONFIG, TABLES, RPC } from './shared/database-config.js';
 
-// Cap every direct Supabase request so a weak connection fails fast instead of
-// hanging the page. Honors an abort signal passed in by the caller (sync.js
-// uses one per queued write).
-const REQUEST_TIMEOUT_MS = 20000;
-function fetchWithTimeout(input, init = {}) {
-  const controller = new AbortController();
-  const outer = init.signal;
-  if (outer) {
-    if (outer.aborted) controller.abort();
-    else outer.addEventListener('abort', () => controller.abort(), { once: true });
-  }
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
-}
-
-const supabaseClient = createClient(
-    window.APP_CONFIG.supabaseUrl,
-    window.APP_CONFIG.supabaseKey,
-    { global: { fetch: fetchWithTimeout } }
-);
-window.supabaseClient = supabaseClient;
+export {
+  initAuth,
+  initAppPage,
+  setupApp,
+  setupLogin,
+  resolveSession,
+  bootstrapAuth,
+  readStoredSession,
+  getInitial,
+  supabase,
+  supabaseClient,
+  APP_CONFIG,
+  TABLES,
+  RPC
+};
 
 // Register Service Worker for PWA and offline resilience.
 // sw.js lives at the site root so it controls every page.
@@ -32,267 +37,31 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Global session store & unified page initialization helper
-window.__appSession = null;
-window.initAppPage = function(callback) {
-  if (typeof callback !== 'function') return;
-  if (window.__appSession) {
-    callback(window.__appSession);
-  } else {
-    document.addEventListener('app:ready', (e) => {
-      callback(e.detail.session);
-    }, { once: true });
-  }
-};
+// Global session store & unified page initialization helper bridge
+if (typeof window !== 'undefined') {
+  window.initAppPage = initAppPage;
+}
 
-/* -----------------------------
-   Session (offline-aware)
------------------------------ */
-
-const AUTH_TIMEOUT_MS = 4000;
-
-function raceTimeout(promise, ms) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('timed out')), ms);
+// Bootstrap authentication
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initAuth();
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
-// The session supabase-js keeps in localStorage. getSession() returns null
-// when the access token has expired and the refresh request can't reach the
-// network — but in that case the stored session is still there (supabase only
-// deletes it when the server actually rejects the refresh token). That lets
-// the app keep working offline instead of bouncing to the login page.
-function readStoredSession() {
-  try {
-    const ref = new URL(window.APP_CONFIG.supabaseUrl).hostname.split('.')[0];
-    const raw = localStorage.getItem(`sb-${ref}-auth-token`);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    return (s && s.access_token && s.refresh_token && s.user) ? s : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-async function resolveSession() {
-  // No connection: don't wait on a refresh that can't happen.
-  if (!navigator.onLine) return readStoredSession();
-
-  try {
-    const { data: { session } } = await raceTimeout(supabaseClient.auth.getSession(), AUTH_TIMEOUT_MS);
-    if (session) return session;
-  } catch (e) {
-    // timed out (weak signal) — fall through to the stored session
-  }
-  return readStoredSession();
-}
-
-document.addEventListener("DOMContentLoaded", async () => {
-  const currentPage = window.location.pathname.split("/").pop() || "index.html";
-  const PUBLIC_PAGES = ["index.html", ""];
-
-  try {
-    let session = await resolveSession();
-
-    // IP-based auto login needs the network; skip it when offline.
-    if (!session && navigator.onLine) {
-      session = await bootstrapAuth();
-    }
-
-    if (PUBLIC_PAGES.includes(currentPage)) {
-      if (session) {
-        window.location.href = "app.html";
-        return;
-      }
-      setupLogin();
-      return;
-    }
-
-    if (!session) {
-      window.location.href = "index.html";
-      return;
-    }
-    setupApp(session);
-
-  } catch (err) {
-    console.error("Auth bootstrap failed:", err);
-    const stored = readStoredSession();
-    if (stored && !PUBLIC_PAGES.includes(currentPage)) {
-      setupApp(stored);
-    } else if (!PUBLIC_PAGES.includes(currentPage)) {
-      window.location.href = "index.html";
-    } else {
-      setupLogin();
-    }
-  }
-});
-
-/* -----------------------------
-   Login
------------------------------ */
-
-async function bootstrapAuth() {
-  try {
-    const { data, error } = await raceTimeout(
-        supabaseClient.functions.invoke('ip-login'),
-        AUTH_TIMEOUT_MS * 2
-    );
-    if (error || !data?.token_hash) return null;
-
-    const { data: verified } = await supabaseClient.auth.verifyOtp({
-      type: 'magiclink',
-      token_hash: data.token_hash,
-    });
-    return verified?.session ?? null;
-  } catch (e) {
-    return null;
-  }
-}
-
-// Global password toggle handler for any .password-toggle button inside .password-input
-document.addEventListener("click", (e) => {
-  const toggleBtn = e.target.closest(".password-toggle");
-  if (!toggleBtn) return;
-
-  const container = toggleBtn.closest(".password-input");
-  const input = container?.querySelector("input");
-  if (!input) return;
-
-  const isPassword = input.type === "password";
-  input.type = isPassword ? "text" : "password";
-  toggleBtn.textContent = isPassword ? "Hide" : "Show";
-  toggleBtn.setAttribute(
-      "aria-label",
-      isPassword ? "Hide password" : "Show password"
-  );
-});
-
-function setupLogin() {
-  const form = document.getElementById("login-form");
-  const usernameInput = document.getElementById("username");
-  const passwordInput = document.getElementById("password");
-  const errorElement = document.getElementById("login-error");
-  const button = document.getElementById("login-button");
-  const buttonText = document.getElementById("login-button-text");
-  const spinner = document.getElementById("login-spinner");
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    errorElement.hidden = true;
-    errorElement.textContent = "";
-
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value;
-
-    if (!username || !password) {
-      showLoginError("Please enter your email and password.");
-      return;
-    }
-
-    button.disabled = true;
-    buttonText.textContent = "Signing in...";
-    spinner.hidden = false;
-
-    // Look up the email associated with the username
-    const {
-      data: email,
-      error: lookupError
-    } = await supabaseClient.rpc(window.RPC.GET_EMAIL_FOR_USERNAME, {
-      input_username: username
-    });
-
-    if (lookupError || !email) {
-      showLoginError("Invalid username or password.");
-
-      button.disabled = false;
-      buttonText.textContent = "Sign in";
-      spinner.hidden = true;
-
-      return;
-    }
-
-    // Authenticate through Supabase Auth
-    const { error: loginError } =
-        await supabaseClient.auth.signInWithPassword({
-          email,
-          password
-        });
-
-    if (loginError) {
-      showLoginError("Invalid username or password.");
-
-      button.disabled = false;
-      buttonText.textContent = "Sign in";
-      spinner.hidden = true;
-
-      return;
-    }
-
-    window.location.href = "app.html";
-
-    function showLoginError(message) {
-      errorElement.textContent = message;
-      errorElement.hidden = false;
-    }
-  });
+} else {
+  initAuth();
 }
 
 /* -----------------------------
-   App
+   PWA Install Prompt
 ----------------------------- */
-
-function setupApp(session) {
-  const user = session.user;
-
-  const emailElement = document.getElementById("user-email");
-  const avatarElement = document.getElementById("user-avatar");
-  const logoutButton = document.getElementById("logout-button");
-
-  if (emailElement) {
-    emailElement.textContent = user.email || "User";
-  }
-
-  if (avatarElement) {
-    avatarElement.textContent = getInitial(user.email);
-  }
-
-  logoutButton?.addEventListener("click", async () => {
-    logoutButton.disabled = true;
-
-    const { error } = await supabaseClient.auth.signOut();
-
-    if (error) {
-      console.error("Logout failed:", error);
-      logoutButton.disabled = false;
-      return;
-    }
-
-    window.location.href = "index.html";
-  });
-
-  // Keep the UI in sync if the auth state changes elsewhere.
-  // Only an actual sign-out leaves the page: supabase also fires
-  // INITIAL_SESSION with a null session when it is offline with an expired
-  // token, and that must not kick the user to the login page.
-  supabaseClient.auth.onAuthStateChange((event) => {
-    if (event === "SIGNED_OUT") {
-      window.location.href = "index.html";
-    }
-  });
-  window.__appSession = session;
-  document.dispatchEvent(new CustomEvent('app:ready', { detail: { session } }));
-}
 
 let deferredInstallPrompt = null;
 
-function isStandaloneApp() {
+export function isStandaloneApp() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
-function getInstallInstructions() {
+export function getInstallInstructions() {
   const ua = navigator.userAgent.toLowerCase();
 
   if (/iphone|ipad|ipod/.test(ua)) {
@@ -314,7 +83,7 @@ function getInstallInstructions() {
   return 'Use your browser menu to install this app, or try Chrome/Edge for one-click install.';
 }
 
-function setupInstallPrompt() {
+export function setupInstallPrompt() {
   const installButton = document.getElementById('installAppBtn');
   if (!installButton) return;
 
@@ -352,22 +121,15 @@ function setupInstallPrompt() {
   });
 }
 
-setupInstallPrompt();
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch((error) => {
-      console.error('Service worker registration failed:', error);
-    });
-  });
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupInstallPrompt);
+} else {
+  setupInstallPrompt();
 }
 
-setupInstallPrompt();
-
-
-// hidden-icon.js
-// Attaches the click behavior for the hidden icon trigger.
-// On click, navigates to the separate password-gated page.
+/* -----------------------------
+   Hidden Trigger Navigation
+----------------------------- */
 
 document.addEventListener('DOMContentLoaded', () => {
   const trigger = document.getElementById('hidden-icon');
@@ -378,33 +140,33 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-
 /* -----------------------------
-   Helpers
+   Grocery Key & Matching Helpers
 ----------------------------- */
-function groceryKey(text) {
+
+export function groceryKey(text) {
   return String(text || '')
-      .trim()
-      .toLowerCase()
-      .replace(/&/g, ' and ')
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .replace(/\b(the|a|an|of|for|with|and)\b/g, ' ')
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(word => {
-        if (word.endsWith('ies') && word.length > 4) return word.slice(0, -3) + 'y';
-        if (word.endsWith('es') && word.length > 3) return word.slice(0, -2);
-        if (word.endsWith('s') && word.length > 3) return word.slice(0, -1);
-        return word;
-      })
-      .join(' ');
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\b(the|a|an|of|for|with|and)\b/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(word => {
+      if (word.endsWith('ies') && word.length > 4) return word.slice(0, -3) + 'y';
+      if (word.endsWith('es') && word.length > 3) return word.slice(0, -2);
+      if (word.endsWith('s') && word.length > 3) return word.slice(0, -1);
+      return word;
+    })
+    .join(' ');
 }
 
-function groceryWords(text) {
+export function groceryWords(text) {
   return groceryKey(text).split(' ').filter(Boolean);
 }
 
-function groceryKeysMatch(itemText, memoryKey) {
+export function groceryKeysMatch(itemText, memoryKey) {
   const itemKey = groceryKey(itemText);
   const normalizedMemoryKey = groceryKey(memoryKey);
 
@@ -418,25 +180,21 @@ function groceryKeysMatch(itemText, memoryKey) {
   return memoryWords.some(memoryWord => itemWords.includes(memoryWord));
 }
 
-window.groceryKey = groceryKey;
-window.groceryKeysMatch = groceryKeysMatch;
-
-
-function getInitial(email) {
-  if (!email) return "U";
-
-  return email
-      .trim()
-      .charAt(0)
-      .toUpperCase();
+if (typeof window !== 'undefined') {
+  window.groceryKey = groceryKey;
+  window.groceryKeysMatch = groceryKeysMatch;
 }
 
-function todayStr(d) {
+/* -----------------------------
+   Date & Seasonal Theme Helpers
+----------------------------- */
+
+export function todayStr(d) {
   const t = d ? new Date(d) : new Date();
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
 
-function getSeason(date) {
+export function getSeason(date) {
   const d = date ? new Date(date) : new Date();
   const m = d.getMonth() + 1; // 1-12
   const day = d.getDate();
@@ -457,7 +215,7 @@ const SEASON_IMAGES = {
 let currentSeason = null;
 let seasonLoadToken = 0;
 
-function updateSeason(date) {
+export function updateSeason(date) {
   if (!document.body || !document.body.classList.contains('cal-page')) return;
 
   const season = getSeason(date);
@@ -487,7 +245,7 @@ function updateSeason(date) {
   }
 }
 
-function initSeasonalBackground() {
+export function initSeasonalBackground() {
   if (!document.body || !document.body.classList.contains('cal-page')) return;
   updateSeason(new Date());
 }
@@ -498,16 +256,18 @@ if (document.readyState === 'loading') {
   initSeasonalBackground();
 }
 
-window.todayStr = todayStr;
-window.getSeason = getSeason;
-window.updateSeason = updateSeason;
-window.initSeasonalBackground = initSeasonalBackground;
+if (typeof window !== 'undefined') {
+  window.todayStr = todayStr;
+  window.getSeason = getSeason;
+  window.updateSeason = updateSeason;
+  window.initSeasonalBackground = initSeasonalBackground;
+}
 
 /* -----------------------------
    Shared UI Helpers
 ----------------------------- */
 
-function escapeHtml(str) {
+export function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, m => ({
     '&': '&amp;',
     '<': '&lt;',
@@ -517,7 +277,7 @@ function escapeHtml(str) {
   }[m]));
 }
 
-function escapeAttr(str) {
+export function escapeAttr(str) {
   return escapeHtml(str);
 }
 
@@ -525,7 +285,7 @@ function escapeAttr(str) {
    Unified Toast & Status System
 ----------------------------- */
 
-function showToast(options, optionalType, optionalDuration) {
+export function showToast(options, optionalType, optionalDuration) {
   let message = '';
   let type = 'info';
   let duration = 3000;
@@ -590,7 +350,7 @@ function showToast(options, optionalType, optionalDuration) {
   return toast;
 }
 
-function setStatus(msg, targetIdOrType, maybeType) {
+export function setStatus(msg, targetIdOrType, maybeType) {
   if (!msg) return;
   let type = 'info';
   let targetId = null;
@@ -626,8 +386,10 @@ function setStatus(msg, targetIdOrType, maybeType) {
   showToast(msg, type, 3000);
 }
 
-window.showToast = showToast;
-window.setStatus = setStatus;
+if (typeof window !== 'undefined') {
+  window.showToast = showToast;
+  window.setStatus = setStatus;
+}
 
 /* -----------------------------
    Shared Drag & Drop
@@ -642,7 +404,7 @@ window.setStatus = setStatus;
  * @param {Function} options.onReorder - Callback (fromIndex, toIndex) => void
  * @param {Function} [options.canDrag] - Optional validator (itemEl) => boolean
  */
-function initDragAndDrop(container, {
+export function initDragAndDrop(container, {
   itemSelector = '.draggable-item',
   handleSelector = '.drag-handle',
   onReorder,
@@ -763,14 +525,6 @@ function initDragAndDrop(container, {
     if (!touch) {
       clearTouchDragState();
       return;
-    }
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch((error) => {
-          console.error('Service worker registration failed:', error);
-        });
-      });
     }
 
     const target = document.elementFromPoint(touch.clientX, touch.clientY);

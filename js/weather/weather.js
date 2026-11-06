@@ -1,3 +1,7 @@
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
+import { initAppPage } from '../shared/auth.js';
+
 const WC_STORAGE_KEY = "wc-unit"; // "c" or "f"
 
 // ---- WMO weather code -> { label, icon, accent } -----------------
@@ -105,8 +109,9 @@ function fmtTemp(c, unit){
 
 // ---- location (Supabase, authenticated users only) -----------------
 async function fetchLocation(){
-    const { data, error } = await window.supabaseClient
-        .from(window.TABLES.WEATHER_LOCATION)
+    const client = sb || window.supabaseClient;
+    const { data, error } = await client
+        .from(TABLES.WEATHER_LOCATION)
         .select('lat, lon, label')
         .single();
     if (error) throw error;
@@ -255,8 +260,4 @@ async function initWeather(){
     }
 }
 
-if (window.initAppPage) {
-    window.initAppPage(initWeather);
-} else {
-    document.addEventListener("app:ready", initWeather, { once: true });
-}
+initAppPage(initWeather);

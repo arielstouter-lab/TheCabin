@@ -3,13 +3,15 @@
 // Sends the password to a Supabase Edge Function for verification —
 // never check the password directly in this file, since this JS is
 // publicly visible to anyone who views source.
-const sb = window.supabaseClient;
+import { supabase as sb } from './shared/supabase.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+function setupSecretLogin() {
     const form = document.getElementById('secret-form');
     const input = document.getElementById('secret-password');
     const errorEl = document.getElementById('secret-error');
     const submitBtn = document.getElementById('secret-submit');
+
+    if (!form || !input) return;
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -17,7 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setLoading(true);
 
         try {
-            const { data, error } = await window.supabaseClient.functions.invoke('verify-secret', {
+            const client = sb || window.supabaseClient;
+            const { data, error } = await client.functions.invoke('verify-secret', {
                 body: { password: input.value }
             });
 
@@ -38,17 +41,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function showError(message) {
-        errorEl.textContent = message;
-        errorEl.classList.remove('hidden');
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
     }
 
     function hideError() {
-        errorEl.textContent = '';
-        errorEl.classList.add('hidden');
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.classList.add('hidden');
+        }
     }
 
     function setLoading(isLoading) {
-        submitBtn.disabled = isLoading;
-        submitBtn.textContent = isLoading ? 'Checking...' : 'Unlock';
+        if (submitBtn) {
+            submitBtn.disabled = isLoading;
+            submitBtn.textContent = isLoading ? 'Checking...' : 'Unlock';
+        }
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupSecretLogin);
+} else {
+    setupSecretLogin();
+}

@@ -1,11 +1,10 @@
 import { writeOrQueue, nowStamp, getPendingOp, initSync } from '../shared/sync.js';
 import { bindEvents, cloneEl, refs } from '../shared/dom.js';
 import { makeChip, setStatus, syncStatusHandler } from '../shared/ui.js';
-
-// This file is a module, so everything below is already module-scoped.
-const sb = window.supabaseClient;
-const TABLES = window.TABLES || {};
-const todayStr = window.todayStr;
+import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
+import { todayStr } from '../app.js';
+import { initAppPage } from '../shared/auth.js';
 
 // ---------- constants ----------
 // Fallbacks keep it working if NOTES isn't in TABLES yet.
@@ -361,8 +360,4 @@ function init(){
     setupRealtime();
 }
 
-if(window.initAppPage){
-    window.initAppPage(init);
-} else {
-    document.addEventListener('app:ready', init, { once: true });
-}
+initAppPage(init);

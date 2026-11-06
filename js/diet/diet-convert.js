@@ -6,6 +6,7 @@
 // Markup lives in elimination-diet.html (#convertCard and <template id="tpl-convert-item">).
 
 import { bindEvents, cloneEl, refs } from '../shared/dom.js';
+import { setStatus } from '../app.js';
 
 // Keep in sync with BRISTOL_RE in diet-main.js: this is what counts as a bowel movement entry.
 const BM_RE = /diarrh|loose|stool|bowel|constip|\bbm\b|poop|toilet/i;
@@ -17,7 +18,7 @@ export const needsConversion = s =>
     s.severity != null && s.pain == null && s.urgency == null && (!s.positive || isBowelMovement(s));
 
 let current = new Map();            // id -> entry, for the entries shown right now
-const say = msg => { if (window.setStatus) window.setStatus(msg); };
+const say = msg => { setStatus(msg); };
 
 function buildRow(s) {
     const row = cloneEl('tpl-convert-item');
