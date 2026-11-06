@@ -1,5 +1,5 @@
 // Lives at the site ROOT so its scope covers every page.
-const CACHE_NAME = 'thecabin-v14';
+const CACHE_NAME = 'thecabin-v15';
 const NAV_TIMEOUT_MS = 3500;
 
 // HTML pages (all at the root).

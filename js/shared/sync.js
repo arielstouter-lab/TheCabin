@@ -61,6 +61,11 @@ export function refreshQueue() {
     let changed = false;
     queue.forEach(op => {
         if (!op.opId) { op.opId = crypto.randomUUID(); changed = true; }
+        // Cleanse deprecated severity column if queued in legacy/buggy symptom payload
+        if (op.table === 'diet_symptoms' && op.payload && 'severity' in op.payload) {
+            delete op.payload.severity;
+            changed = true;
+        }
     });
     if (changed) saveQueue();
 }

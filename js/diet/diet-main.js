@@ -624,7 +624,6 @@ bindEvents(document, {
                 occurred_at: new Date(+btn.dataset.fine).toISOString(),
                 symptom: 'Felt fine',
                 positive: true,
-                severity: null,
                 created_at: nowStamp()
             };
             state.symptoms.unshift(row);

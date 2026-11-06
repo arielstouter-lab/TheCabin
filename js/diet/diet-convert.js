@@ -54,10 +54,11 @@ export function initConversion(sb, reload) {
             const entry = row && current.get(row.dataset.id);
             if (!entry) return;
             const action = btn.dataset.convert;
-            const patch = { severity: null, updated_at: nowStamp() };
+            const patch = { updated_at: nowStamp() };
             if (action === 'urgency') patch.urgency = entry.severity;
             if (action === 'pain') patch.pain = entry.severity;
             btn.disabled = true;
+            entry.severity = null;
             Object.assign(entry, patch);
             writeOrQueue(sb, {
                 table: TABLES.DIET_SYMPTOMS,
