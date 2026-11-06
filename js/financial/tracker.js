@@ -2,10 +2,12 @@ import { cloneEl, refs } from '../shared/dom.js';
 import { fmt$, setStatus } from '../shared/ui.js';
 import { supabase as sb } from '../shared/supabase.js';
 import { TABLES } from '../shared/database-config.js';
+import { writeOrQueue, nowStamp } from '../shared/sync.js';
 
 export const TRACKER_TABLE = TABLES.SPENDING_TALLY || 'spending_tally';
 
 const TRACKER_START_KEY = 'ccTrackerPeriodStart';
+const CACHE_KEY = 'thecabin_tracker_cache';
 
 // Provided by creditcards.js via initTracker()
 let getSpendRows = () => [];
@@ -14,6 +16,25 @@ let tallyRows = [];
 let trackerStart = loadTrackerStart();
 let trackerEnd = todayStr();
 let pendingFocusId = null;
+
+export function saveToLocalCache() {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ tallyRows, timestamp: Date.now() }));
+    } catch (e) {}
+}
+
+export function loadFromLocalCache() {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.tallyRows)) return false;
+        tallyRows = data.tallyRows;
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 // -------------------------------------------------------------------
 // Date helpers
@@ -58,32 +79,46 @@ const entriesFor = categoryId => tallyRows.filter(r =>
 // Supabase
 // -------------------------------------------------------------------
 export async function loadTrackerData() {
+    const hadCached = loadFromLocalCache();
+    if (hadCached) renderTracker();
     if (!sb) return;
     try {
         const { data, error } = await sb.from(TRACKER_TABLE).select('*').order('created_at', { ascending: true });
         if (error) throw error;
         tallyRows = data || [];
+        saveToLocalCache();
     } catch (err) {
         console.error('Could not load spending tracker entries:', err);
-        tallyRows = [];
+        if (!hadCached) tallyRows = [];
     }
 }
 
 async function addEntry(categoryId, rawAmount) {
-    if (!sb) return false;
     const amount = parseFloat(rawAmount);
     if (!Number.isFinite(amount) || amount === 0) {
         setStatus('Enter an amount to add.');
         return false;
     }
     try {
-        const { data, error } = await sb.from(TRACKER_TABLE)
-            .insert([{ period_start: trackerStart, period_end: trackerEnd, category_id: categoryId, amount }])
-            .select().single();
-        if (error) throw error;
-        if (data) tallyRows.push(data);
+        const id = crypto.randomUUID();
+        const row = {
+            id,
+            period_start: trackerStart,
+            period_end: trackerEnd,
+            category_id: categoryId,
+            amount,
+            created_at: nowStamp()
+        };
+        tallyRows.push(row);
         pendingFocusId = categoryId;
         renderTracker();
+        saveToLocalCache();
+        writeOrQueue(sb, {
+            table: TRACKER_TABLE,
+            type: 'insert',
+            id,
+            payload: row
+        });
         return true;
     } catch (err) {
         console.error('Could not add entry:', err);
@@ -93,12 +128,15 @@ async function addEntry(categoryId, rawAmount) {
 }
 
 async function deleteEntry(id) {
-    if (!sb) return false;
     try {
-        const { error } = await sb.from(TRACKER_TABLE).delete().eq('id', id);
-        if (error) throw error;
         tallyRows = tallyRows.filter(r => r.id !== id);
         renderTracker();
+        saveToLocalCache();
+        writeOrQueue(sb, {
+            table: TRACKER_TABLE,
+            type: 'delete',
+            id
+        });
         setStatus('Deleted entry.');
         return true;
     } catch (err) {
@@ -110,8 +148,8 @@ async function deleteEntry(id) {
 
 // Deletes every entry in the selected period (and clears any typed-but-unadded amounts)
 async function clearEntries() {
-    if (!sb) return false;
-    const count = tallyRows.filter(r => r.period_start === trackerStart).length;
+    const periodEntries = tallyRows.filter(r => r.period_start === trackerStart);
+    const count = periodEntries.length;
     if (!count) {
         setStatus('Nothing to clear for this period.');
         return false;
@@ -119,11 +157,17 @@ async function clearEntries() {
     if (!confirm(`Delete all ${count} entr${count === 1 ? 'y' : 'ies'} for the period starting ${trackerStart}? This can't be undone.`)) return false;
 
     try {
-        const { error } = await sb.from(TRACKER_TABLE).delete().eq('period_start', trackerStart);
-        if (error) throw error;
         tallyRows = tallyRows.filter(r => r.period_start !== trackerStart);
         document.querySelectorAll('#trackerGridBody input[type="number"]').forEach(i => { i.value = ''; });
         renderTracker();
+        saveToLocalCache();
+        periodEntries.forEach(entry => {
+            writeOrQueue(sb, {
+                table: TRACKER_TABLE,
+                type: 'delete',
+                id: entry.id
+            });
+        });
         setStatus('Cleared spending tracker.');
         return true;
     } catch (err) {
@@ -237,6 +281,7 @@ export function renderTracker() {
         if (input) input.focus();
         pendingFocusId = null;
     }
+    saveToLocalCache();
 }
 
 // -------------------------------------------------------------------

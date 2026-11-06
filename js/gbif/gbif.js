@@ -529,6 +529,7 @@ function render(perYear, origin) {
     setStatus(`${total} records, ${groups.size} taxa within ${kmToMiles(origin.km).toFixed(1)} miles` +
         (origin.taxon ? ` · limited to ${origin.taxon.label}` : ''));
     $('results').replaceChildren(...buildTaxonomy(groups, origin));
+    saveLastSearch(perYear, origin);
 }
 
 /* ---------- location + wiring ---------- */
@@ -553,20 +554,79 @@ function useDeviceLocation() {
     );
 }
 
-async function loadHouse() {
-    setStatus('Loading house location…');
-    const client = sb || window.supabaseClient;
-    const { data, error } = await client
-        .from(TABLES.WEATHER_LOCATION).select('lat, lon').limit(1).maybeSingle();
+const GBIF_HOUSE_CACHE_KEY = 'thecabin_gbif_house_cache';
+const GBIF_LAST_SEARCH_KEY = 'thecabin_gbif_last_search';
 
-    if (error || !data || data.lat == null || data.lon == null) {
-        setStatus('Could not read weather_location' +
-            (error ? ` (${error.message})` : '') + '. Enter coordinates above.', true);
-        return;
+function saveLastSearch(perYear, origin) {
+    try {
+        localStorage.setItem(GBIF_LAST_SEARCH_KEY, JSON.stringify({
+            perYear: [...perYear.entries()],
+            origin,
+            timestamp: Date.now()
+        }));
+    } catch (e) {}
+}
+
+function loadLastSearch() {
+    try {
+        const raw = localStorage.getItem(GBIF_LAST_SEARCH_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.perYear)) return null;
+        return {
+            perYear: new Map(data.perYear),
+            origin: data.origin,
+            timestamp: data.timestamp
+        };
+    } catch (e) {
+        return null;
     }
-    $('lat').value = (+data.lat).toFixed(5);
-    $('lon').value = (+data.lon).toFixed(5);
-    setStatus('Ready. Choose your options and click Search.');
+}
+
+async function loadHouse() {
+    try {
+        const cachedHouse = localStorage.getItem(GBIF_HOUSE_CACHE_KEY);
+        if (cachedHouse) {
+            const parsed = JSON.parse(cachedHouse);
+            if (parsed.lat != null && parsed.lon != null) {
+                $('lat').value = (+parsed.lat).toFixed(5);
+                $('lon').value = (+parsed.lon).toFixed(5);
+            }
+        }
+        const cachedSearch = loadLastSearch();
+        if (cachedSearch) {
+            render(cachedSearch.perYear, cachedSearch.origin);
+            const timeStr = new Date(cachedSearch.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
+            setStatus(`Loaded previous search results (${timeStr}). Click Search to refresh.`);
+        } else {
+            setStatus('Loading house location…');
+        }
+    } catch (e) {}
+
+    const client = sb || window.supabaseClient;
+    if (!client) return;
+    try {
+        const { data, error } = await client
+            .from(TABLES.WEATHER_LOCATION).select('lat, lon').limit(1).maybeSingle();
+
+        if (error || !data || data.lat == null || data.lon == null) {
+            if (!$('lat').value) {
+                setStatus('Could not read weather_location' +
+                    (error ? ` (${error.message})` : '') + '. Enter coordinates above.', true);
+            }
+            return;
+        }
+        $('lat').value = (+data.lat).toFixed(5);
+        $('lon').value = (+data.lon).toFixed(5);
+        localStorage.setItem(GBIF_HOUSE_CACHE_KEY, JSON.stringify({ lat: data.lat, lon: data.lon }));
+        if (!loadLastSearch()) {
+            setStatus('Ready. Choose your options and click Search.');
+        }
+    } catch (e) {
+        if (!$('lat').value) {
+            setStatus('Could not read house location. Enter coordinates above.', true);
+        }
+    }
 }
 
 $('manual').addEventListener('click', searchFromInputs);

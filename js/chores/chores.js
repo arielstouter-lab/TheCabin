@@ -3,11 +3,37 @@ import { supabase as sb } from '../shared/supabase.js';
 import { TABLES } from '../shared/database-config.js';
 import { setStatus } from '../shared/ui.js';
 import { initAppPage } from '../shared/auth.js';
+import { writeOrQueue, nowStamp, initSync, withTimeout } from '../shared/sync.js';
 
 const DEFAULT_DISLIKE = 5;
+const CACHE_KEY = 'thecabin_chores_cache';
+const LOAD_TIMEOUT_MS = 6000;
 
 let state = null;
 const pendingSaves = {};
+
+function saveToLocalCache(){
+  if(!state) return;
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      state,
+      timestamp: Date.now()
+    }));
+  } catch(e){}
+}
+
+function loadFromLocalCache(){
+  try{
+    const raw = localStorage.getItem(CACHE_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    if(!data || !data.state || !Array.isArray(data.state.people)) return false;
+    state = data.state;
+    return true;
+  } catch(e){
+    return false;
+  }
+}
 
 function debounceSave(key, fn, delay = 400){
   clearTimeout(pendingSaves[key]);
@@ -44,13 +70,27 @@ function splitTotal(choreId){
 }
 
 async function load(){
+  const hadCached = loadFromLocalCache();
+  if(hadCached){
+    render();
+  }
+
   try{
-    const [{data: people}, {data: chores}, {data: dislikes}, {data: assignments}] = await Promise.all([
+    const [
+      {data: people, error: pErr},
+      {data: chores, error: cErr},
+      {data: dislikes, error: dErr},
+      {data: assignments, error: aErr}
+    ] = await withTimeout(Promise.all([
       sb.from(TABLES.PEOPLE).select('*').order('created_at'),
       sb.from(TABLES.CHORES).select('*').order('created_at'),
       sb.from(TABLES.CHORE_DISLIKES).select('*'),
       sb.from(TABLES.CHORE_ASSIGNMENTS).select('*')
-    ]);
+    ]), LOAD_TIMEOUT_MS, 'Loading chores');
+
+    if(pErr || cErr || dErr || aErr){
+      throw (pErr || cErr || dErr || aErr);
+    }
 
     const chorelist = (chores || []).map(c => ({
       id: c.id,
@@ -75,11 +115,16 @@ async function load(){
       chores: chorelist,
       assignments: assignMap
     };
+    render();
+    saveToLocalCache();
   } catch(e){
-    setStatus('Could not load data.');
-    state = {people: [], chores: [], assignments: {}};
+    console.error('Could not load chores data:', e);
+    if(!hadCached){
+      setStatus('Could not load data.');
+      state = {people: [], chores: [], assignments: {}};
+      render();
+    }
   }
-  render();
   setupRealtime();
 }
 
@@ -149,24 +194,25 @@ async function autoBalance(){
   state.assignments = newAssign;
   render();
 
-  try{
-    const choreIds = Object.keys(newAssign);
-    if(choreIds.length){
-      await sb.from('chore_assignments').delete().in('chore_id', choreIds);
-      const rows = choreIds.flatMap(choreId =>
-              Object.entries(newAssign[choreId]).map(([personId, pct]) => ({chore_id: choreId, person_id: personId, pct}))
-      );
-      await sb.from('chore_assignments').insert(rows);
-    }
-  } catch(e){
-    setStatus('Balanced locally, but could not save.');
-  }
+  const choreIds = Object.keys(newAssign);
+  choreIds.forEach(choreId => {
+    Object.entries(newAssign[choreId]).forEach(([personId, pct]) => {
+      writeOrQueue(sb, {
+        table: TABLES.CHORE_ASSIGNMENTS,
+        type: 'upsert',
+        id: `${choreId}_${personId}`,
+        payload: { chore_id: choreId, person_id: personId, pct, updated_at: nowStamp() },
+        options: { onConflict: 'chore_id,person_id' }
+      });
+    });
+  });
 }
 
 function render(){
   renderBeam();
   renderChores();
   renderPeople();
+  saveToLocalCache();
 }
 
 function renderBeam(){
@@ -344,10 +390,16 @@ bindEvents(document, {
     if(t.dataset.field === 'minutes') chore.minutes = Math.max(0, parseFloat(t.value) || 0);
     refreshChoreBadge(chore.id);
     refreshPeopleTotalsAndTickets();
+    saveToLocalCache();
     debounceSave(`chore-fields-${chore.id}`, () =>
-            sb.from(TABLES.CHORES).update({
-              name: chore.name, times_per_week: chore.timesPerWeek, minutes: chore.minutes
-            }).eq('id', chore.id)
+      writeOrQueue(sb, {
+        table: TABLES.CHORES,
+        type: 'update',
+        id: chore.id,
+        payload: {
+          name: chore.name, times_per_week: chore.timesPerWeek, minutes: chore.minutes, updated_at: nowStamp()
+        }
+      })
     );
   },
   'input input[data-dislike-chore][data-dislike-person]': (e, t) => {
@@ -360,8 +412,15 @@ bindEvents(document, {
     chore.dislike[personId] = val;
     refreshChoreBadge(choreId);
     refreshPeopleTotalsAndTickets();
+    saveToLocalCache();
     debounceSave(`dislike-${choreId}-${personId}`, () =>
-            sb.from(TABLES.CHORE_DISLIKES).upsert({chore_id: choreId, person_id: personId, dislike: val})
+      writeOrQueue(sb, {
+        table: TABLES.CHORE_DISLIKES,
+        type: 'upsert',
+        id: `${choreId}_${personId}`,
+        payload: { chore_id: choreId, person_id: personId, dislike: val, updated_at: nowStamp() },
+        options: { onConflict: 'chore_id,person_id' }
+      })
     );
   },
   'input input[data-split-chore][data-split-person]': (e, t) => {
@@ -372,8 +431,15 @@ bindEvents(document, {
     state.assignments[choreId][personId] = pct;
     refreshChoreBadge(choreId);
     refreshPeopleTotalsAndTickets();
+    saveToLocalCache();
     debounceSave(`split-${choreId}-${personId}`, () =>
-            sb.from(TABLES.CHORE_ASSIGNMENTS).upsert({chore_id: choreId, person_id: personId, pct})
+      writeOrQueue(sb, {
+        table: TABLES.CHORE_ASSIGNMENTS,
+        type: 'upsert',
+        id: `${choreId}_${personId}`,
+        payload: { chore_id: choreId, person_id: personId, pct, updated_at: nowStamp() },
+        options: { onConflict: 'chore_id,person_id' }
+      })
     );
   },
   'input input[data-person-name]': (e, t) => {
@@ -383,8 +449,14 @@ bindEvents(document, {
     renderBeam();
     renderChores();
     renderPeople();
+    saveToLocalCache();
     debounceSave(`person-name-${p.id}`, () =>
-            sb.from(TABLES.PEOPLE).update({name: p.name}).eq('id', p.id)
+      writeOrQueue(sb, {
+        table: TABLES.PEOPLE,
+        type: 'update',
+        id: p.id,
+        payload: { name: p.name, updated_at: nowStamp() }
+      })
     );
   },
   'click [data-del-chore]': async (e, t) => {
@@ -392,9 +464,13 @@ bindEvents(document, {
     state.chores = state.chores.filter(c => c.id !== id);
     delete state.assignments[id];
     render();
-    try{
-      await sb.from(TABLES.CHORES).delete().eq('id', id);
-    } catch(err){ setStatus('Could not delete chore.'); }
+    saveToLocalCache();
+    writeOrQueue(sb, {
+      table: TABLES.CHORES,
+      type: 'delete',
+      id: id
+    });
+    setStatus('Deleted chore.');
   },
   'click [data-del-person]': async (e, t) => {
     if(state.people.length <= 1){ setStatus('Keep at least one person.'); return; }
@@ -405,72 +481,94 @@ bindEvents(document, {
       if(state.assignments[cid]) delete state.assignments[cid][id];
     });
     render();
-    try{
-      await sb.from(TABLES.PEOPLE).delete().eq('id', id);
-    } catch(err){ setStatus('Could not delete person.'); }
+    saveToLocalCache();
+    writeOrQueue(sb, {
+      table: TABLES.PEOPLE,
+      type: 'delete',
+      id: id
+    });
+    setStatus('Deleted person.');
   },
   'click #cl-add-chore': async () => {
     const input = document.getElementById('cl-new-chore-name');
     const name = input.value.trim();
     if(!name) return;
 
-    try{
-      const {data, error} = await sb.from(TABLES.CHORES)
-              .insert({name, times_per_week: 1, minutes: 15})
-              .select()
-              .single();
-      if(error || !data){ setStatus('Could not add chore.'); return; }
-      const id = data.id;
+    const id = crypto.randomUUID();
+    const dislike = {};
+    state.people.forEach(p => dislike[p.id] = DEFAULT_DISLIKE);
+    const firstPerson = state.people[0];
 
-      const dislike = {};
-      state.people.forEach(p => dislike[p.id] = DEFAULT_DISLIKE);
-      if(state.people.length){
-        await sb.from(TABLES.CHORE_DISLIKES).upsert(
-                state.people.map(p => ({chore_id: id, person_id: p.id, dislike: DEFAULT_DISLIKE}))
-        );
-      }
-      const firstPerson = state.people[0];
-      if(firstPerson){
-        await sb.from(TABLES.CHORE_ASSIGNMENTS).upsert({chore_id: id, person_id: firstPerson.id, pct: 100});
-      }
+    state.chores.push({id, name, timesPerWeek: 1, minutes: 15, dislike});
+    state.assignments[id] = firstPerson ? {[firstPerson.id]: 100} : {};
+    input.value = '';
+    render();
+    saveToLocalCache();
 
-      state.chores.push({id, name, timesPerWeek: 1, minutes: 15, dislike});
-      state.assignments[id] = firstPerson ? {[firstPerson.id]: 100} : {};
-      input.value = '';
-      render();
-    } catch(err){
-      setStatus('Could not add chore.');
+    writeOrQueue(sb, {
+      table: TABLES.CHORES,
+      type: 'insert',
+      id,
+      payload: { id, name, times_per_week: 1, minutes: 15, created_at: nowStamp() }
+    });
+
+    if(state.people.length){
+      state.people.forEach(p => {
+        writeOrQueue(sb, {
+          table: TABLES.CHORE_DISLIKES,
+          type: 'upsert',
+          id: `${id}_${p.id}`,
+          payload: { chore_id: id, person_id: p.id, dislike: DEFAULT_DISLIKE, updated_at: nowStamp() },
+          options: { onConflict: 'chore_id,person_id' }
+        });
+      });
     }
+
+    if(firstPerson){
+      writeOrQueue(sb, {
+        table: TABLES.CHORE_ASSIGNMENTS,
+        type: 'upsert',
+        id: `${id}_${firstPerson.id}`,
+        payload: { chore_id: id, person_id: firstPerson.id, pct: 100, updated_at: nowStamp() },
+        options: { onConflict: 'chore_id,person_id' }
+      });
+    }
+    setStatus('Added chore.');
   },
   'click #cl-add-person': async () => {
     const input = document.getElementById('cl-new-person-name');
     const name = input.value.trim();
     if(!name) return;
 
-    try{
-      const {data, error} = await sb.from(TABLES.PEOPLE)
-              .insert({name})
-              .select()
-              .single();
-      if(error || !data){ setStatus('Could not add person.'); return; }
-      const id = data.id;
+    const id = crypto.randomUUID();
+    state.people.push({id, name});
+    state.chores.forEach(c => {
+      c.dislike = c.dislike || {};
+      c.dislike[id] = DEFAULT_DISLIKE;
+    });
+    input.value = '';
+    render();
+    saveToLocalCache();
 
-      if(state.chores.length){
-        await sb.from(TABLES.CHORE_DISLIKES).upsert(
-                state.chores.map(c => ({chore_id: c.id, person_id: id, dislike: DEFAULT_DISLIKE}))
-        );
-      }
+    writeOrQueue(sb, {
+      table: TABLES.PEOPLE,
+      type: 'insert',
+      id,
+      payload: { id, name, created_at: nowStamp() }
+    });
 
-      state.people.push({id, name});
+    if(state.chores.length){
       state.chores.forEach(c => {
-        c.dislike = c.dislike || {};
-        c.dislike[id] = DEFAULT_DISLIKE;
+        writeOrQueue(sb, {
+          table: TABLES.CHORE_DISLIKES,
+          type: 'upsert',
+          id: `${c.id}_${id}`,
+          payload: { chore_id: c.id, person_id: id, dislike: DEFAULT_DISLIKE, updated_at: nowStamp() },
+          options: { onConflict: 'chore_id,person_id' }
+        });
       });
-      input.value = '';
-      render();
-    } catch(err){
-      setStatus('Could not add person.');
     }
+    setStatus('Added person.');
   },
   'click #cl-auto-balance': async () => {
     try {
@@ -487,20 +585,19 @@ bindEvents(document, {
       state.assignments[c.id] = first ? {[first.id]: 100} : {};
     });
     render();
+    saveToLocalCache();
     setStatus('Reset — everything assigned 100% to the first person.');
 
-    try{
-      const choreIds = state.chores.map(c => c.id);
-      if(choreIds.length){
-        await sb.from(TABLES.CHORE_ASSIGNMENTS).delete().in('chore_id', choreIds);
-        if(first){
-          await sb.from(TABLES.CHORE_ASSIGNMENTS).insert(
-                  choreIds.map(cid => ({chore_id: cid, person_id: first.id, pct: 100}))
-          );
-        }
-      }
-    } catch(err){
-      setStatus('Reset locally, but could not save.');
+    if(first){
+      state.chores.forEach(c => {
+        writeOrQueue(sb, {
+          table: TABLES.CHORE_ASSIGNMENTS,
+          type: 'upsert',
+          id: `${c.id}_${first.id}`,
+          payload: { chore_id: c.id, person_id: first.id, pct: 100, updated_at: nowStamp() },
+          options: { onConflict: 'chore_id,person_id' }
+        });
+      });
     }
   },
   'keydown #cl-new-chore-name': (e) => {
@@ -539,4 +636,11 @@ window.addEventListener('beforeunload', () => {
   if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
 });
 
-initAppPage(load);
+window.addEventListener('sync:flushed', () => {
+  debounceReload();
+});
+
+initAppPage(() => {
+  if(sb) initSync(sb);
+  load();
+});

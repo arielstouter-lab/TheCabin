@@ -1,8 +1,11 @@
-import { writeOrQueue, nowStamp, initSync } from '../shared/sync.js';
+import { writeOrQueue, nowStamp, initSync, withTimeout } from '../shared/sync.js';
 import { TABLES, RPC } from '../shared/database-config.js';
 import { supabase as sb } from '../shared/supabase.js';
 import { groceryKey, groceryKeysMatch, escapeHtml, setStatus, initDragAndDrop } from '../app.js';
 import { initAppPage } from '../shared/auth.js';
+
+const CACHE_KEY = 'thecabin_cached_lists_manage';
+const LOAD_TIMEOUT_MS = 6000;
 
 let groceries = null;
 let groceryItems = [];
@@ -10,6 +13,34 @@ let aisles = [];
 let itemMemory = [];
 let mappingSearchQuery = '';
 let reorderSaveToken = 0;
+
+    function saveToLocalCache(){
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+                groceries,
+                groceryItems,
+                aisles,
+                itemMemory,
+                timestamp: Date.now()
+            }));
+        } catch(e){}
+    }
+
+    function loadFromLocalCache(){
+        try {
+            const raw = localStorage.getItem(CACHE_KEY);
+            if(!raw) return false;
+            const data = JSON.parse(raw);
+            if(!data || !Array.isArray(data.aisles)) return false;
+            groceries = data.groceries || null;
+            groceryItems = data.groceryItems || [];
+            aisles = data.aisles || [];
+            itemMemory = data.itemMemory || [];
+            return true;
+        } catch(e){
+            return false;
+        }
+    }
 
     function sortedAisles(){
         return [...aisles].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -24,12 +55,17 @@ let reorderSaveToken = 0;
     }
 
     async function loadAll(){
+        const hadCached = loadFromLocalCache();
+        if(hadCached){
+            render();
+        }
+
         try{
-            const [sectionResult, aisleResult, memoryResult] = await Promise.all([
+            const [sectionResult, aisleResult, memoryResult] = await withTimeout(Promise.all([
                 sb.from(TABLES.LIST_SECTIONS).select('*'),
                 sb.from(TABLES.GROCERY_AISLES).select('*').order('sort_order'),
                 sb.from(TABLES.GROCERY_ITEM_MEMORY).select('*')
-            ]);
+            ]), LOAD_TIMEOUT_MS, 'Loading manage groceries');
 
             const loadErrors = [sectionResult.error, aisleResult.error, memoryResult.error].filter(Boolean);
             if(loadErrors.length){
@@ -49,30 +85,31 @@ let reorderSaveToken = 0;
             aisles = aisleResult.data || [];
             itemMemory = memoryResult.data || [];
 
-
             if(groceries){
                 const itemResult = await sb.from(TABLES.LIST_ITEMS)
                     .select('*')
                     .eq('section_id', groceries.id);
                 if(itemResult.error){
                     console.error('Could not load grocery items:', itemResult.error);
-                    groceryItems = [];
                 } else {
                     groceryItems = itemResult.data || [];
                 }
             } else {
                 groceryItems = [];
             }
+            render();
+            saveToLocalCache();
         } catch(e){
             console.error('Could not load manage-groceries data:', e);
-            setStatus('Could not load groceries data.');
-            aisles = [];
-            itemMemory = [];
-            groceryItems = [];
+            if(!hadCached){
+                setStatus('Could not load groceries data.');
+                aisles = [];
+                itemMemory = [];
+                groceryItems = [];
+                render();
+            }
         }
-        render();
         setupRealtime();
-        if(sb) initSync(sb);
     }
 
     // ---- Aisles ---------------------------------------------------
@@ -94,18 +131,23 @@ let reorderSaveToken = 0;
         const trimmed = name.trim();
         if(!trimmed) return;
         const maxSort = aisles.reduce((max, a) => Math.max(max, a.sort_order || 0), 0);
-        try{
-            const {data, error} = await sb.from(TABLES.GROCERY_AISLES)
-                .insert({ name: trimmed, sort_order: maxSort + 1 })
-                .select()
-                .single();
-            if(error || !data){ setStatus('Could not add aisle.'); return; }
-            aisles.push(data);
-            render();
-        } catch(e){
-            console.error('Could not add aisle:', e);
-            setStatus('Could not add aisle.');
-        }
+        const newAisle = {
+            id: crypto.randomUUID(),
+            name: trimmed,
+            sort_order: maxSort + 1,
+            created_at: nowStamp()
+        };
+        aisles.push(newAisle);
+        render();
+        saveToLocalCache();
+
+        writeOrQueue(sb, {
+            table: TABLES.GROCERY_AISLES,
+            type: 'insert',
+            id: newAisle.id,
+            payload: newAisle
+        });
+        setStatus('Aisle added.');
     }
 
     async function renameAisle(id, name){
@@ -114,49 +156,68 @@ let reorderSaveToken = 0;
         const aisle = aisles.find(a => a.id === id);
         if(!aisle || aisle.name === trimmed) return;
         aisle.name = trimmed;
-        try{
-            const {error} = await sb.from(TABLES.GROCERY_AISLES).update({name: trimmed}).eq('id', id);
-            if(error) throw error;
-            render();
-        } catch(e){
-            console.error('Could not rename aisle:', e);
-            setStatus('Could not rename aisle.');
-        }
+        render();
+        saveToLocalCache();
+
+        writeOrQueue(sb, {
+            table: TABLES.GROCERY_AISLES,
+            type: 'update',
+            id: id,
+            payload: { name: trimmed, updated_at: nowStamp() }
+        });
     }
 
     async function deleteAisle(id){
         if(!confirm('Remove this aisle? Items assigned to it will become unassigned.')) return;
 
-        const previousAisles = aisles.map(a => ({...a}));
-        const previousItems = groceryItems.map(i => ({...i}));
-        const previousMemory = itemMemory.map(m => ({...m}));
-
         aisles = aisles.filter(a => a.id !== id);
-        groceryItems = groceryItems.map(i => i.aisle_id === id ? {...i, aisle_id: null} : i);
-        itemMemory = itemMemory.map(m => m.aisle_id === id ? {...m, aisle_id: null} : m);
+        const affectedItemIds = [];
+        groceryItems = groceryItems.map(i => {
+            if (i.aisle_id === id) {
+                affectedItemIds.push(i.id);
+                return { ...i, aisle_id: null };
+            }
+            return i;
+        });
+        const affectedMemoryKeys = [];
+        itemMemory = itemMemory.map(m => {
+            if (m.aisle_id === id) {
+                affectedMemoryKeys.push(m.item_key);
+                return { ...m, aisle_id: null };
+            }
+            return m;
+        });
         render();
+        saveToLocalCache();
 
-        try{
-            await Promise.all([
-                sb.from(TABLES.LIST_ITEMS).update({aisle_id: null}).eq('aisle_id', id),
-                sb.from(TABLES.GROCERY_ITEM_MEMORY).update({aisle_id: null}).eq('aisle_id', id)
-            ]);
-            const {error} = await sb.from(TABLES.GROCERY_AISLES).delete().eq('id', id);
-            if(error) throw error;
-        } catch(e){
-            console.error('Could not delete aisle:', e);
-            aisles = previousAisles;
-            groceryItems = previousItems;
-            itemMemory = previousMemory;
-            render();
-            setStatus('Could not delete aisle.');
-        }
+        affectedItemIds.forEach(itemId => {
+            writeOrQueue(sb, {
+                table: TABLES.LIST_ITEMS,
+                type: 'update',
+                id: itemId,
+                payload: { aisle_id: null, updated_at: nowStamp() }
+            });
+        });
+        affectedMemoryKeys.forEach(key => {
+            writeOrQueue(sb, {
+                table: TABLES.GROCERY_ITEM_MEMORY,
+                type: 'update',
+                id: key,
+                idColumn: 'item_key',
+                payload: { aisle_id: null, updated_at: nowStamp() }
+            });
+        });
+        writeOrQueue(sb, {
+            table: TABLES.GROCERY_AISLES,
+            type: 'delete',
+            id: id
+        });
+        setStatus('Aisle removed.');
     }
 
     async function reorderAisles(fromIndex, toIndex){
         if(isNaN(fromIndex) || isNaN(toIndex) || fromIndex === toIndex) return;
 
-        const previousAisles = aisles.map(a => ({...a}));
         const ordered = sortedAisles();
         const [moved] = ordered.splice(fromIndex, 1);
         if(!moved) return;
@@ -166,20 +227,16 @@ let reorderSaveToken = 0;
 
         aisles = ordered;
         render();
+        saveToLocalCache();
 
-        const saveToken = ++reorderSaveToken;
-        try{
-            await Promise.all(ordered.map(aisle =>
-                sb.from(TABLES.GROCERY_AISLES).update({sort_order: aisle.sort_order}).eq('id', aisle.id)
-            ));
-        } catch(e){
-            console.error('Could not save aisle order:', e);
-            if(saveToken === reorderSaveToken){
-                aisles = previousAisles;
-                render();
-                setStatus('Could not save aisle order.');
-            }
-        }
+        ordered.forEach(aisle => {
+            writeOrQueue(sb, {
+                table: TABLES.GROCERY_AISLES,
+                type: 'update',
+                id: aisle.id,
+                payload: { sort_order: aisle.sort_order, updated_at: nowStamp() }
+            });
+        });
     }
 
     // ---- Item -> aisle assignment ----------------------------------
@@ -195,63 +252,55 @@ let reorderSaveToken = 0;
         if(!key) return;
         const existingMemory = itemMemory.find(m => m.item_key === key);
 
-        const previousMemory = itemMemory.map(m => ({...m}));
-        const previousItems = groceryItems.map(i => ({...i}));
-
         if(existingMemory){
             itemMemory = itemMemory.map(m => m.item_key === key ? {...m, aisle_id: aisleId || null} : m);
         } else {
             itemMemory = [...itemMemory, {item_key: key, aisle_id: aisleId || null, id: `pending-${key}`}];
         }
-        groceryItems = groceryItems.map(i =>
-            groceryKey(i.text) === key ? {...i, aisle_id: aisleId || null} : i
-        );
+        const matchingIds = [];
+        groceryItems = groceryItems.map(i => {
+            if (groceryKey(i.text) === key) {
+                matchingIds.push(i.id);
+                return {...i, aisle_id: aisleId || null};
+            }
+            return i;
+        });
         render();
+        saveToLocalCache();
 
         const nowIso = nowStamp();
-        try{
-            const { data, error } = await sb.from(TABLES.GROCERY_ITEM_MEMORY)
-                .upsert(
-                    { item_key: key, aisle_id: aisleId || null, updated_at: nowIso },
-                    { onConflict: 'item_key' }
-                )
-                .select()
-                .maybeSingle();
-            if(error) throw error;
-            if(data){
-                itemMemory = itemMemory.map(m => m.item_key === key ? data : m);
-            }
+        writeOrQueue(sb, {
+            table: TABLES.GROCERY_ITEM_MEMORY,
+            type: 'upsert',
+            id: key,
+            idColumn: 'item_key',
+            payload: { item_key: key, aisle_id: aisleId || null, updated_at: nowIso },
+            options: { onConflict: 'item_key' }
+        });
 
-            const matchingIds = groceryItems.filter(i => groceryKey(i.text) === key).map(i => i.id);
-            if(matchingIds.length){
-                const {error: itemsErr} = await sb.from(TABLES.LIST_ITEMS)
-                    .update({aisle_id: aisleId || null, updated_at: nowIso})
-                    .in('id', matchingIds);
-                if(itemsErr) throw itemsErr;
-            }
-            setStatus('Aisle updated.');
-        } catch(e){
-            console.error('Could not save item aisle assignment:', e);
-            itemMemory = previousMemory;
-            groceryItems = previousItems;
-            render();
-            setStatus('Could not save aisle assignment.');
-        }
+        matchingIds.forEach(id => {
+            writeOrQueue(sb, {
+                table: TABLES.LIST_ITEMS,
+                type: 'update',
+                id: id,
+                payload: { aisle_id: aisleId || null, updated_at: nowIso }
+            });
+        });
+        setStatus('Aisle updated.');
     }
 
     async function deleteMapping(itemKey){
-        const previousMemory = itemMemory.map(m => ({...m}));
         itemMemory = itemMemory.filter(m => m.item_key !== itemKey);
         render();
-        try{
-            const {error} = await sb.from(TABLES.GROCERY_ITEM_MEMORY).delete().eq('item_key', itemKey);
-            if(error) throw error;
-        } catch(e){
-            console.error('Could not remove item mapping:', e);
-            itemMemory = previousMemory;
-            render();
-            setStatus('Could not remove mapping.');
-        }
+        saveToLocalCache();
+
+        writeOrQueue(sb, {
+            table: TABLES.GROCERY_ITEM_MEMORY,
+            type: 'delete',
+            id: itemKey,
+            idColumn: 'item_key'
+        });
+        setStatus('Mapping removed.');
     }
 
     // ---- Rendering: unassigned + mappings --------------------------
@@ -453,4 +502,11 @@ let reorderSaveToken = 0;
         if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
     });
 
-    initAppPage(loadAll);
+    window.addEventListener('sync:flushed', () => {
+        debounceReload();
+    });
+
+    initAppPage(() => {
+        if(sb) initSync(sb);
+        loadAll();
+    });

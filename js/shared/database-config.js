@@ -25,7 +25,14 @@ export const TABLES = Object.freeze({
   DEBT_SETTINGS: 'financial_debt_settings',
   BUDGET_SNAPSHOTS: 'financial_budget_snapshots',
   CARD_USAGE: 'financial_card_usage',
-  NOTES: 'household_notes'
+  NOTES: 'household_notes',
+  DIET_INGREDIENTS: 'diet_ingredients',
+  DIET_MEALS: 'diet_meals',
+  DIET_MEAL_INGREDIENTS: 'diet_meal_ingredients',
+  DIET_SYMPTOMS: 'diet_symptoms',
+  DIET_ITEM_MEMORY: 'diet_item_memory',
+  DIET_SUPPLEMENTS: 'diet_supplements',
+  DIET_ELIMINATIONS: 'diet_eliminations'
 });
 
 export const RPC = Object.freeze({

@@ -7,6 +7,7 @@
 
 import { bindEvents, cloneEl, refs } from '../shared/dom.js';
 import { setStatus } from '../app.js';
+import { writeOrQueue, nowStamp } from '../shared/sync.js';
 
 // Typical lengths used in elimination diets. `days` is the longest end of the range and drives the countdown.
 export const SUGGESTIONS = [
@@ -44,9 +45,29 @@ export const SUGGESTIONS = [
 
 const PRIORITY_TAGS = new Set(['gluten', 'dairy', 'lactose', 'high-FODMAP', 'sweetener', 'fatty/fried']);
 const TABLE = 'diet_eliminations';
+const CACHE_KEY = 'thecabin_diet_eliminations_cache';
 
 let sb = null;
 let rows = [];                       // saved rows from diet_eliminations
+
+function saveToLocalCache() {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ rows, timestamp: Date.now() }));
+    } catch (e) {}
+}
+
+function loadFromLocalCache() {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.rows)) return false;
+        rows = data.rows;
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 export const fmtLength = days => !days ? '' : days % 7 === 0 ? `${days / 7} week${days === 7 ? '' : 's'}` : `${days} day${days === 1 ? '' : 's'}`;
 const fmtDate = d => d.toLocaleDateString([], { month: 'short', day: 'numeric' });
@@ -111,11 +132,14 @@ export function renderEliminations() {
 }
 
 export async function loadEliminations() {
+    const hadCached = loadFromLocalCache();
+    if (hadCached) renderEliminations();
     if (!sb) return;
     try {
         const { data, error } = await sb.from(TABLE).select('*').order('created_at');
         if (error) throw error;
         rows = data || [];
+        saveToLocalCache();
     } catch (err) {
         console.error('Could not load eliminations (suggestions still show):', err);
     }
@@ -125,19 +149,38 @@ export async function loadEliminations() {
 // Save a change to one item. Suggestions are upserted by seed_key on first use; your own rows are updated by id.
 async function save(it, patch) {
     try {
-        const stamped = { ...patch, updated_at: new Date().toISOString() };
-        const { data, error } = it.seed
-            ? await sb.from(TABLE).upsert({ seed_key: it.key, name: it.name, length_days: it.days, tag: it.tag || null, ...stamped },
-                { onConflict: 'seed_key' }).select().single()
-            : await sb.from(TABLE).update(stamped).eq('id', it.id).select().single();
-        if (error) throw error;
-        const i = rows.findIndex(r => r.id === data.id);
-        i >= 0 ? (rows[i] = data) : rows.push(data);
-        renderEliminations();
+        const stamped = { ...patch, updated_at: nowStamp() };
+        if (it.seed) {
+            const payload = { seed_key: it.key, name: it.name, length_days: it.days, tag: it.tag || null, ...stamped };
+            const i = rows.findIndex(r => r.seed_key === it.key);
+            if (i >= 0) rows[i] = { ...rows[i], ...payload };
+            else rows.push(payload);
+            saveToLocalCache();
+            renderEliminations();
+            writeOrQueue(sb, {
+                table: TABLE,
+                type: 'upsert',
+                id: it.key,
+                idColumn: 'seed_key',
+                payload,
+                options: { onConflict: 'seed_key' }
+            });
+        } else {
+            const i = rows.findIndex(r => r.id === it.id);
+            if (i >= 0) rows[i] = { ...rows[i], ...stamped };
+            saveToLocalCache();
+            renderEliminations();
+            writeOrQueue(sb, {
+                table: TABLE,
+                type: 'update',
+                id: it.id,
+                payload: stamped
+            });
+        }
     } catch (err) {
         console.error('Could not save elimination:', err);
         say('Could not save: ' + (err.message || err));
-        renderEliminations();           // put the checkbox/notes back to what is actually saved
+        renderEliminations();
     }
 }
 
@@ -148,7 +191,7 @@ export function initEliminations(client) {
     bindEvents(document, {
         'change #elimList [data-elim-tried]': async (e, box) => {
             const it = itemFor(box); if (!it) return;
-            await save(it, { tried: box.checked, tried_at: box.checked ? new Date().toISOString() : null });
+            await save(it, { tried: box.checked, tried_at: box.checked ? nowStamp() : null });
         },
         'click #elimList [data-elim-start]': async (e, btn) => {
             const it = itemFor(btn); if (!it) return;
@@ -162,22 +205,38 @@ export function initEliminations(client) {
         'click #elimList [data-elim-del]': async (e, btn) => {
             const it = itemFor(btn); if (!it || it.seed) return;
             if (!confirm(`Delete "${it.name}"?`)) return;
-            const { error } = await sb.from(TABLE).delete().eq('id', it.id);
-            if (error) { console.error(error); say('Could not delete: ' + error.message); return; }
             rows = rows.filter(r => r.id !== it.id);
+            saveToLocalCache();
             renderEliminations();
+            writeOrQueue(sb, {
+                table: TABLE,
+                type: 'delete',
+                id: it.id
+            });
         },
         'submit #elimForm': async (e) => {
             e.preventDefault();
             const name = document.getElementById('elimName').value.trim();
             if (!name) return;
             const length = Math.round(+document.getElementById('elimLength').value) || null;
-            const { data, error } = await sb.from(TABLE).insert({ name, length_days: length > 0 ? length : null,
-                details: document.getElementById('elimDetails').value.trim() || null }).select().single();
-            if (error) { console.error(error); say('Could not add: ' + error.message); return; }
+            const id = crypto.randomUUID();
+            const data = {
+                id,
+                name,
+                length_days: length > 0 ? length : null,
+                details: document.getElementById('elimDetails').value.trim() || null,
+                created_at: nowStamp()
+            };
             rows.push(data);
+            saveToLocalCache();
             e.target.reset();
             renderEliminations();
+            writeOrQueue(sb, {
+                table: TABLE,
+                type: 'insert',
+                id,
+                payload: data
+            });
         },
     });
 }

@@ -17,6 +17,7 @@ import {
 import { fmt$, el, setStatus, captureDetailsState, restoreDetailsState } from '../shared/ui.js';
 import { supabase as sb } from '../shared/supabase.js';
 import { TABLES } from '../shared/database-config.js';
+import { writeOrQueue, nowStamp } from '../shared/sync.js';
 
 const DEBTS_TABLE = TABLES.DEBTS;
 const SNAP_TABLE = TABLES.DEBT_SNAPSHOTS;
@@ -74,6 +75,36 @@ const strategyLabel = s => {
     return 'Avalanche (highest APR first)';
 };
 
+const CACHE_KEY = 'thecabin_debts_cache';
+
+export function saveToLocalCache() {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+            debtRows,
+            snapRows,
+            moneyRows,
+            settings,
+            timestamp: Date.now()
+        }));
+    } catch (e) {}
+}
+
+export function loadFromLocalCache() {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.debtRows)) return false;
+        debtRows = data.debtRows || [];
+        snapRows = data.snapRows || [];
+        moneyRows = data.moneyRows || [];
+        if (data.settings) settings = { ...settings, ...data.settings };
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 // ------------------------------------------------------------- data access
 async function fetchAll(table, orderCol) {
     const q = sb.from(table).select('*');
@@ -99,13 +130,18 @@ async function fetchDebtData() {
 }
 
 export async function loadDebtData() {
+    const hadCached = loadFromLocalCache();
+    if (hadCached) renderDebts();
     if (!sb) return;
     try {
         await fetchDebtData();
+        saveToLocalCache();
     } catch (err) {
         console.error('Error loading debts:', err);
-        status('Could not load debts — have you run debts.sql?');
-        debtRows = []; snapRows = []; moneyRows = [];
+        if (!hadCached) {
+            status('Could not load debts — have you run debts.sql?');
+            debtRows = []; snapRows = []; moneyRows = [];
+        }
     }
     setupDebtRealtime();
 }
@@ -140,31 +176,32 @@ function queueRender() {
     setTimeout(() => { renderQueued = false; renderDebts(); }, 0);
 }
 
-async function persist(table, id, patch, failMsg) {
-    if (!sb) return false;
-    try {
-        const { error } = await sb.from(table).update(patch).eq('id', id);
-        if (error) throw error;
-        return true;
-    } catch (err) {
-        console.error(failMsg, err);
-        status(failMsg);
-        return false;
-    }
-}
-
 function updateDebt(id, patch) {
     const row = debtRows.find(r => r.id === id);
     if (row) Object.assign(row, patch);
     queueRender();
-    return persist(DEBTS_TABLE, id, patch, 'Could not update debt.');
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: DEBTS_TABLE,
+        type: 'update',
+        id,
+        payload: { ...patch, updated_at: nowStamp() }
+    });
+    return true;
 }
 
 function updateSnap(id, patch) {
     const row = snapRows.find(r => r.id === id);
     if (row) Object.assign(row, patch);
     queueRender();
-    return persist(SNAP_TABLE, id, patch, 'Could not update snapshot.');
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: SNAP_TABLE,
+        type: 'update',
+        id,
+        payload: { ...patch, updated_at: nowStamp() }
+    });
+    return true;
 }
 
 // ---------------------------------------------------- snapshots / months
@@ -190,20 +227,20 @@ function moneyFor(ym) {
 }
 
 async function saveMoney(month, amount) {
-    if (!sb || !month) return;
+    if (!month) return;
     const i = moneyRows.findIndex(r => r.month === month);
     if (i >= 0) moneyRows[i] = { ...moneyRows[i], amount };
     else moneyRows.push({ month, amount });
     renderDebts();
-    try {
-        const { data, error } = await sb.from(MONEY_TABLE).upsert([{ month, amount }], { onConflict: 'month' }).select().single();
-        if (error) throw error;
-        const j = moneyRows.findIndex(r => r.month === month);
-        if (j >= 0) moneyRows[j] = data;
-    } catch (err) {
-        console.error('Could not save money available:', err);
-        status('Could not save money available: ' + (err.message || err));
-    }
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: MONEY_TABLE,
+        type: 'upsert',
+        id: month,
+        idColumn: 'month',
+        payload: { month, amount, updated_at: nowStamp() },
+        options: { onConflict: 'month' }
+    });
 }
 
 // First payment month: explicit, else two months after origination (the usual
@@ -231,7 +268,6 @@ function loanInfo(d, aprPct) {
 async function createSnapshot(month) {
     if (!isYm(month)) { status('Pick a month for the new snapshot.'); return; }
     if (snapshotMonths().includes(month)) { selectedMonth = month; renderDebts(); return; }
-    if (!sb) return;
 
     // Project balances forward from the latest earlier snapshot using the current strategy / plan
     const priorMonth = snapshotMonths().find(m => m < month);
@@ -267,123 +303,157 @@ async function createSnapshot(month) {
         // Promos are saved per snapshot: carry forward unless it has already expired
         const promoEnd = dateToYm(prior.promo_end);
         const promoLive = prior.promo_apr != null && !(promoEnd && promoEnd <= month);
+        const id = crypto.randomUUID();
         inserts.push({
+            id,
             debt_id: d.id, month, balance, apr: num(prior.apr), payment_override: prior.payment_override ?? null,
             promo_apr: promoLive ? prior.promo_apr : null,
             promo_start: promoLive ? (prior.promo_start ?? null) : null,
-            promo_end: promoLive ? (prior.promo_end ?? null) : null
+            promo_end: promoLive ? (prior.promo_end ?? null) : null,
+            created_at: nowStamp()
         });
     });
     if (!inserts.length) { status('Add a debt first.'); return; }
 
-    try {
-        const { data, error } = await sb.from(SNAP_TABLE).insert(inserts).select();
-        if (error) throw error;
-        snapRows.push(...(data || []));
-// Carry the money-available setting forward; it keeps applying until reset
-        try {
-            const carried = moneyFor(addMonths(month, 1));
-            const { data: m, error: mErr } = await sb.from(MONEY_TABLE).upsert([{ month, amount: carried }], { onConflict: 'month' }).select().single();
-            if (!mErr && m) moneyRows = [...moneyRows.filter(r => r.month !== month), m];
-        } catch (err) {
-            console.warn('Could not carry the money setting forward:', err);
-        }
-        selectedMonth = month;
-        const input = $('debtNewMonth');
-        if (input) input.value = '';
-        renderDebts();
-        status(`Started ${fmtYm(month)} snapshot.${projection ? ` Balances projected from ${fmtYm(priorMonth)} (${projection.label}).` : ''} Update them to match your statements.`);
-    } catch (err) {
-        console.error('Could not create snapshot:', err);
-        status('Could not create snapshot: ' + (err.message || err));
-    }
+    snapRows.push(...inserts);
+    inserts.forEach(snapItem => {
+        writeOrQueue(sb, {
+            table: SNAP_TABLE,
+            type: 'insert',
+            id: snapItem.id,
+            payload: snapItem
+        });
+    });
+
+    const carried = moneyFor(addMonths(month, 1));
+    const mIdx = moneyRows.findIndex(r => r.month === month);
+    if (mIdx >= 0) moneyRows[mIdx] = { ...moneyRows[mIdx], amount: carried };
+    else moneyRows.push({ month, amount: carried });
+
+    writeOrQueue(sb, {
+        table: MONEY_TABLE,
+        type: 'upsert',
+        id: month,
+        idColumn: 'month',
+        payload: { month, amount: carried, updated_at: nowStamp() },
+        options: { onConflict: 'month' }
+    });
+
+    selectedMonth = month;
+    const input = $('debtNewMonth');
+    if (input) input.value = '';
+    renderDebts();
+    saveToLocalCache();
+    status(`Started ${fmtYm(month)} snapshot.${projection ? ` Balances projected from ${fmtYm(priorMonth)} (${projection.label}).` : ''} Update them to match your statements.`);
 }
 
 async function deleteMonth(month) {
-    if (!month || !sb) return;
+    if (!month) return;
     if (!confirm(`Delete the ${fmtYm(month)} snapshot for every debt?`)) return;
-    try {
-        const { error } = await sb.from(SNAP_TABLE).delete().eq('month', month);
-        if (error) throw error;
-        snapRows = snapRows.filter(s => s.month !== month);
 
-        const { error: mErr } = await sb.from(MONEY_TABLE).delete().eq('month', month);
-        if (mErr) throw mErr;
-        moneyRows = moneyRows.filter(r => r.month !== month);
-        
-await sb.from(MONEY_TABLE).delete().eq('month', month);
-        moneyRows = moneyRows.filter(r => r.month !== month);
-        
-        if (selectedMonth === month) selectedMonth = null;
-        renderDebts();
-        status('Deleted snapshot.');
-    } catch (err) {
-        console.error('Could not delete snapshot:', err);
-        status('Could not delete snapshot.');
-    }
+    const snapsToDelete = snapRows.filter(s => s.month === month);
+    snapRows = snapRows.filter(s => s.month !== month);
+    moneyRows = moneyRows.filter(r => r.month !== month);
+    
+    if (selectedMonth === month) selectedMonth = null;
+    renderDebts();
+    saveToLocalCache();
+
+    snapsToDelete.forEach(snap => {
+        writeOrQueue(sb, {
+            table: SNAP_TABLE,
+            type: 'delete',
+            id: snap.id
+        });
+    });
+    writeOrQueue(sb, {
+        table: MONEY_TABLE,
+        type: 'delete',
+        id: month,
+        idColumn: 'month'
+    });
+    status('Deleted snapshot.');
 }
 
 async function addDebt({ name, kind, balance, apr }) {
-    if (!sb) return;
-    try {
-        const month = resolveMonth() || thisYm();
-        const { data: debt, error } = await sb.from(DEBTS_TABLE).insert([{ name, kind, in_budget: kind === 'mortgage' }]).select().single();
-        if (error) throw error;
-        const { data: snap, error: e2 } = await sb.from(SNAP_TABLE).insert([{ debt_id: debt.id, month, balance, apr }]).select().single();
-        if (e2) throw e2;
-        debtRows.push(debt);
-        snapRows.push(snap);
-        selectedMonth = month;
-        renderDebts();
-        status(kind === 'mortgage' ? 'Added mortgage — fill in its loan details below.' : 'Added debt.');
-    } catch (err) {
-        console.error('Could not add debt:', err);
-        status('Could not add debt: ' + (err.message || err));
-    }
+    const month = resolveMonth() || thisYm();
+    const debtId = crypto.randomUUID();
+    const snapId = crypto.randomUUID();
+    const debt = { id: debtId, name, kind, in_budget: kind === 'mortgage', created_at: nowStamp() };
+    const snap = { id: snapId, debt_id: debtId, month, balance, apr, created_at: nowStamp() };
+    
+    debtRows.push(debt);
+    snapRows.push(snap);
+    selectedMonth = month;
+    renderDebts();
+    saveToLocalCache();
+
+    writeOrQueue(sb, {
+        table: DEBTS_TABLE,
+        type: 'insert',
+        id: debtId,
+        payload: debt
+    });
+    writeOrQueue(sb, {
+        table: SNAP_TABLE,
+        type: 'insert',
+        id: snapId,
+        payload: snap
+    });
+
+    status(kind === 'mortgage' ? 'Added mortgage — fill in its loan details below.' : 'Added debt.');
 }
 
 async function deleteDebt(id, name) {
-    if (!sb) return;
     if (!confirm(`Delete "${name}" and all of its monthly snapshots?`)) return;
-    try {
-        const { error } = await sb.from(DEBTS_TABLE).delete().eq('id', id);
-        if (error) throw error;
-        debtRows = debtRows.filter(d => d.id !== id);
-        snapRows = snapRows.filter(s => s.debt_id !== id);
-        renderDebts();
-        status('Deleted debt.');
-    } catch (err) {
-        console.error('Could not delete debt:', err);
-        status('Could not delete debt.');
-    }
+    
+    const snapsToDelete = snapRows.filter(s => s.debt_id === id);
+    debtRows = debtRows.filter(d => d.id !== id);
+    snapRows = snapRows.filter(s => s.debt_id !== id);
+    renderDebts();
+    saveToLocalCache();
+
+    writeOrQueue(sb, {
+        table: DEBTS_TABLE,
+        type: 'delete',
+        id
+    });
+    snapsToDelete.forEach(snap => {
+        writeOrQueue(sb, {
+            table: SNAP_TABLE,
+            type: 'delete',
+            id: snap.id
+        });
+    });
+    status('Deleted debt.');
 }
 
 // ---------------------------------------------------- overrides + settings
 async function saveStrategy(strategy) {
     settings.strategy = strategy;
     renderDebts();
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(SETTINGS_TABLE).upsert([{ id: 1, strategy }], { onConflict: 'id' });
-        if (error) throw error;
-    } catch (err) {
-        console.error('Could not save strategy:', err);
-    }
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: SETTINGS_TABLE,
+        type: 'upsert',
+        id: 1,
+        payload: { id: 1, strategy, updated_at: nowStamp() },
+        options: { onConflict: 'id' }
+    });
 }
 
 async function saveCustomOrder(customOrder) {
     settings.customOrder = customOrder;
     settings.custom_order = customOrder;
     renderDebts();
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(SETTINGS_TABLE).upsert([{ id: 1, custom_order: customOrder }], { onConflict: 'id' });
-        if (error) {
-            console.warn('Could not save custom order to database:', error);
-        }
-    } catch (err) {
-        console.warn('Could not save custom order:', err);
-    }
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: SETTINGS_TABLE,
+        type: 'upsert',
+        id: 1,
+        payload: { id: 1, custom_order: customOrder, updated_at: nowStamp() },
+        options: { onConflict: 'id' }
+    });
 }
 
 // ------------------------------------------------------------------ model
@@ -545,6 +615,7 @@ export function renderDebts() {
     renderResults(model);
 
     restoreDetailsState(openState, pane);
+    saveToLocalCache();
 
     if (fk) {
         const target = pane.querySelector(`[data-fk="${CSS.escape(fk)}"]`);

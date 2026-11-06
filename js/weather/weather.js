@@ -1,8 +1,33 @@
 import { supabase as sb } from '../shared/supabase.js';
 import { TABLES } from '../shared/database-config.js';
 import { initAppPage } from '../shared/auth.js';
+import { withTimeout } from '../shared/sync.js';
 
 const WC_STORAGE_KEY = "wc-unit"; // "c" or "f"
+const WX_CACHE_KEY = "thecabin_weather_cache";
+const FETCH_TIMEOUT_MS = 6000;
+
+function saveWeatherCache(raw, location) {
+    try {
+        localStorage.setItem(WX_CACHE_KEY, JSON.stringify({
+            raw,
+            location,
+            timestamp: Date.now()
+        }));
+    } catch (e) {}
+}
+
+function loadWeatherCache() {
+    try {
+        const str = localStorage.getItem(WX_CACHE_KEY);
+        if (!str) return null;
+        const data = JSON.parse(str);
+        if (!data || !data.raw || !data.raw.current) return null;
+        return data;
+    } catch (e) {
+        return null;
+    }
+}
 
 // ---- WMO weather code -> { label, icon, accent } -----------------
 // Open-Meteo returns WMO codes: https://open-meteo.com/en/docs
@@ -135,9 +160,13 @@ async function fetchForecastData(lat, lon){
 
 let wcUnit = localStorage.getItem(WC_STORAGE_KEY) || "f";
 let wcLastRaw = null;
+let wcLastPlace = null;
+let wcLastTimestamp = null;
 
-function renderWeatherCard(raw, place){
+function renderWeatherCard(raw, place, timestamp){
     wcLastRaw = raw;
+    wcLastPlace = place;
+    wcLastTimestamp = timestamp || Date.now();
     const root = document.getElementById("weatherCard");
     const { current, daily } = raw;
     const info = codeInfo(current.weather_code, current.is_day);
@@ -156,6 +185,9 @@ function renderWeatherCard(raw, place){
             isDay: raw.hourly.is_day[idx],
         };
     });
+
+    const timeStr = new Date(wcLastTimestamp).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+    const updatedText = (!navigator.onLine || timestamp) ? `Cached · ${timeStr}` : `Updated ${timeStr}`;
 
     root.style.setProperty("--accent", info.accent);
     root.innerHTML = `
@@ -183,14 +215,14 @@ function renderWeatherCard(raw, place){
     </div>
 
     <div class="wc-strip">
-     <span class="wc-updated">Updated ${new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'})}</span>
+     <span class="wc-updated">${updatedText}</span>
     </div>
   `;
 
     document.getElementById("wcUnitToggle").addEventListener("click", () => {
         wcUnit = wcUnit === "f" ? "c" : "f";
         localStorage.setItem(WC_STORAGE_KEY, wcUnit);
-        renderWeatherCard(wcLastRaw, place);
+        renderWeatherCard(wcLastRaw, wcLastPlace, wcLastTimestamp);
         renderWeekForecast(wcLastRaw); // no-op if #weekForecast isn't on this page
     });
 }
@@ -249,14 +281,25 @@ function renderWeekForecast(raw){
 // ==== INIT (runs on both pages) ====
 
 async function initWeather(){
-    showWeatherCardState("Loading forecast…");
+    const cached = loadWeatherCache();
+    if(cached){
+        renderWeatherCard(cached.raw, cached.location?.label, cached.timestamp);
+        renderWeekForecast(cached.raw);
+    } else {
+        showWeatherCardState("Loading forecast…");
+    }
+
     try{
-        const location = await fetchLocation();
-        const raw = await fetchForecastData(location.lat, location.lon);
+        const location = await withTimeout(fetchLocation(), FETCH_TIMEOUT_MS, 'Weather location fetch');
+        const raw = await withTimeout(fetchForecastData(location.lat, location.lon), FETCH_TIMEOUT_MS, 'Weather forecast fetch');
+        saveWeatherCache(raw, location);
         renderWeatherCard(raw, location.label);
         renderWeekForecast(raw); // no-op on pages without #weekForecast
     } catch(err){
-        showWeatherCardState("Couldn't load weather.", true, true);
+        console.warn("Could not refresh weather:", err);
+        if(!cached){
+            showWeatherCardState("Couldn't load weather.", true, true);
+        }
     }
 }
 

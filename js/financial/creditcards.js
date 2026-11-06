@@ -7,6 +7,7 @@ import { fmt$, setStatus, captureDetailsState, restoreDetailsState } from '../sh
 import { initCardUsage, loadCardUsageData, renderCardUsage, CARD_USAGE_TABLE } from './card-usage.js';
 import { supabase as sb } from '../shared/supabase.js';
 import { TABLES } from '../shared/database-config.js';
+import { writeOrQueue, nowStamp, initSync, withTimeout } from '../shared/sync.js';
 import { initAppPage } from '../shared/auth.js';
 
 const CATEGORIES_TABLE = TABLES.CATEGORIES;
@@ -14,6 +15,8 @@ const CARDS_TABLE = TABLES.CREDIT_CARDS;
 const REWARDS_TABLE = TABLES.CARD_REWARDS;
 const TAX_TABLE = TABLES.INCOME_TAX;
 const BUDGET_SNAPSHOT_TABLE = TABLES.BUDGET_SNAPSHOTS;
+const CACHE_KEY = 'thecabin_financial_cache';
+const LOAD_TIMEOUT_MS = 6000;
 
 const COL_CAT_ID = 'id';
 const COL_CAT_CATEGORY = 'category';
@@ -137,11 +140,12 @@ const getBudgetTotals = () => computeBudgetTotals(categoryRows);
 // Generic category-row CRUD
 // -------------------------------------------------------------------
 async function addCategoryRow(fields, tag) {
-    if (!sb) return false;
     const frequency = fields.frequency || 'monthly';
     const amount = fields.amount || 0;
     const monthly_spend = computeMonthlySpend(amount, frequency);
+    const id = crypto.randomUUID();
     const payload = {
+        [COL_CAT_ID]: id,
         [COL_CAT_CATEGORY]: fields.category,
         [COL_CAT_FREQUENCY]: frequency,
         [COL_CAT_AMOUNT]: amount,
@@ -149,64 +153,59 @@ async function addCategoryRow(fields, tag) {
         [COL_CAT_MONTHLY_SPEND]: monthly_spend,
         [COL_CAT_ACCOUNT_TYPE]: tag.account_type,
         [COL_CAT_TYPE]: tag.type,
-        ...(tag.property ? { [COL_CAT_PROPERTY]: tag.property } : {})
+        ...(tag.property ? { [COL_CAT_PROPERTY]: tag.property } : {}),
+        created_at: nowStamp()
     };
-    try {
-        const { data: inserted, error } = await sb.from(CATEGORIES_TABLE).insert([payload]).select().single();
-        if (error) throw error;
-        if (inserted) {
-            categoryRows.push(normalizeCategoryRow(inserted));
-            render();
-        }
-        setStatus(tag.addedMessage || 'Added.');
-        return true;
-    } catch (err) {
-        console.error('Could not add row:', err);
-        setStatus('Could not add: ' + (err.message || err));
-        return false;
-    }
+    categoryRows.push(normalizeCategoryRow(payload));
+    render();
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: CATEGORIES_TABLE,
+        type: 'insert',
+        id,
+        payload
+    });
+    setStatus(tag.addedMessage || 'Added.');
+    return true;
 }
 
 async function updateCategoryRow(id, patch) {
-    if (!sb) return false;
-    try {
-        const row = categoryRows.find(r => r.id === id);
-        if (row) {
-            Object.assign(row, patch);
-            row.monthly_spend = computeMonthlySpend(row.amount, row.frequency);
-        }
-        render();
-        const payload = { ...patch };
-        if (row) {
-            payload[COL_CAT_FREQUENCY] = row.frequency;
-            payload[COL_CAT_AMOUNT] = row.amount;
-            payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
-            if (row.notes !== undefined) payload[COL_CAT_NOTES] = row.notes;
-        }
-        const { error } = await sb.from(CATEGORIES_TABLE).update(payload).eq(COL_CAT_ID, id);
-        if (error) throw error;
-        return true;
-    } catch (err) {
-        console.error('Could not update row:', err);
-        setStatus('Could not update.');
-        return false;
+    const row = categoryRows.find(r => r.id === id);
+    if (row) {
+        Object.assign(row, patch);
+        row.monthly_spend = computeMonthlySpend(row.amount, row.frequency);
     }
+    render();
+    saveToLocalCache();
+    const payload = { ...patch };
+    if (row) {
+        payload[COL_CAT_FREQUENCY] = row.frequency;
+        payload[COL_CAT_AMOUNT] = row.amount;
+        payload[COL_CAT_MONTHLY_SPEND] = row.monthly_spend;
+        if (row.notes !== undefined) payload[COL_CAT_NOTES] = row.notes;
+    }
+    writeOrQueue(sb, {
+        table: CATEGORIES_TABLE,
+        type: 'update',
+        id,
+        idColumn: COL_CAT_ID,
+        payload: { ...payload, updated_at: nowStamp() }
+    });
+    return true;
 }
 
 async function deleteCategoryRow(id, message) {
-    if (!sb) return false;
-    try {
-        const { error } = await sb.from(CATEGORIES_TABLE).delete().eq(COL_CAT_ID, id);
-        if (error) throw error;
-        categoryRows = categoryRows.filter(r => r.id !== id);
-        render();
-        setStatus(message || 'Deleted.');
-        return true;
-    } catch (err) {
-        console.error('Could not delete row:', err);
-        setStatus('Could not delete.');
-        return false;
-    }
+    categoryRows = categoryRows.filter(r => r.id !== id);
+    render();
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: CATEGORIES_TABLE,
+        type: 'delete',
+        id,
+        idColumn: COL_CAT_ID
+    });
+    setStatus(message || 'Deleted.');
+    return true;
 }
 
 async function setRentalRent(propertyName, rentAmount) {
@@ -329,18 +328,30 @@ async function materializeSnapshot(month) {
     const norm = normalizeYm(month);
     const rows = buildSnapshotPayload(norm, norm);
     if (!rows.length) return true;
-    const { data, error } = await sb
-        .from(BUDGET_SNAPSHOT_TABLE)
-        .upsert(rows, { onConflict: 'category_id,month' })
-        .select();
-    if (error) throw error;
+    const items = rows.map(r => ({
+        id: crypto.randomUUID(),
+        ...r,
+        created_at: nowStamp()
+    }));
     budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== norm);
-    budgetSnapshotRows.push(...(data || []));
+    budgetSnapshotRows.push(...items);
+    renderProjection();
+    saveToLocalCache();
+
+    items.forEach(item => {
+        writeOrQueue(sb, {
+            table: BUDGET_SNAPSHOT_TABLE,
+            type: 'upsert',
+            id: `${item.category_id}_${norm}`,
+            payload: item,
+            options: { onConflict: 'category_id,month' }
+        });
+    });
     return true;
 }
 
 async function createBudgetSnapshot(month) {
-    if (!sb || !month) return;
+    if (!month) return;
     const normMonth = normalizeYm(month);
     if (!isYm(normMonth)) {
         setStatus('Pick a valid month (YYYY-MM).');
@@ -348,24 +359,27 @@ async function createBudgetSnapshot(month) {
     }
 
     const rows = buildSnapshotPayload(resolveProjectionMonth(), normMonth);
+    const items = rows.map(r => ({
+        id: crypto.randomUUID(),
+        ...r,
+        created_at: nowStamp()
+    }));
+    budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== normMonth);
+    budgetSnapshotRows.push(...items);
+    selectedProjectionMonth = normMonth;
+    renderProjection();
+    saveToLocalCache();
 
-    try {
-        const { data, error } = await sb
-            .from(BUDGET_SNAPSHOT_TABLE)
-            .upsert(rows, { onConflict: 'category_id,month' })
-            .select();
-
-        if (error) throw error;
-
-        budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== normMonth);
-        budgetSnapshotRows.push(...(data || []));
-        selectedProjectionMonth = normMonth;
-        renderProjection();
-        setStatus(`Created projection for ${fmtYm(normMonth)}.`);
-    } catch (err) {
-        console.error('Could not create budget snapshot:', err);
-        setStatus('Could not create snapshot.');
-    }
+    items.forEach(item => {
+        writeOrQueue(sb, {
+            table: BUDGET_SNAPSHOT_TABLE,
+            type: 'upsert',
+            id: `${item.category_id}_${normMonth}`,
+            payload: item,
+            options: { onConflict: 'category_id,month' }
+        });
+    });
+    setStatus(`Created projection for ${fmtYm(normMonth)}.`);
 }
 
 async function updateBudgetSnapshotRow(categoryId, rawPatch) {
@@ -374,89 +388,86 @@ async function updateBudgetSnapshotRow(categoryId, rawPatch) {
     const patch = { amount: rawPatch.amount };
 
     const month = resolveProjectionMonth();
-    if (!month || !sb) return false;
+    if (!month) return false;
 
-    try {
-        if (!monthHasSnapshots(month)) await materializeSnapshot(month);
+    if (!monthHasSnapshots(month)) await materializeSnapshot(month);
 
-        let row = budgetSnapshotRows.find(x => String(x.category_id) === String(categoryId) && normalizeYm(x.month) === month);
+    let row = budgetSnapshotRows.find(x => String(x.category_id) === String(categoryId) && normalizeYm(x.month) === month);
 
-        if (!row) {
-            const sourceRow = categoryRows.find(r => String(r.id) === String(categoryId));
-            const payload = {
-                category_id: categoryId,
-                month: month,
-                amount: patch.amount ?? sourceRow?.amount ?? 0
-            };
-
-            const { data, error } = await sb.from(BUDGET_SNAPSHOT_TABLE).insert([payload]).select().single();
-            if (error) throw error;
-            budgetSnapshotRows.push(data);
-            row = data;
-        }
-
-        Object.assign(row, patch);
-
-        const { error } = await sb.from(BUDGET_SNAPSHOT_TABLE).update(patch).eq('id', row.id);
-        if (error) throw error;
-
-        renderProjection();
-        return true;
-    } catch (err) {
-        console.error('Could not update budget snapshot:', err);
-        setStatus('Could not save projection.');
-        return false;
+    if (!row) {
+        const sourceRow = categoryRows.find(r => String(r.id) === String(categoryId));
+        const id = crypto.randomUUID();
+        row = {
+            id,
+            category_id: categoryId,
+            month: month,
+            amount: patch.amount ?? sourceRow?.amount ?? 0,
+            created_at: nowStamp()
+        };
+        budgetSnapshotRows.push(row);
     }
+
+    Object.assign(row, patch);
+    renderProjection();
+    saveToLocalCache();
+
+    writeOrQueue(sb, {
+        table: BUDGET_SNAPSHOT_TABLE,
+        type: 'upsert',
+        id: `${row.category_id}_${month}`,
+        payload: { ...row, updated_at: nowStamp() },
+        options: { onConflict: 'category_id,month' }
+    });
+    return true;
 }
 
 // Removes one row (a category, or a property's rental net) from the selected
 // month's projection. The live Budget row is not touched.
 async function deleteBudgetSnapshotRow(categoryId) {
     const month = resolveProjectionMonth();
-    if (!month || !sb) return false;
+    if (!month) return false;
 
-    try {
-        if (!monthHasSnapshots(month)) await materializeSnapshot(month);
+    if (!monthHasSnapshots(month)) await materializeSnapshot(month);
 
-        const row = budgetSnapshotRows.find(x =>
-            String(x.category_id) === String(categoryId) && normalizeYm(x.month) === month
-        );
-        if (!row) return false;
+    const row = budgetSnapshotRows.find(x =>
+        String(x.category_id) === String(categoryId) && normalizeYm(x.month) === month
+    );
+    if (!row) return false;
 
-        const { error } = await sb.from(BUDGET_SNAPSHOT_TABLE).delete().eq('id', row.id);
-        if (error) throw error;
+    budgetSnapshotRows = budgetSnapshotRows.filter(x => x !== row);
+    renderProjection();
+    saveToLocalCache();
 
-        budgetSnapshotRows = budgetSnapshotRows.filter(x => x !== row);
-        renderProjection();
-        setStatus('Removed row from projection.');
-        return true;
-    } catch (err) {
-        console.error('Could not delete projection row:', err);
-        setStatus('Could not remove row.');
-        return false;
-    }
+    writeOrQueue(sb, {
+        table: BUDGET_SNAPSHOT_TABLE,
+        type: 'delete',
+        id: row.id
+    });
+    setStatus('Removed row from projection.');
+    return true;
 }
 
 async function deleteBudgetSnapshot(month) {
-    if (!month || !sb) return;
+    if (!month) return;
     if (!confirm(`Delete the budget projection for ${fmtYm(month)}?`)) return;
 
-    try {
-        const normMonth = normalizeYm(month);
-        const slashMonth = normMonth.replace('-', '/');
+    const normMonth = normalizeYm(month);
+    const slashMonth = normMonth.replace('-', '/');
+    const rowsToDelete = budgetSnapshotRows.filter(r => normalizeYm(r.month) === normMonth || r.month === slashMonth);
 
-        const { error: err1 } = await sb.from(BUDGET_SNAPSHOT_TABLE).delete().eq('month', normMonth);
-        if (err1) throw err1;
-        await sb.from(BUDGET_SNAPSHOT_TABLE).delete().eq('month', slashMonth);
+    budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== normMonth && r.month !== slashMonth);
+    selectedProjectionMonth = null;
+    renderProjection();
+    saveToLocalCache();
 
-        budgetSnapshotRows = budgetSnapshotRows.filter(r => normalizeYm(r.month) !== normMonth && r.month !== slashMonth);
-        selectedProjectionMonth = null;
-        renderProjection();
-        setStatus('Deleted projection snapshot.');
-    } catch (err) {
-        console.error('Could not delete budget snapshot:', err);
-        setStatus('Could not delete snapshot.');
-    }
+    rowsToDelete.forEach(r => {
+        writeOrQueue(sb, {
+            table: BUDGET_SNAPSHOT_TABLE,
+            type: 'delete',
+            id: r.id
+        });
+    });
+    setStatus('Deleted projection snapshot.');
 }
 
 
@@ -1128,6 +1139,36 @@ function renderProjection() {
 // -------------------------------------------------------------------
 // Master Render
 // -------------------------------------------------------------------
+function saveToLocalCache() {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+            categoryRows,
+            cardsRows,
+            rewardRows,
+            taxRows,
+            budgetSnapshotRows,
+            timestamp: Date.now()
+        }));
+    } catch (e) {}
+}
+
+function loadFromLocalCache() {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.categoryRows)) return false;
+        categoryRows = (data.categoryRows || []).map(normalizeCategoryRow);
+        cardsRows = data.cardsRows || [];
+        rewardRows = data.rewardRows || [];
+        taxRows = data.taxRows || [];
+        budgetSnapshotRows = data.budgetSnapshotRows || [];
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function render() {
     const open = captureDetailsState(document);
     renderBudgetTab();
@@ -1142,6 +1183,7 @@ function render() {
     renderTracker();
     renderCardUsage();
     restoreDetailsState(open, document);
+    saveToLocalCache();
 }
 
 // -------------------------------------------------------------------
@@ -1174,44 +1216,45 @@ async function loadCards() {
 }
 
 async function addCardRow(data) {
-    if (!sb) return;
-    try {
-        const { data: inserted, error } = await sb.from(CARDS_TABLE).insert([data]).select().single();
-        if (error) throw error;
-        if (inserted) { cardsRows.push(inserted); render(); }
-        setStatus('Added card.');
-    } catch (err) {
-        console.error('Could not add card:', err);
-        setStatus('Could not add card: ' + (err.message || err));
-    }
+    const id = crypto.randomUUID();
+    const row = { id, ...data, created_at: nowStamp() };
+    cardsRows.push(row);
+    render();
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: CARDS_TABLE,
+        type: 'insert',
+        id,
+        payload: row
+    });
+    setStatus('Added card.');
 }
 
 async function updateCardRow(id, patch) {
-    if (!sb) return;
-    try {
-        const row = cardsRows.find(r => r.id === id);
-        if (row) Object.assign(row, patch);
-        render();
-        const { error } = await sb.from(CARDS_TABLE).update(patch).eq(COL_CARD_ID, id);
-        if (error) throw error;
-    } catch (err) {
-        console.error('Could not update card:', err);
-        setStatus('Could not update card.');
-    }
+    const row = cardsRows.find(r => r.id === id);
+    if (row) Object.assign(row, patch);
+    render();
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: CARDS_TABLE,
+        type: 'update',
+        id,
+        idColumn: COL_CARD_ID,
+        payload: { ...patch, updated_at: nowStamp() }
+    });
 }
 
 async function deleteCardRow(id) {
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(CARDS_TABLE).delete().eq(COL_CARD_ID, id);
-        if (error) throw error;
-        cardsRows = cardsRows.filter(r => r.id !== id);
-        render();
-        setStatus('Deleted card.');
-    } catch (err) {
-        console.error('Could not delete card:', err);
-        setStatus('Could not delete card.');
-    }
+    cardsRows = cardsRows.filter(r => r.id !== id);
+    render();
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: CARDS_TABLE,
+        type: 'delete',
+        id,
+        idColumn: COL_CARD_ID
+    });
+    setStatus('Deleted card.');
 }
 
 async function loadRewards() {
@@ -1228,44 +1271,45 @@ async function loadRewards() {
 }
 
 async function addRewardRow(data) {
-    if (!sb) return;
-    try {
-        const { data: inserted, error } = await sb.from(REWARDS_TABLE).insert([data]).select().single();
-        if (error) throw error;
-        if (inserted) { rewardRows.push(inserted); render(); }
-        setStatus('Added reward rate.');
-    } catch (err) {
-        console.error('Could not add row:', err);
-        setStatus('Could not add row: ' + (err.message || err));
-    }
+    const id = crypto.randomUUID();
+    const row = { id, ...data, created_at: nowStamp() };
+    rewardRows.push(row);
+    render();
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: REWARDS_TABLE,
+        type: 'insert',
+        id,
+        payload: row
+    });
+    setStatus('Added reward rate.');
 }
 
 async function updateRewardRow(id, patch) {
-    if (!sb) return;
-    try {
-        const row = rewardRows.find(r => r.id === id);
-        if (row) Object.assign(row, patch);
-        render();
-        const { error } = await sb.from(REWARDS_TABLE).update(patch).eq(COL_REWARD_ID, id);
-        if (error) throw error;
-    } catch (err) {
-        console.error('Could not update row:', err);
-        setStatus('Could not update row.');
-    }
+    const row = rewardRows.find(r => r.id === id);
+    if (row) Object.assign(row, patch);
+    render();
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: REWARDS_TABLE,
+        type: 'update',
+        id,
+        idColumn: COL_REWARD_ID,
+        payload: { ...patch, updated_at: nowStamp() }
+    });
 }
 
 async function deleteRewardRow(id) {
-    if (!sb) return;
-    try {
-        const { error } = await sb.from(REWARDS_TABLE).delete().eq(COL_REWARD_ID, id);
-        if (error) throw error;
-        rewardRows = rewardRows.filter(r => r.id !== id);
-        render();
-        setStatus('Deleted row.');
-    } catch (err) {
-        console.error('Could not delete row:', err);
-        setStatus('Could not delete row.');
-    }
+    rewardRows = rewardRows.filter(r => r.id !== id);
+    render();
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: REWARDS_TABLE,
+        type: 'delete',
+        id,
+        idColumn: COL_REWARD_ID
+    });
+    setStatus('Deleted row.');
 }
 
 async function loadIncomeTax() {
@@ -1300,26 +1344,24 @@ async function updateTaxRow(streamName, patch) {
     }
     Object.assign(row, patch);
     render();
+    saveToLocalCache();
 
-    if (!sb) return;
-    try {
-        const payload = {
-            [COL_TAX_STREAM]: streamName,
-            [COL_TAX_RATE]: parseFloat(row[COL_TAX_RATE] ?? row.tax_rate) || 0,
-            [COL_TAX_DEPRECIATION]: parseFloat(row[COL_TAX_DEPRECIATION] ?? row.depreciation) || 0,
-            [COL_TAX_MORTGAGE_INTEREST]: parseFloat(row[COL_TAX_MORTGAGE_INTEREST] ?? row.mortgage_interest) || 0
-        };
-        if (row[COL_TAX_ID] || row.id) {
-            const { error } = await sb.from(TAX_TABLE).update(payload).eq(COL_TAX_ID, row[COL_TAX_ID] || row.id);
-            if (error) throw error;
-        } else {
-            const { data: upserted, error } = await sb.from(TAX_TABLE).upsert([payload], { onConflict: COL_TAX_STREAM }).select().single();
-            if (error) throw error;
-            if (upserted) Object.assign(row, upserted);
-        }
-    } catch (err) {
-        console.error('Could not save tax settings:', err);
-    }
+    const payload = {
+        [COL_TAX_STREAM]: streamName,
+        [COL_TAX_RATE]: parseFloat(row[COL_TAX_RATE] ?? row.tax_rate) || 0,
+        [COL_TAX_DEPRECIATION]: parseFloat(row[COL_TAX_DEPRECIATION] ?? row.depreciation) || 0,
+        [COL_TAX_MORTGAGE_INTEREST]: parseFloat(row[COL_TAX_MORTGAGE_INTEREST] ?? row.mortgage_interest) || 0,
+        updated_at: nowStamp()
+    };
+
+    writeOrQueue(sb, {
+        table: TAX_TABLE,
+        type: 'upsert',
+        id: streamName,
+        idColumn: COL_TAX_STREAM,
+        payload,
+        options: { onConflict: COL_TAX_STREAM }
+    });
 }
 
 // -------------------------------------------------------------------
@@ -1362,16 +1404,25 @@ window.addEventListener('beforeunload', () => {
 });
 
 async function loadAll() {
-    await Promise.all([
-        loadSpendingCategories(),
-        loadCards(),
-        loadRewards(),
-        loadIncomeTax(),
-        loadDebtData(),
-        loadBudgetSnapshots(),
-        loadTrackerData()
-    ]);
-    render();
+    const hadCached = loadFromLocalCache();
+    if (hadCached) {
+        render();
+    }
+    try {
+        await withTimeout(Promise.all([
+            loadSpendingCategories(),
+            loadCards(),
+            loadRewards(),
+            loadIncomeTax(),
+            loadDebtData(),
+            loadBudgetSnapshots(),
+            loadTrackerData(),
+            loadCardUsageData()
+        ]), LOAD_TIMEOUT_MS, 'Loading financial data');
+        render();
+    } catch (err) {
+        console.error('Failed to load financial data:', err);
+    }
     setupRealtime();
 }
 
@@ -1552,6 +1603,13 @@ if (tabsContainer) {
 
 window.addEventListener('hashchange', () => switchTab(tabFromHash()));
 
+window.addEventListener('sync:flushed', () => {
+    debounceReload();
+});
+
 // Initial tab & start
 switchTab(tabFromHash());
-initAppPage(loadAll);
+initAppPage(() => {
+    if (sb) initSync(sb);
+    loadAll();
+});

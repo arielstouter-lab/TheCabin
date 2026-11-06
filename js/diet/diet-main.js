@@ -5,8 +5,13 @@ import { exportTimelineCsv } from './diet-export.js';
 import { initEliminations, loadEliminations } from './diet-eliminations.js';
 import { initConversion, renderConversion } from './diet-convert.js';
 import { supabase as sb } from '../shared/supabase.js';
+import { TABLES } from '../shared/database-config.js';
+import { writeOrQueue, nowStamp, initSync, withTimeout } from '../shared/sync.js';
 import { groceryKey, groceryKeysMatch, setStatus } from '../app.js';
 import { initAppPage } from '../shared/auth.js';
+
+const CACHE_KEY = 'thecabin_diet_cache';
+const LOAD_TIMEOUT_MS = 6000;
 
 // ---------- allergen / trigger tagging ----------
 // kind: 'allergen' (top allergens) or 'trigger' (common GI triggers)
@@ -57,12 +62,19 @@ function tagsFor(name) {
 }
 async function rememberTags(name, tags) {
     const key = gk(name); if (!key) return;
-    const row = { item_key: key, tags, updated_at: new Date().toISOString() };
+    const row = { item_key: key, tags, updated_at: nowStamp() };
     const i = state.memory.findIndex(m => m.item_key === key);
     i >= 0 ? (state.memory[i] = row) : state.memory.push(row);
     rebuildMemoryLookup();
-    const { error } = await sb.from('diet_item_memory').upsert(row, { onConflict: 'item_key' });
-    if (error) console.error(error);
+    saveToLocalCache();
+    writeOrQueue(sb, {
+        table: TABLES.DIET_ITEM_MEMORY,
+        type: 'upsert',
+        id: key,
+        idColumn: 'item_key',
+        payload: row,
+        options: { onConflict: 'item_key' }
+    });
 }
 // Suspected triggers get the site's priority chip style; everything else is a plain chip.
 const PRIORITY_TAGS = new Set(['gluten', 'dairy', 'lactose', 'high-FODMAP', 'sweetener', 'fatty/fried']);
@@ -75,17 +87,56 @@ const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.g
 const fmt = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 const state = { memory: [], memoryLookup: new Map(), ingredients: [], meals: [], symptoms: [], recipes: [], supplements: [], picked: new Set() };
 
+function saveToLocalCache() {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+            memory: state.memory,
+            ingredients: state.ingredients,
+            meals: state.meals,
+            symptoms: state.symptoms,
+            recipes: state.recipes,
+            supplements: state.supplements,
+            timestamp: Date.now()
+        }));
+    } catch (e) {}
+}
+
+function loadFromLocalCache() {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.ingredients)) return false;
+        state.memory = data.memory || [];
+        rebuildMemoryLookup();
+        state.ingredients = data.ingredients || [];
+        state.meals = data.meals || [];
+        state.symptoms = data.symptoms || [];
+        state.recipes = data.recipes || [];
+        state.supplements = data.supplements || [];
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 // ---------- load ----------
 async function loadAll() {
+    const hadCached = loadFromLocalCache();
+    if (hadCached) {
+        renderAll();
+    }
+
     try {
-        const [ing, meals, sym, rec, mem, sup] = await Promise.all([
-            sb.from('diet_ingredients').select('*').order('name'),
-            sb.from('diet_meals').select('*, diet_meal_ingredients(ingredient_id)').order('eaten_at', { ascending: false }).limit(200),
-            sb.from('diet_symptoms').select('*').order('occurred_at', { ascending: false }).limit(200),
-            sb.from('list_recipes').select('*').order('name'),   // read-only; GI tables never write here
-            sb.from('diet_item_memory').select('*'),
-            sb.from('diet_supplements').select('*').order('taken_at', { ascending: false }).limit(200),
-        ]);
+        const [ing, meals, sym, rec, mem, sup] = await withTimeout(Promise.all([
+            sb.from(TABLES.DIET_INGREDIENTS).select('*').order('name'),
+            sb.from(TABLES.DIET_MEALS).select('*, diet_meal_ingredients(ingredient_id)').order('eaten_at', { ascending: false }).limit(200),
+            sb.from(TABLES.DIET_SYMPTOMS).select('*').order('occurred_at', { ascending: false }).limit(200),
+            sb.from(TABLES.RECIPES).select('*').order('name'),   // read-only; GI tables never write here
+            sb.from(TABLES.DIET_ITEM_MEMORY).select('*'),
+            sb.from(TABLES.DIET_SUPPLEMENTS).select('*').order('taken_at', { ascending: false }).limit(200),
+        ]), LOAD_TIMEOUT_MS, 'Loading diet data');
+
         state.memory = mem.data || [];
         rebuildMemoryLookup();
         state.ingredients = ing.data || [];
@@ -94,9 +145,13 @@ async function loadAll() {
         state.recipes = rec.data || [];
         state.supplements = sup.data || [];
         renderAll();
+        saveToLocalCache();
         await loadEliminations();
     } catch (err) {
         console.error('Failed to load diet data:', err);
+        if (!hadCached) {
+            await loadEliminations();
+        }
     }
 }
 
@@ -107,11 +162,18 @@ async function addIngredient(name, extra = {}) {
         if (!name) return null;
         const existing = state.ingredients.find(i => i.name.toLowerCase() === name.toLowerCase());
         if (existing) return existing;
-        const { data, error } = await sb.from('diet_ingredients')
-            .insert({ name, tags: tagsFor(name), ...extra }).select().single();
-        if (error) { console.error(error); return null; }
+        const id = crypto.randomUUID();
+        const data = { id, name, tags: tagsFor(name), ...extra, created_at: nowStamp() };
         state.ingredients.push(data);
         state.ingredients.sort((a, b) => a.name.localeCompare(b.name));
+        renderAll();
+        saveToLocalCache();
+        writeOrQueue(sb, {
+            table: TABLES.DIET_INGREDIENTS,
+            type: 'insert',
+            id,
+            payload: data
+        });
         return data;
     } catch (err) {
         console.error('Failed to add ingredient:', err);
@@ -121,14 +183,19 @@ async function addIngredient(name, extra = {}) {
 
 async function updateIngredient(id, patch) {
     try {
-        const { error } = await sb.from('diet_ingredients').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
-        if (error) return console.error(error);
         const ing = state.ingredients.find(i => i.id === id);
         if (ing) {
             Object.assign(ing, patch);
             if (patch.tags) await rememberTags(ing.name, patch.tags);   // tag edits are remembered by exact name
             renderAll();
+            saveToLocalCache();
         }
+        writeOrQueue(sb, {
+            table: TABLES.DIET_INGREDIENTS,
+            type: 'update',
+            id,
+            payload: { ...patch, updated_at: nowStamp() }
+        });
     } catch (err) {
         console.error('Failed to update ingredient:', err);
     }
@@ -379,13 +446,19 @@ bindEvents(document, {
         const ing = state.ingredients.find(i => i.id === row.dataset.id);
         if (!ing) return;
         if (!confirm(`Delete ${ing.name}? It will be removed from logged meals too.`)) return;
-        try {
-            await sb.from('diet_ingredients').delete().eq('id', ing.id);
-            state.ingredients = state.ingredients.filter(i => i.id !== ing.id);
-            await loadAll();
-        } catch (err) {
-            console.error('Failed to delete ingredient:', err);
-        }
+        state.ingredients = state.ingredients.filter(i => i.id !== ing.id);
+        state.meals.forEach(m => {
+            if (m.diet_meal_ingredients) {
+                m.diet_meal_ingredients = m.diet_meal_ingredients.filter(x => x.ingredient_id !== ing.id);
+            }
+        });
+        renderAll();
+        saveToLocalCache();
+        writeOrQueue(sb, {
+            table: TABLES.DIET_INGREDIENTS,
+            type: 'delete',
+            id: ing.id
+        });
     },
     'click #ingList [data-star]': async (e, star) => {
         const row = star.closest('.diet-row'); if (!row) return;
@@ -439,18 +512,21 @@ bindEvents(document, {
     'click [data-del-meal], [data-del-sym], [data-del-supp]': async (e, del) => {
         const kind = del.dataset.delMeal ? 'meal' : del.dataset.delSym ? 'sym' : 'supp';
         const id = del.dataset.delMeal || del.dataset.delSym || del.dataset.delSupp;
-        const table = { meal: 'diet_meals', sym: 'diet_symptoms', supp: 'diet_supplements' }[kind];
+        const table = { meal: TABLES.DIET_MEALS, sym: TABLES.DIET_SYMPTOMS, supp: TABLES.DIET_SUPPLEMENTS }[kind];
         if (!confirm({ meal: 'Delete this meal?', sym: 'Delete this entry?', supp: 'Delete this supplement entry?' }[kind])) return;
-        try {
-            const { error } = await sb.from(table).delete().eq('id', id);
-            if (error) return console.error(error);
-            if (kind === 'meal' && editMealId === id) resetMealForm();
-            if (kind === 'sym' && editSymId === id) resetSymForm();
-            if (kind === 'supp' && editSuppId === id) resetSuppForm();
-            await loadAll();
-        } catch (err) {
-            console.error('Failed to delete item:', err);
-        }
+        if (kind === 'meal') state.meals = state.meals.filter(m => m.id !== id);
+        if (kind === 'sym') state.symptoms = state.symptoms.filter(s => s.id !== id);
+        if (kind === 'supp') state.supplements = state.supplements.filter(s => s.id !== id);
+        if (kind === 'meal' && editMealId === id) resetMealForm();
+        if (kind === 'sym' && editSymId === id) resetSymForm();
+        if (kind === 'supp' && editSuppId === id) resetSuppForm();
+        renderAll();
+        saveToLocalCache();
+        writeOrQueue(sb, {
+            table,
+            type: 'delete',
+            id
+        });
     },
     'click .diet-row[data-meal-id], .diet-row[data-sym-id], .diet-row[data-supp-id]': (e, row) => {
         if (e.target.closest('button, a, input, select, label, textarea')) return;
@@ -470,12 +546,29 @@ bindEvents(document, {
             const fields = { taken_at: new Date($('suppWhen').value).toISOString(), name: $('suppName').value.trim(),
                 dose: $('suppDose').value.trim() || null, notes: $('suppNotes').value || null };
             if (!fields.name) return;
-            const { error } = editSuppId
-                ? await sb.from('diet_supplements').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editSuppId)
-                : await sb.from('diet_supplements').insert(fields);
-            if (error) return console.error(error);
+            if (editSuppId) {
+                const row = state.supplements.find(s => s.id === editSuppId);
+                if (row) Object.assign(row, fields);
+                writeOrQueue(sb, {
+                    table: TABLES.DIET_SUPPLEMENTS,
+                    type: 'update',
+                    id: editSuppId,
+                    payload: { ...fields, updated_at: nowStamp() }
+                });
+            } else {
+                const id = crypto.randomUUID();
+                const row = { id, ...fields, created_at: nowStamp() };
+                state.supplements.unshift(row);
+                writeOrQueue(sb, {
+                    table: TABLES.DIET_SUPPLEMENTS,
+                    type: 'insert',
+                    id,
+                    payload: row
+                });
+            }
             resetSuppForm();
-            await loadAll();
+            renderAll();
+            saveToLocalCache();
         } catch (err) {
             console.error('Failed to save supplement:', err);
         }
@@ -495,10 +588,23 @@ bindEvents(document, {
     // ---- Needs attention card ----
     'click #attentionList [data-skip-meal]': async (e, btn) => {
         try {
-            const { error } = await sb.from('diet_meals').insert({
-                eaten_at: new Date(+btn.dataset.skipMeal).toISOString(), label: btn.dataset.slot, skipped: true });
-            if (error) return console.error(error);
-            await loadAll();
+            const id = crypto.randomUUID();
+            const row = {
+                id,
+                eaten_at: new Date(+btn.dataset.skipMeal).toISOString(),
+                label: btn.dataset.slot,
+                skipped: true,
+                created_at: nowStamp()
+            };
+            state.meals.unshift(row);
+            renderAll();
+            saveToLocalCache();
+            writeOrQueue(sb, {
+                table: TABLES.DIET_MEALS,
+                type: 'insert',
+                id,
+                payload: row
+            });
         } catch (err) {
             console.error('Failed to mark meal not eaten:', err);
         }
@@ -512,10 +618,24 @@ bindEvents(document, {
     },
     'click #attentionList [data-fine]': async (e, btn) => {
         try {
-            const { error } = await sb.from('diet_symptoms').insert({
-                occurred_at: new Date(+btn.dataset.fine).toISOString(), symptom: 'Felt fine', positive: true, severity: null });
-            if (error) return console.error(error);
-            await loadAll();
+            const id = crypto.randomUUID();
+            const row = {
+                id,
+                occurred_at: new Date(+btn.dataset.fine).toISOString(),
+                symptom: 'Felt fine',
+                positive: true,
+                severity: null,
+                created_at: nowStamp()
+            };
+            state.symptoms.unshift(row);
+            renderAll();
+            saveToLocalCache();
+            writeOrQueue(sb, {
+                table: TABLES.DIET_SYMPTOMS,
+                type: 'insert',
+                id,
+                payload: row
+            });
         } catch (err) {
             console.error('Failed to log positive entry:', err);
         }
@@ -539,23 +659,59 @@ bindEvents(document, {
                 notes: $('mealNotes').value || null, skipped,
                 meal_size: skipped ? null : ($('mealSize').value || null) };
             if (editMealId) {
-                const { error } = await sb.from('diet_meals').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editMealId);
-                if (error) return console.error(error);
                 const m = state.meals.find(m => m.id === editMealId);
-                const current = new Set(m ? m.diet_meal_ingredients.map(x => x.ingredient_id) : []);
-                const removed = [...current].filter(i => !picked.has(i));
-                const added = [...picked].filter(i => !current.has(i));
-                if (removed.length) await sb.from('diet_meal_ingredients').delete().eq('meal_id', editMealId).in('ingredient_id', removed);
-                if (added.length) await sb.from('diet_meal_ingredients').insert(added.map(ingredient_id => ({ meal_id: editMealId, ingredient_id })));
+                if (m) {
+                    Object.assign(m, fields);
+                    const current = new Set(m.diet_meal_ingredients ? m.diet_meal_ingredients.map(x => x.ingredient_id) : []);
+                    const removed = [...current].filter(i => !picked.has(i));
+                    const added = [...picked].filter(i => !current.has(i));
+                    m.diet_meal_ingredients = [...picked].map(ingredient_id => ({ meal_id: editMealId, ingredient_id }));
+                    removed.forEach(ingId => {
+                        writeOrQueue(sb, {
+                            table: TABLES.DIET_MEAL_INGREDIENTS,
+                            type: 'delete',
+                            id: `${editMealId}_${ingId}`
+                        });
+                    });
+                    added.forEach(ingId => {
+                        writeOrQueue(sb, {
+                            table: TABLES.DIET_MEAL_INGREDIENTS,
+                            type: 'insert',
+                            id: `${editMealId}_${ingId}`,
+                            payload: { meal_id: editMealId, ingredient_id: ingId }
+                        });
+                    });
+                }
+                writeOrQueue(sb, {
+                    table: TABLES.DIET_MEALS,
+                    type: 'update',
+                    id: editMealId,
+                    payload: { ...fields, updated_at: nowStamp() }
+                });
             } else {
-                const { data: meal, error } = await sb.from('diet_meals').insert(fields).select().single();
-                if (error) return console.error(error);
-                if (picked.size)
-                    await sb.from('diet_meal_ingredients').insert([...picked].map(ingredient_id => ({ meal_id: meal.id, ingredient_id })));
+                const id = crypto.randomUUID();
+                const mealIngs = [...picked].map(ingredient_id => ({ meal_id: id, ingredient_id }));
+                const row = { id, ...fields, created_at: nowStamp(), diet_meal_ingredients: mealIngs };
+                state.meals.unshift(row);
+                writeOrQueue(sb, {
+                    table: TABLES.DIET_MEALS,
+                    type: 'insert',
+                    id,
+                    payload: { id, ...fields, created_at: nowStamp() }
+                });
+                mealIngs.forEach(item => {
+                    writeOrQueue(sb, {
+                        table: TABLES.DIET_MEAL_INGREDIENTS,
+                        type: 'insert',
+                        id: `${id}_${item.ingredient_id}`,
+                        payload: item
+                    });
+                });
             }
             resetMealForm();
             mealFilterId = null;
-            await loadAll();
+            renderAll();
+            saveToLocalCache();
         } catch (err) {
             console.error('Failed to save meal:', err);
         }
@@ -567,12 +723,29 @@ bindEvents(document, {
             const fields = { occurred_at: new Date($('symWhen').value).toISOString(), symptom: $('symName').value.trim(),
                 positive: bristol ? !NEGATIVE_BRISTOL.includes(bristol) : $('symType').value === 'positive', pain: $('symPain').hidden ? null : (+$('symPain').value || null),
                 urgency: $('symUrgency').hidden ? null : (+$('symUrgency').value || null), bristol, notes: $('symNotes').value || null };
-            const { error } = editSymId
-                ? await sb.from('diet_symptoms').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', editSymId)
-                : await sb.from('diet_symptoms').insert(fields);
-            if (error) return console.error(error);
+            if (editSymId) {
+                const s = state.symptoms.find(s => s.id === editSymId);
+                if (s) Object.assign(s, fields);
+                writeOrQueue(sb, {
+                    table: TABLES.DIET_SYMPTOMS,
+                    type: 'update',
+                    id: editSymId,
+                    payload: { ...fields, updated_at: nowStamp() }
+                });
+            } else {
+                const id = crypto.randomUUID();
+                const row = { id, ...fields, created_at: nowStamp() };
+                state.symptoms.unshift(row);
+                writeOrQueue(sb, {
+                    table: TABLES.DIET_SYMPTOMS,
+                    type: 'insert',
+                    id,
+                    payload: row
+                });
+            }
             resetSymForm();
-            await loadAll();
+            renderAll();
+            saveToLocalCache();
         } catch (err) {
             console.error('Failed to save symptom:', err);
         }
@@ -621,8 +794,16 @@ function renderAll() {
     renderTimeline();
     renderAttention(state);
     renderPredictions(state, chipClass);
+    saveToLocalCache();
 }
 
 $('mealWhen').value = nowLocal(); $('symWhen').value = nowLocal(); $('suppWhen').value = nowLocal(); setSymType();
 
-initAppPage(loadAll);
+window.addEventListener('sync:flushed', () => {
+    loadAll();
+});
+
+initAppPage(() => {
+    if (sb) initSync(sb);
+    loadAll();
+});

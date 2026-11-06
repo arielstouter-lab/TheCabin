@@ -7,6 +7,8 @@
 
 import { bindEvents, cloneEl, refs } from '../shared/dom.js';
 import { setStatus } from '../app.js';
+import { writeOrQueue, nowStamp } from '../shared/sync.js';
+import { TABLES } from '../shared/database-config.js';
 
 // Keep in sync with BRISTOL_RE in diet-main.js: this is what counts as a bowel movement entry.
 const BM_RE = /diarrh|loose|stool|bowel|constip|\bbm\b|poop|toilet/i;
@@ -52,19 +54,19 @@ export function initConversion(sb, reload) {
             const entry = row && current.get(row.dataset.id);
             if (!entry) return;
             const action = btn.dataset.convert;
-            const patch = { severity: null, updated_at: new Date().toISOString() };
+            const patch = { severity: null, updated_at: nowStamp() };
             if (action === 'urgency') patch.urgency = entry.severity;
             if (action === 'pain') patch.pain = entry.severity;
             btn.disabled = true;
-            try {
-                const { error } = await sb.from('diet_symptoms').update(patch).eq('id', entry.id);
-                if (error) throw error;
-                await reload();
-            } catch (err) {
-                console.error('Could not convert entry:', err);
-                say('Could not convert: ' + (err.message || err));
-                btn.disabled = false;
-            }
+            Object.assign(entry, patch);
+            writeOrQueue(sb, {
+                table: TABLES.DIET_SYMPTOMS,
+                type: 'update',
+                id: entry.id,
+                payload: patch
+            });
+            say('Converted entry.');
+            await reload();
         },
     });
 }

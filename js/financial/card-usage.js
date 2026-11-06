@@ -2,33 +2,65 @@ import { cloneEl, refs } from '../shared/dom.js';
 import { setStatus } from '../shared/ui.js';
 import { supabase as sb } from '../shared/supabase.js';
 import { TABLES } from '../shared/database-config.js';
+import { writeOrQueue, nowStamp } from '../shared/sync.js';
 
 export const CARD_USAGE_TABLE = TABLES.CARD_USAGE;
 
+const CACHE_KEY = 'thecabin_card_usage_cache';
+
 let usageRows = [];
 
+export function saveToLocalCache() {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ usageRows, timestamp: Date.now() }));
+    } catch (e) {}
+}
+
+export function loadFromLocalCache() {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.usageRows)) return false;
+        usageRows = data.usageRows;
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 export async function loadCardUsageData() {
+    const hadCached = loadFromLocalCache();
+    if (hadCached) renderCardUsage();
     if (!sb) return;
     try {
         const { data, error } = await sb.from(CARD_USAGE_TABLE).select('*').order('created_at', { ascending: true });
         if (error) throw error;
         usageRows = data || [];
+        saveToLocalCache();
     } catch (err) {
         console.error('Could not load card usage:', err);
-        setStatus('Could not load card usage.');
-        usageRows = [];
+        if (!hadCached) {
+            setStatus('Could not load card usage.');
+            usageRows = [];
+        }
     }
+    renderCardUsage();
 }
 
 async function addUsage({ card_name, last_four, used_for, notes }) {
-    if (!sb) return false;
     try {
-        const { data, error } = await sb.from(CARD_USAGE_TABLE)
-            .insert([{ card_name, last_four: last_four || null, used_for, notes }])
-            .select().single();
-        if (error) throw error;
-        if (data) usageRows.push(data);
+        const id = crypto.randomUUID();
+        const row = { id, card_name, last_four: last_four || null, used_for, notes: notes || null, created_at: nowStamp() };
+        usageRows.push(row);
         renderCardUsage();
+        saveToLocalCache();
+        writeOrQueue(sb, {
+            table: CARD_USAGE_TABLE,
+            type: 'insert',
+            id,
+            payload: row
+        });
         setStatus('Added.', 'success');
         return true;
     } catch (err) {
@@ -39,12 +71,16 @@ async function addUsage({ card_name, last_four, used_for, notes }) {
 }
 
 async function deleteUsage(id) {
-    if (!sb) return false;
     try {
-        const { error } = await sb.from(CARD_USAGE_TABLE).delete().eq('id', id);
-        if (error) throw error;
         usageRows = usageRows.filter(r => r.id !== id);
         renderCardUsage();
+        saveToLocalCache();
+        writeOrQueue(sb, {
+            table: CARD_USAGE_TABLE,
+            type: 'delete',
+            id
+        });
+        setStatus('Deleted.', 'success');
         return true;
     } catch (err) {
         console.error('Could not delete card usage:', err);
@@ -73,6 +109,7 @@ export function renderCardUsage() {
 
     list.replaceChildren(...usageRows.map(buildRow));
     if (empty) empty.hidden = usageRows.length > 0;
+    saveToLocalCache();
 }
 
 export function initCardUsage() {
