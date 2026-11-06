@@ -390,6 +390,33 @@
                 </div>
             </div>
 
+            <template id="tpl-attn-meal">
+                <div class="diet-row">
+                    <strong data-ref="day"></strong>
+                    <small data-ref="count"></small>
+                    <div data-ref="slots"></div>
+                </div>
+            </template>
+
+            <template id="tpl-attn-slot">
+                <span class="attn-slot">
+                    <span data-ref="name"></span>:
+                    <button type="button" class="button-inline" data-ref="skip" data-skip-meal data-slot-name>Not eaten</button>
+                    <button type="button" class="button-inline button-ghost" data-ref="log" data-log-meal data-slot-name>Log it</button>
+                </span>
+            </template>
+
+            <template id="tpl-attn-sym">
+                <div class="diet-row">
+                    <strong data-ref="title"></strong>
+                    <small>no symptom or positive entry</small>
+                    <div>
+                        <button type="button" class="button-inline" data-ref="fine" data-fine>Felt fine</button>
+                        <button type="button" class="button-inline button-ghost" data-ref="log" data-log-sym>Log symptom</button>
+                    </div>
+                </div>
+            </template>
+
             <template id="tpl-elim-item">
                 <div class="diet-row" data-state="idle">
                     <div class="diet-row-top">
