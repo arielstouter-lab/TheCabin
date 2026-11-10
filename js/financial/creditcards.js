@@ -18,6 +18,18 @@ const BUDGET_SNAPSHOT_TABLE = TABLES.BUDGET_SNAPSHOTS;
 const CACHE_KEY = 'thecabin_financial_cache';
 const LOAD_TIMEOUT_MS = 6000;
 
+const REWARD_OVERRIDES_KEY = 'thecabin_card_reward_overrides';
+
+// The two cards the Budget tab is split across. Rows are tagged with the slot's
+// account_type (Card 1 keeps the original 'credit_cards' rows). `match` is tested
+// against the card names on the Credit Card Comparison tab to find each card's
+// reward rates; change these to switch cards.
+const CARD_SLOTS = [
+    { key: 'card1', accountType: 'credit_cards', label: 'Amex BCP', match: /bcp|blue cash/i },
+    { key: 'card2', accountType: 'credit_cards_2', label: 'Capital One Quicksilver', match: /quicksilver/i }
+];
+const isCardRow = r => CARD_SLOTS.some(slot => slot.accountType === r.account_type);
+
 const COL_CAT_ID = 'id';
 const COL_CAT_CATEGORY = 'category';
 const COL_CAT_FREQUENCY = 'frequency';
@@ -51,6 +63,23 @@ let rewardRows = [];
 let taxRows = [];
 let budgetSnapshotRows = [];
 let selectedProjectionMonth = null;
+
+// Manual monthly rewards per card slot ('card1' / 'card2'). A slot with no entry
+// uses the auto-calculated rewards. Stored on this device only.
+let rewardOverrides = loadRewardOverrides();
+
+function loadRewardOverrides() {
+    try {
+        const o = JSON.parse(localStorage.getItem(REWARD_OVERRIDES_KEY));
+        return o && typeof o === 'object' ? o : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveRewardOverrides() {
+    try { localStorage.setItem(REWARD_OVERRIDES_KEY, JSON.stringify(rewardOverrides)); } catch (e) {}
+}
 
 let realtimeChannel = null;
 let realtimeDebounceTimer = null;
@@ -92,10 +121,13 @@ function normalizeCategoryRow(r) {
     if (acc === 'bank') {
         return { ...r, category: r[COL_CAT_CATEGORY] || '', frequency, amount, notes, monthly_spend, account_type: 'bank', type: 'spending' };
     }
+    if (acc === 'credit_cards_2') {
+        return { ...r, category: r[COL_CAT_CATEGORY] || '', frequency, amount, notes, monthly_spend, account_type: 'credit_cards_2', type: 'spending' };
+    }
     return { ...r, category: r[COL_CAT_CATEGORY] || '', frequency, amount, notes, monthly_spend, account_type: 'credit_cards', type: 'spending' };
 }
 
-const spendRows = () => categoryRows.filter(r => r.account_type === 'credit_cards');
+const spendRows = () => categoryRows.filter(isCardRow); // both cards' rows
 const bankSpendRows = () => categoryRows.filter(r => r.account_type === 'bank');
 const incomeRows = () => categoryRows.filter(r => r.account_type === 'income');
 const getRentalIncomeRow = property => categoryRows.find(r => r.account_type === 'rental' && r.property === property && r.type === 'income');
@@ -106,14 +138,16 @@ const getRentalExpenseRows = property => categoryRows.filter(r => r.account_type
 // -------------------------------------------------------------------
 // rentalNets (optional): { [property]: netMonthly } overrides the live
 // rental profit calculation (used by the Budget Projection tab).
-function computeBudgetTotals(rows, rentalNets = null) {
-    const cc = rows.filter(r => r.account_type === 'credit_cards');
+// cardRewards (optional): total monthly card rewards, subtracted from spending.
+function computeBudgetTotals(rows, rentalNets = null, cardRewards = 0) {
+    const cc = rows.filter(isCardRow);
     const bank = rows.filter(r => r.account_type === 'bank');
     const inc = rows.filter(r => r.account_type === 'income');
 
     const totalCcSpend = cc.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
     const totalBankSpend = bank.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
-    const totalSpending = totalCcSpend + totalBankSpend;
+    const totalSpendingGross = totalCcSpend + totalBankSpend;
+    const totalSpending = totalSpendingGross - cardRewards;
     const regularIncome = inc.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
     const rentalProfits = RENTAL_PROPERTIES.reduce(
         (sum, prop) => sum + (rentalNets ? (rentalNets[prop] || 0) : getRentalProfit(prop)),
@@ -126,6 +160,8 @@ function computeBudgetTotals(rows, rentalNets = null) {
         income: inc,
         totalCcSpend,
         totalBankSpend,
+        totalSpendingGross,
+        cardRewards,
         totalSpending,
         regularIncome,
         rentalProfits,
@@ -134,7 +170,10 @@ function computeBudgetTotals(rows, rentalNets = null) {
     };
 }
 
-const getBudgetTotals = () => computeBudgetTotals(categoryRows);
+function getBudgetTotals() {
+    const split = computeCardSplit();
+    return { ...computeBudgetTotals(categoryRows, null, split.rewards), split };
+}
 
 // -------------------------------------------------------------------
 // Generic category-row CRUD
@@ -761,6 +800,7 @@ function renderBudgetTab() {
         onUpdate: updateCategoryRow,
         onDelete: (id, msg) => deleteCategoryRow(id, msg)
     });
+    renderCardTotals();
     renderBalanceSummary();
 }
 
@@ -768,7 +808,7 @@ function renderBalanceSummary() {
     const container = document.getElementById('balanceSummaryGrid');
     if (!container) return;
 
-    const { income, totalCcSpend, totalBankSpend, totalSpending, totalIncome, netBalance } = getBudgetTotals();
+    const { income, totalBankSpend, split, totalSpending, totalIncome, netBalance } = getBudgetTotals();
 
     const isSurplus = netBalance >= 0;
     const statusClass = isSurplus ? 'surplus' : 'deficit';
@@ -781,7 +821,7 @@ function renderBalanceSummary() {
     r.incomeFoot.textContent = `${fmt$(totalIncome * 12)}/yr · across ${income.length} source${income.length === 1 ? '' : 's'} + ${RENTAL_PROPERTIES.length} rental${RENTAL_PROPERTIES.length === 1 ? '' : 's'}`;
 
     r.spendVal.textContent = fmt$(totalSpending);
-    r.spendFoot.textContent = `CC: ${fmt$(totalCcSpend)}/mo · Bank: ${fmt$(totalBankSpend)}/mo · ${fmt$(totalSpending * 12)}/yr`;
+    r.spendFoot.textContent = `${split.blocks[0].label} ${fmt$(split.blocks[0].total)} + ${split.blocks[1].label} ${fmt$(split.blocks[1].total)} + Bank ${fmt$(totalBankSpend)} = ${fmt$(totalSpending)}/mo · ${fmt$(totalSpending * 12)}/yr`;
 
     r.netLabel.textContent = `Net Balance (${statusText})`;
     r.netVal.textContent = fmt$(netBalance);
@@ -849,6 +889,78 @@ function getEffectiveRate(cardId, category) {
 function getAnnualFee(cardId) {
     const card = cardsRows.find(c => c.id === cardId);
     return card ? (card.annual_fee || 0) : 0;
+}
+
+// -------------------------------------------------------------------
+// Budget tab: per-card totals (Card 1 / Card 2), rewards subtracted per card
+// -------------------------------------------------------------------
+// Auto rewards for one card: each category's spend × the card's rate for that
+// category (or its base rate), plus any special refund once per category.
+function autoRewardsForRows(cardId, rows) {
+    const spendByCategory = new Map();
+    rows.forEach(r => {
+        const key = (r.category || '').trim().toLowerCase();
+        spendByCategory.set(key, (spendByCategory.get(key) || 0) + (r.monthly_spend || 0));
+    });
+    let total = 0;
+    spendByCategory.forEach((spend, key) => {
+        const eff = getEffectiveRate(cardId, key);
+        total += (spend * eff.rate / 100) + eff.refund;
+    });
+    return total;
+}
+
+// rows defaults to the live Budget rows; the projection passes its own.
+// Rewards are the manual override if one is set, otherwise the auto value.
+function computeCardSplit(rows = categoryRows) {
+    const blocks = CARD_SLOTS.map(slot => {
+        const slotRows = rows.filter(r => r.account_type === slot.accountType);
+        const card = cardsRows.find(c => slot.match.test(c.name || '')) || null;
+        const spend = slotRows.reduce((sum, r) => sum + (r.monthly_spend || 0), 0);
+        const autoRewards = card ? autoRewardsForRows(card.id, slotRows) : 0;
+        const manual = rewardOverrides[slot.key];
+        const overridden = typeof manual === 'number';
+        const rewards = overridden ? manual : autoRewards;
+        return { key: slot.key, label: slot.label, card, spend, autoRewards, overridden, rewards, total: spend - rewards };
+    });
+
+    return {
+        blocks,
+        spend: blocks[0].spend + blocks[1].spend,
+        rewards: blocks[0].rewards + blocks[1].rewards,
+        total: blocks[0].total + blocks[1].total
+    };
+}
+
+function setRewardOverride(slotKey, value) {
+    if (value == null) delete rewardOverrides[slotKey];
+    else rewardOverrides[slotKey] = value;
+    saveRewardOverrides();
+    render();
+}
+
+function renderCardTotals() {
+    const round2 = n => Math.round(n * 100) / 100;
+
+    computeCardSplit().blocks.forEach(b => {
+        const subtotal = document.getElementById(`${b.key}Subtotal`);
+        const input = document.getElementById(`${b.key}RewardInput`);
+        const note = document.getElementById(`${b.key}RewardNote`);
+        const reset = document.getElementById(`${b.key}RewardReset`);
+        const total = document.getElementById(`${b.key}Total`);
+
+        if (subtotal) subtotal.textContent = fmt$(b.spend);
+        if (input && document.activeElement !== input) input.value = round2(b.rewards);
+        if (note) {
+            note.textContent = b.overridden
+                ? `manual (auto would be ${fmt$(b.autoRewards)})`
+                : (b.card
+                    ? 'auto, from Credit Card Comparison rates'
+                    : `no card matching "${b.label}" on the Credit Card Comparison tab, so no auto rewards`);
+        }
+        if (reset) reset.style.display = b.overridden ? '' : 'none';
+        if (total) total.textContent = fmt$(b.total);
+    });
 }
 
 function findBestTwoCardCombo() {
@@ -1081,7 +1193,8 @@ function renderProjectionSummary(totals) {
     r.incomeFoot.textContent = `${fmt$(totals.totalIncome * 12)}/yr`;
 
     r.spendVal.textContent = fmt$(totals.totalSpending);
-    r.spendFoot.textContent = `Credit Cards ${fmt$(totals.totalCcSpend)}/mo · Bank ${fmt$(totals.totalBankSpend)}/mo`;
+    r.spendFoot.textContent = `Credit Cards ${fmt$(totals.totalCcSpend)}/mo · Bank ${fmt$(totals.totalBankSpend)}/mo` +
+        (totals.cardRewards ? ` · Rewards −${fmt$(totals.cardRewards)}/mo` : '');
 
     r.rentalVal.textContent = fmt$(totals.rentalProfits);
     r.rentalFoot.textContent = `${fmt$(totals.rentalProfits * 12)}/yr`;
@@ -1132,7 +1245,8 @@ function renderProjection() {
         rentalNets
     });
 
-    const totals = computeBudgetTotals(projectedRows, rentalNets);
+    const split = computeCardSplit(projectedRows);
+    const totals = computeBudgetTotals(projectedRows, rentalNets, split.rewards);
     renderProjectionSummary(totals);
 }
 
@@ -1444,7 +1558,31 @@ wireAddForm({
     buttonId: 'addCategoryBtn',
     fieldIds: { category: 'newCategory', frequency: 'newCategoryFrequency', amount: 'newCategoryAmount', notes: 'newCategoryNotes' },
     requiredMessage: 'Category name is required.',
-    onAdd: v => addCategoryRow(v, { account_type: 'credit_cards', type: 'spending', addedMessage: 'Added credit card category.' })
+    onAdd: v => addCategoryRow(v, { account_type: 'credit_cards', type: 'spending', addedMessage: 'Added Card 1 category.' })
+});
+
+wireAddForm({
+    buttonId: 'addCard2CategoryBtn',
+    fieldIds: { category: 'newCard2Category', frequency: 'newCard2CategoryFrequency', amount: 'newCard2CategoryAmount', notes: 'newCard2CategoryNotes' },
+    requiredMessage: 'Category name is required.',
+    onAdd: v => addCategoryRow(v, { account_type: 'credit_cards_2', type: 'spending', addedMessage: 'Added Card 2 category.' })
+});
+
+// Rewards rows under each card: typing sets a manual amount, clearing it (or
+// "Use auto") goes back to the amount calculated from the comparison rates.
+CARD_SLOTS.forEach(slot => {
+    const input = document.getElementById(`${slot.key}RewardInput`);
+    if (input) {
+        input.addEventListener('change', () => {
+            const raw = input.value.trim();
+            setRewardOverride(slot.key, raw === '' ? null : Math.max(0, parseFloat(raw) || 0));
+        });
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        });
+    }
+    const resetBtn = document.getElementById(`${slot.key}RewardReset`);
+    if (resetBtn) resetBtn.addEventListener('click', () => setRewardOverride(slot.key, null));
 });
 
 wireAddForm({

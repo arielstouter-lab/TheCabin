@@ -50,10 +50,11 @@
             <!-- Tab 1: Budget -->
             <div id="tab-budget" class="tab-pane">
 
+                <!-- Card 1 (the original Credit Card Spending rows) -->
                 <div class="card" data-account-type="credit_cards">
                     <div class="card-head">
-                        <h2 class="card-title">Credit Card Spending</h2>
-                        <span class="note">Monthly credit card spend per category, used by credit card comparison</span>
+                        <h2 class="card-title">Card 1 &ndash; Amex BCP</h2>
+                        <span class="note">Monthly spend on this card, by category</span>
                     </div>
                     <div class="card-body">
                         <div class="table-wrap">
@@ -69,9 +70,34 @@
                                 </tr>
                                 </thead>
                                 <tbody id="spendGridBody" data-ref="gridBody"></tbody>
+                                <tfoot>
+                                <tr>
+                                    <td colspan="4"><strong>Subtotal</strong></td>
+                                    <td class="col-num" id="card1Subtotal">$0.00</td>
+                                    <td class="col-action"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4">
+                                        Rewards (subtracted)
+                                        <span class="note" id="card1RewardNote"></span>
+                                        <button type="button" class="button-inline button-ghost" id="card1RewardReset" style="display:none">Use auto</button>
+                                    </td>
+                                    <td class="col-num">
+                                        <div class="num-wrap money">
+                                            <input type="number" class="text-input" id="card1RewardInput" min="0" step="any" />
+                                        </div>
+                                    </td>
+                                    <td class="col-action"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4"><strong>Card total</strong></td>
+                                    <td class="col-num"><strong id="card1Total">$0.00</strong></td>
+                                    <td class="col-action"></td>
+                                </tr>
+                                </tfoot>
                             </table>
                         </div>
-                        <p id="spendGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No credit card categories yet &mdash; add your first one below.</p>
+                        <p id="spendGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No Card 1 categories yet &mdash; add your first one below.</p>
 
                         <div class="cc-add-form">
                             <div class="cc-add-fields">
@@ -88,6 +114,74 @@
                                 <input type="text" class="text-input note" id="newCategoryNotes" placeholder="Notes (optional)" />
                             </div>
                             <button class="button-inline" id="addCategoryBtn">Add category</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="card" data-account-type="credit_cards_2">
+                    <div class="card-head">
+                        <h2 class="card-title">Card 2 &ndash; Capital One Quicksilver</h2>
+                        <span class="note">Monthly spend on this card, by category</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="card2SpendGridBody" data-ref="gridBody"></tbody>
+                                <tfoot>
+                                <tr>
+                                    <td colspan="4"><strong>Subtotal</strong></td>
+                                    <td class="col-num" id="card2Subtotal">$0.00</td>
+                                    <td class="col-action"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4">
+                                        Rewards (subtracted)
+                                        <span class="note" id="card2RewardNote"></span>
+                                        <button type="button" class="button-inline button-ghost" id="card2RewardReset" style="display:none">Use auto</button>
+                                    </td>
+                                    <td class="col-num">
+                                        <div class="num-wrap money">
+                                            <input type="number" class="text-input" id="card2RewardInput" min="0" step="any" />
+                                        </div>
+                                    </td>
+                                    <td class="col-action"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4"><strong>Card total</strong></td>
+                                    <td class="col-num"><strong id="card2Total">$0.00</strong></td>
+                                    <td class="col-action"></td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <p id="card2SpendGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No Card 2 categories yet &mdash; add your first one below.</p>
+
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newCard2Category" placeholder="Category (e.g. Dining, Gas)" />
+                                <select class="text-input" id="newCard2CategoryFrequency">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semimonthly">Semimonthly (twice a month)</option>
+                                    <option value="biweekly">Biweekly (every other week)</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <div class="num-wrap money">
+                                    <input type="number" class="text-input" id="newCard2CategoryAmount" placeholder="Amount" min="0" step="any" />
+                                </div>
+                                <input type="text" class="text-input note" id="newCard2CategoryNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="addCard2CategoryBtn">Add category</button>
                         </div>
                     </div>
                 </div>
@@ -179,7 +273,7 @@
                 <div class="card">
                     <div class="card-head">
                         <h2 class="card-title">Monthly Budget Balance</h2>
-                        <span class="note">Total Income &minus; Total Spending = Net Balance</span>
+                        <span class="note">Total Income &minus; Total Spending (after card rewards) = Net Balance</span>
                     </div>
                     <div class="card-body">
                         <div id="balanceSummaryGrid" class="summary-grid">
@@ -189,7 +283,7 @@
                                 <div class="foot" data-ref="incomeFoot"></div>
                             </div>
                             <div class="summary-card">
-                                <div class="label">Total Spending</div>
+                                <div class="label">Total Spending (after card rewards)</div>
                                 <div class="value"><span data-ref="spendVal">$0.00</span></div>
                                 <div class="foot" data-ref="spendFoot"></div>
                             </div>
@@ -739,8 +833,8 @@
 
                 <div class="card" data-account-type="credit_cards">
                     <div class="card-head">
-                        <h2 class="card-title">Credit Card Spending</h2>
-                        <span class="note">Monthly credit card spend per category, used by credit card comparison</span>
+                        <h2 class="card-title">Card 1 &ndash; Amex BCP</h2>
+                        <span class="note">Monthly spend on this card, by category</span>
                     </div>
                     <div class="card-body">
                         <div class="table-wrap">
@@ -758,7 +852,32 @@
                                 <tbody id="projectionGridBody" data-ref="gridBody"></tbody>
                             </table>
                         </div>
-                        <p id="projectionGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No credit card categories yet &mdash; add your first one below.</p>
+                        <p id="projectionGridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No Card 1 categories yet.</p>
+                    </div>
+                </div>
+
+                <div class="card" data-account-type="credit_cards_2">
+                    <div class="card-head">
+                        <h2 class="card-title">Card 2 &ndash; Capital One Quicksilver</h2>
+                        <span class="note">Monthly spend on this card, by category</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrap">
+                            <table class="cc-table">
+                                <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Frequency</th>
+                                    <th class="col-num">Amount</th>
+                                    <th>Notes</th>
+                                    <th class="col-num">Monthly Spend</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                                </thead>
+                                <tbody id="projectionCard2GridBody" data-ref="gridBody"></tbody>
+                            </table>
+                        </div>
+                        <p id="projectionCard2GridEmpty" class="empty-state" data-ref="gridEmpty" hidden>No Card 2 categories yet.</p>
                     </div>
                 </div>
 
@@ -914,28 +1033,28 @@
             </div>
 
             <!-- Tab 7: Card Usage -->
-<div id="tab-cardusage" class="tab-pane" hidden>
-    <div class="card">
-        <div class="card-head">
-            <h2 class="card-title">Which card for what</h2>
-            <span class="note">Last four digits only, never the full number</span>
-        </div>
-        <div class="card-body">
-            <div id="cardUsageList"></div>
-            <p id="cardUsageEmpty" class="empty-state" hidden>Nothing here yet &mdash; add your first one below.</p>
+            <div id="tab-cardusage" class="tab-pane" hidden>
+                <div class="card">
+                    <div class="card-head">
+                        <h2 class="card-title">Which card for what</h2>
+                        <span class="note">Last four digits only, never the full number</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="cardUsageList"></div>
+                        <p id="cardUsageEmpty" class="empty-state" hidden>Nothing here yet &mdash; add your first one below.</p>
 
-            <div class="cc-add-form">
-                <div class="cc-add-fields">
-                    <input type="text" class="text-input" id="newUsageCard" placeholder="Card (e.g. Amex Gold)" />
-                    <input type="text" class="text-input" id="newUsageLast4" placeholder="Last 4" maxlength="4" inputmode="numeric" />
-                    <input type="text" class="text-input" id="newUsageFor" placeholder="Used for (e.g. Gas, Netflix)" />
-                    <input type="text" class="text-input note" id="newUsageNotes" placeholder="Notes (optional)" />
+                        <div class="cc-add-form">
+                            <div class="cc-add-fields">
+                                <input type="text" class="text-input" id="newUsageCard" placeholder="Card (e.g. Amex Gold)" />
+                                <input type="text" class="text-input" id="newUsageLast4" placeholder="Last 4" maxlength="4" inputmode="numeric" />
+                                <input type="text" class="text-input" id="newUsageFor" placeholder="Used for (e.g. Gas, Netflix)" />
+                                <input type="text" class="text-input note" id="newUsageNotes" placeholder="Notes (optional)" />
+                            </div>
+                            <button class="button-inline" id="addUsageBtn">Add</button>
+                        </div>
+                    </div>
                 </div>
-                <button class="button-inline" id="addUsageBtn">Add</button>
             </div>
-        </div>
-    </div>
-</div>
 
             <!-- ============ Templates ============ -->
 
@@ -1220,16 +1339,16 @@
             </template>
 
             <template id="tpl-card-usage-row">
-    <div class="lst-item lst-item-row">
+                <div class="lst-item lst-item-row">
         <span class="lst-item-text">
             <strong data-ref="usedFor"></strong><span class="note" data-ref="notes"></span>
         </span>
-        <div class="lst-actions">
-            <span class="cal-event-chips"><span class="chip" data-kind="default" data-ref="card"></span></span>
-            <button type="button" class="icon-delete" title="Delete" data-ref="del">✕</button>
-        </div>
-    </div>
-</template>
+                    <div class="lst-actions">
+                        <span class="cal-event-chips"><span class="chip" data-kind="default" data-ref="card"></span></span>
+                        <button type="button" class="icon-delete" title="Delete" data-ref="del">✕</button>
+                    </div>
+                </div>
+            </template>
 
         </section>
     </main>
