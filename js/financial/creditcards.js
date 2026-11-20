@@ -880,15 +880,28 @@ function renderCardOptions() {
 
 function getEffectiveRate(cardId, category) {
     const exact = rewardRows.find(r => r.card_id === cardId && r.category && r.category.trim().toLowerCase() === category.trim().toLowerCase());
-    if (exact) return { rate: exact.rate || 0, refund: exact.special_refund || 0, isDefault: false };
+    if (exact) return { rate: parseFloat(exact.rate) || 0, refund: parseFloat(exact.special_refund) || 0, isDefault: false };
     const card = cardsRows.find(c => c.id === cardId);
-    if (card) return { rate: card.base_rate || 0, refund: 0, isDefault: true };
+    if (card) return { rate: parseFloat(card.base_rate) || 0, refund: 0, isDefault: true };
     return { rate: 0, refund: 0, isDefault: false, none: true };
 }
 
 function getAnnualFee(cardId) {
     const card = cardsRows.find(c => c.id === cardId);
     return card ? (card.annual_fee || 0) : 0;
+}
+
+// One entry per category (case/space-insensitive), spend summed, so a flat
+// special refund counts once per card + category instead of once per budget row.
+function groupSpendByCategory(rows) {
+    const grouped = new Map();
+    rows.forEach(r => {
+        const key = (r.category || '').trim().toLowerCase();
+        const entry = grouped.get(key);
+        if (entry) entry.monthly_spend += (r.monthly_spend || 0);
+        else grouped.set(key, { category: r.category || '', monthly_spend: r.monthly_spend || 0 });
+    });
+    return [...grouped.values()];
 }
 
 // -------------------------------------------------------------------
@@ -964,7 +977,7 @@ function renderCardTotals() {
 }
 
 function findBestTwoCardCombo() {
-    const spend = spendRows();
+    const spend = groupSpendByCategory(spendRows());
     if (cardsRows.length < 2 || !spend.length) return null;
     let bestCombo = null;
 
@@ -1024,7 +1037,7 @@ function renderComparison() {
     const compareTableWrap = document.getElementById('compareTableWrap');
     const compareEmpty = document.getElementById('compareEmpty');
     const summaryGrid = document.getElementById('summaryGrid');
-    const spend = spendRows();
+    const spend = groupSpendByCategory(spendRows());
 
     if (!aId || !bId || aId === bId || !spend.length) {
         if (compareTableWrap) compareTableWrap.hidden = true;
